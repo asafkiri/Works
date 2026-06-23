@@ -305,6 +305,24 @@
   .emp-hero .eh-sub{font-size:13px;opacity:.85}
   .emp-next{display:flex;align-items:center;gap:10px;font-size:15.5px;font-weight:700}
   .emp-next .en-when{color:var(--primary)}
+  /* תיקיות גדולות בדשבורד עובד */
+  .folder.lg{padding:20px}
+  .folder.lg .f-ico{width:58px;height:58px;font-size:28px;border-radius:16px}
+  .folder.lg .f-title{font-size:17px}
+  .note-dot{display:inline-block;font-size:10px;font-weight:800;color:#fff;background:var(--danger);border-radius:999px;padding:2px 8px;margin-inline-start:6px;vertical-align:middle}
+  /* משמרות קרובות */
+  .up-item{display:flex;align-items:center;gap:10px;padding:13px;border:1px solid var(--line);border-radius:12px;margin-bottom:9px;background:#fff}
+  .up-item.once{background:var(--live-bg);border-color:var(--live-line)}
+  .up-item .ui-main{flex:1;min-width:0}
+  .up-item .ui-date{font-weight:800;font-size:14.5px}
+  .up-item .ui-time{font-size:13px;color:var(--muted);margin-top:2px}
+  .up-badge{font-size:11px;font-weight:800;border-radius:999px;padding:3px 9px;flex:0 0 auto}
+  .up-badge.rec{background:var(--primary-soft);color:var(--primary-d)}
+  .up-badge.once{background:#fff;color:var(--live-d);border:1px solid var(--live-line)}
+  /* הערות מנהל */
+  .note-card{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px;background:#fff;box-shadow:var(--shadow-sm)}
+  .note-card .nc-date{font-size:12.5px;color:var(--muted);margin-bottom:6px}
+  .note-card .nc-text{font-size:14.5px;line-height:1.55}
 </style>
 </head>
 <body>
@@ -593,25 +611,74 @@
     </div>
   </div>
   <div class="wrap">
-    <div class="card emp-hero">
-      <div class="eh-label" id="empOwedLabel">מגיע לך</div>
-      <div class="eh-amount" id="empOwed">₪0</div>
-      <div class="eh-sub" id="empOwedSub">—</div>
-    </div>
 
-    <div class="card">
-      <h2>📅 המשמרת הקרובה שלך</h2>
-      <div id="empNext"></div>
-    </div>
-
-    <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px">
-        <h2 style="margin:0">🕐 המשמרות שלי</h2>
-        <select id="empMonthSel" onchange="onEmpMonthChange()" style="max-width:170px"></select>
+    <!-- בית -->
+    <div id="empHome">
+      <div class="card emp-hero">
+        <div class="eh-label" id="empOwedLabel">מגיע לך</div>
+        <div class="eh-amount" id="empOwed">₪0</div>
+        <div class="eh-sub" id="empOwedSub">—</div>
       </div>
-      <div id="empShifts"></div>
-      <div id="empSummary"></div>
+      <div class="folder-grid">
+        <button class="folder lg" onclick="openEmpNav('pay')">
+          <span class="f-ico">💰</span>
+          <span class="f-txt"><span class="f-title">התשלומים שלי</span><span class="f-sub">פירוט חודשי, שעות וסכומים</span></span>
+          <span class="f-arr">→</span>
+        </button>
+        <button class="folder lg" onclick="openEmpNav('upcoming')">
+          <span class="f-ico">📅</span>
+          <span class="f-txt"><span class="f-title">המשמרות הקרובות שלי</span><span class="f-sub" id="empUpcomingSub">מתי אתה עובד בהמשך</span></span>
+          <span class="f-arr">→</span>
+        </button>
+        <button class="folder lg" onclick="openEmpNav('notes')">
+          <span class="f-ico">💬</span>
+          <span class="f-txt"><span class="f-title">הערות מהמנהל <span id="notesDot" class="note-dot hidden">חדש</span></span><span class="f-sub">משוב על המשמרות שלך</span></span>
+          <span class="f-arr">→</span>
+        </button>
+      </div>
     </div>
+
+    <!-- תשלומים: רשימת חודשים -->
+    <div id="empPay" class="hidden">
+      <div class="screen-head"><button class="back-btn" onclick="empNavHome()">→ חזרה</button><h1 class="screen-title">💰 התשלומים שלי</h1></div>
+      <div class="card">
+        <p class="sub">בחר חודש לצפייה בפירוט המשמרות והסכומים. מוצגים 12 החודשים האחרונים.</p>
+        <div id="empMonthFolders"></div>
+      </div>
+    </div>
+
+    <!-- תשלומים: חודש מסוים -->
+    <div id="empPayMonth" class="hidden">
+      <div class="screen-head"><button class="back-btn" onclick="openEmpNav('pay')">→ חזרה</button><h1 class="screen-title" id="empPayMonthTitle">💰</h1></div>
+      <div class="card emp-hero">
+        <div class="eh-label" id="empMonthOwedLabel">מגיע לך</div>
+        <div class="eh-amount" id="empMonthOwed">₪0</div>
+        <div class="eh-sub" id="empMonthOwedSub">—</div>
+      </div>
+      <div class="card">
+        <div id="empShifts"></div>
+        <div id="empSummary"></div>
+      </div>
+    </div>
+
+    <!-- משמרות קרובות -->
+    <div id="empUpcoming" class="hidden">
+      <div class="screen-head"><button class="back-btn" onclick="empNavHome()">→ חזרה</button><h1 class="screen-title">📅 המשמרות הקרובות שלי</h1></div>
+      <div class="card">
+        <p class="sub">משמרות קבועות וחד-פעמיות שמתוכננות לך. משמרות חד-פעמיות מסומנות בצבע.</p>
+        <div id="empUpcomingBody"></div>
+      </div>
+    </div>
+
+    <!-- הערות מנהל -->
+    <div id="empNotes" class="hidden">
+      <div class="screen-head"><button class="back-btn" onclick="empNavHome()">→ חזרה</button><h1 class="screen-title">💬 הערות מהמנהל</h1></div>
+      <div class="card">
+        <p class="sub">משוב מהמנהל מהמשמרות האחרונות שלך.</p>
+        <div id="empNotesBody"></div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -1030,7 +1097,7 @@ function enterEmployeeMode(user){
       auth.signOut();
       return;
     }
-    currentRole="employee"; currentEmpId=id; empMonthKey=null;
+    currentRole="employee"; currentEmpId=id; empMonthKey=null; empNav="home";
     $("authScreen").classList.add("hidden");
     $("app").classList.add("hidden");
     $("empApp").classList.remove("hidden");
@@ -1044,7 +1111,7 @@ function startDataListeners(){
   db.ref("employees").on("value", snap=>{ employees = snap.val() || {}; renderActive(); });
   db.ref("shifts").on("value",    snap=>{ shifts    = snap.val() || {}; renderActive(); checkAutoClose(); });
   db.ref("recurringShifts").on("value", snap=>{ recurring = snap.val() || {}; if(currentView==="console") renderSchedule(); if(currentRole==="employee") renderEmployeeDashboard(); });
-  db.ref("oneTimeShifts").on("value",   snap=>{ oneTime   = snap.val() || {}; if(currentView==="console") renderSchedule(); if(currentRole==="employee") renderEmployeeDashboard(); });
+  db.ref("oneTimeShifts").on("value",   snap=>{ oneTime   = snap.val() || {}; if(currentView==="console") renderSchedule(); if(currentRole==="employee") renderEmployeeDashboard(); if(currentRole==="manager") cleanupPastOneTimes(); });
   db.ref("config/consolePin").on("value", snap=>{
     pinConfig = snap.val() || null;
     if(currentView==="console") renderPinStatus();
@@ -1146,62 +1213,123 @@ function renderActive(){
 }
 
 /* ============================================================
-   7ב. דשבורד עובד (קריאה בלבד)
+   7ב. דשבורד עובד (קריאה בלבד) - תיקיות
    ============================================================ */
-function onEmpMonthChange(){ empMonthKey=$("empMonthSel").value; renderEmployeeDashboard(); }
+let empNav="home";       // 'home' | 'pay' | 'paymonth' | 'upcoming' | 'notes'
+let empNavMonth=null;    // מפתח החודש בתצוגת פירוט חודש
+
+function applyEmpNav(){
+  const map={home:"empHome",pay:"empPay",paymonth:"empPayMonth",upcoming:"empUpcoming",notes:"empNotes"};
+  Object.keys(map).forEach(k=>{ const el=$(map[k]); if(el) el.classList.toggle("hidden", empNav!==k); });
+}
+function empNavHome(){ empNav="home"; renderEmployeeDashboard(); try{window.scrollTo(0,0);}catch(e){} }
+function openEmpNav(name){
+  empNav=name;
+  if(name==="notes" && currentEmpId){ db.ref("employees/"+currentEmpId+"/notesSeenAt").set(TS); }
+  renderEmployeeDashboard();
+  try{window.scrollTo(0,0);}catch(e){}
+}
+function openEmpMonth(key){ empNavMonth=key; empNav="paymonth"; renderEmployeeDashboard(); try{window.scrollTo(0,0);}catch(e){} }
+
+// חישוב סיכומי חודש לעובד
+function empMonthTotals(monthKey){
+  const e=employees[currentEmpId]; const rate=e?e.hourlyRate||0:0;
+  const list=payShiftsFor(currentEmpId, monthKey);
+  let totalH=0, totalPay=0, paidPay=0;
+  list.forEach(s=>{ const h=hoursBetween(s.clockIn,s.clockOut); totalH+=h; totalPay+=h*rate; if(s.paid===true) paidPay+=h*rate; });
+  return {list, totalH, totalPay, paidPay, remaining:totalPay-paidPay, rate};
+}
 
 function renderEmployeeDashboard(){
   if(currentRole!=="employee" || !currentEmpId) return;
   const e=employees[currentEmpId];
   if(!e){ return; } // הנתונים עדיין נטענים
-  const rate=e.hourlyRate||0;
   $("empHello").textContent="שלום, "+e.name+" 👋";
 
-  // בורר חודש
-  const months=monthsForEmp(currentEmpId);
-  if(!empMonthKey || months.indexOf(empMonthKey)===-1){
-    empMonthKey = months.indexOf(currentMonthKey())!==-1 ? currentMonthKey() : months[0];
-  }
-  $("empMonthSel").innerHTML=months.map(k=>`<option value="${k}" ${k===empMonthKey?'selected':''}>${monthLabel(k)}</option>`).join("");
+  // --- בית: כרטיס "מגיע לך" לחודש הנוכחי ---
+  const cur=empMonthTotals(currentMonthKey());
+  $("empOwedLabel").textContent="מגיע לך · "+monthLabel(currentMonthKey());
+  $("empOwed").textContent="₪"+cur.remaining.toFixed(0);
+  $("empOwedSub").textContent=`${fmtHours(cur.totalH)} · סך הכל ₪${cur.totalPay.toFixed(0)} · שולם ₪${cur.paidPay.toFixed(0)}`;
 
-  // משמרות החודש הנבחר
-  const list=payShiftsFor(currentEmpId, empMonthKey);
-  let totalH=0, totalPay=0, paidPay=0;
-  const rows=list.map(s=>{
-    const h=hoursBetween(s.clockIn, s.clockOut);
-    const amt=h*rate; totalH+=h; totalPay+=amt;
-    const isPaid=s.paid===true; if(isPaid) paidPay+=amt;
-    return `<div class="pay-line ${isPaid?'paid':''}">
-      <div class="pl-main">
-        <div class="pl-date">${fmtDate(s.clockIn)} ${isPaid?'<span class="badge-paid">שולם ✓</span>':''}</div>
-        <div class="pl-times">${fmtTime(s.clockIn)} ← ${fmtTime(s.clockOut)} · ${fmtHours(h)}</div>
+  // --- תיקיות חודשים (12 אחרונים) ---
+  const months=monthsForEmp(currentEmpId).slice(0,12);
+  $("empMonthFolders").innerHTML = months.map(k=>{
+    const t=empMonthTotals(k);
+    return `<button class="folder" onclick="openEmpMonth('${k}')">
+      <span class="f-ico">🗓️</span>
+      <span class="f-txt"><span class="f-title">${monthLabel(k)}</span><span class="f-sub">${fmtHours(t.totalH)} · מגיע ₪${t.remaining.toFixed(0)}</span></span>
+      <span class="f-arr">→</span>
+    </button>`;
+  }).join("") || '<div class="empty">אין נתונים עדיין.</div>';
+
+  // --- משמרות קרובות ---
+  const up=computeUpcomingForEmp(currentEmpId, 6);
+  $("empUpcomingSub").textContent = up.length ? `${up.length} משמרות מתוכננות` : "אין משמרות קרובות";
+  $("empUpcomingBody").innerHTML = up.length ? up.map(u=>{
+    const once=u.type==='once';
+    return `<div class="up-item ${once?'once':''}">
+      <div class="ui-main">
+        <div class="ui-date">${fmtIsoShort(u.date)}</div>
+        <div class="ui-time">${u.startTime}–${u.endTime}</div>
       </div>
-      <div class="pl-amt">₪${amt.toFixed(0)}</div>
+      <span class="up-badge ${once?'once':'rec'}">${once?'חד-פעמית':'קבועה'}</span>
     </div>`;
-  }).join("");
-  const remaining=totalPay-paidPay;
+  }).join("") : '<div class="empty">אין משמרות קרובות בסידור.</div>';
 
-  // כרטיס עליון - מגיע לך
-  $("empOwedLabel").textContent="מגיע לך · "+monthLabel(empMonthKey);
-  $("empOwed").textContent="₪"+remaining.toFixed(0);
-  $("empOwedSub").textContent=`${fmtHours(totalH)} · סך הכל ₪${totalPay.toFixed(0)} · שולם ₪${paidPay.toFixed(0)}`;
+  // --- הערות מנהל: מ-3 המשמרות האחרונות שיש בהן משוב ---
+  const notes=Object.keys(shifts).map(id=>({id,...shifts[id]}))
+    .filter(s=> s.employeeId===currentEmpId && s.managerFeedback && s.managerFeedback.trim()!=="")
+    .sort((a,b)=>(b.clockIn||0)-(a.clockIn||0))
+    .slice(0,3);
+  $("empNotesBody").innerHTML = notes.length ? notes.map(s=>`
+    <div class="note-card">
+      <div class="nc-date">${fmtDate(s.clockIn)} · ${fmtTime(s.clockIn)}–${s.clockOut?fmtTime(s.clockOut):'—'}</div>
+      <div class="nc-text">${esc(s.managerFeedback)}</div>
+    </div>`).join("") : '<div class="empty">אין הערות מהמנהל כרגע.</div>';
 
-  // המשמרת הקרובה
-  const up=computeUpcomingForEmp(currentEmpId, 5);
-  $("empNext").innerHTML = up.length
-    ? `<div class="emp-next"><span class="en-when">${fmtIsoShort(up[0].date)}</span><span class="meta">${up[0].startTime}–${up[0].endTime} · ${up[0].type==='once'?'חד-פעמית':'קבועה'}</span></div>`
-    : '<div class="empty">אין משמרות קרובות בסידור.</div>';
+  // חיווי "הערה חדשה" - אם יש משוב שעודכן אחרי שהעובד צפה לאחרונה
+  const seenAt = e.notesSeenAt || 0;
+  const hasNew = Object.values(shifts).some(s=> s.employeeId===currentEmpId && s.managerFeedback && s.managerFeedback.trim()!=="" && (s.feedbackAt||0) > seenAt);
+  const dot=$("notesDot"); if(dot) dot.classList.toggle("hidden", !hasNew);
 
-  // רשימת המשמרות + סיכום
-  $("empShifts").innerHTML = list.length ? rows
-    : `<div class="empty">אין משמרות סגורות ב${monthLabel(empMonthKey)}.</div>`;
-  $("empSummary").innerHTML = list.length ? `
-    <div class="pay-sum">
-      <div class="ps-row"><span>סך שעות החודש</span><span>${fmtHours(totalH)}</span></div>
-      <div class="ps-row big"><span>סך הכל</span><span>₪${totalPay.toFixed(0)}</span></div>
-      <div class="ps-row"><span>שולם</span><span>₪${paidPay.toFixed(0)}</span></div>
-      <div class="ps-row big"><span>נותר לתשלום</span><span class="rem">₪${remaining.toFixed(0)}</span></div>
-    </div>` : '';
+  // --- פירוט חודש נבחר ---
+  if(empNav==="paymonth"){
+    if(!empNavMonth) empNavMonth=currentMonthKey();
+    const t=empMonthTotals(empNavMonth);
+    $("empPayMonthTitle").textContent="💰 "+monthLabel(empNavMonth);
+    $("empMonthOwedLabel").textContent="מגיע לך · "+monthLabel(empNavMonth);
+    $("empMonthOwed").textContent="₪"+t.remaining.toFixed(0);
+    $("empMonthOwedSub").textContent=`${fmtHours(t.totalH)} · סך הכל ₪${t.totalPay.toFixed(0)} · שולם ₪${t.paidPay.toFixed(0)}`;
+    $("empShifts").innerHTML = t.list.length ? t.list.map(s=>{
+      const h=hoursBetween(s.clockIn,s.clockOut); const amt=h*t.rate; const isPaid=s.paid===true;
+      return `<div class="pay-line ${isPaid?'paid':''}">
+        <div class="pl-main">
+          <div class="pl-date">${fmtDate(s.clockIn)} ${isPaid?'<span class="badge-paid">שולם ✓</span>':''}</div>
+          <div class="pl-times">${fmtTime(s.clockIn)} ← ${fmtTime(s.clockOut)} · ${fmtHours(h)}</div>
+        </div>
+        <div class="pl-amt">₪${amt.toFixed(0)}</div>
+      </div>`;
+    }).join("") : `<div class="empty">אין משמרות סגורות ב${monthLabel(empNavMonth)}.</div>`;
+    $("empSummary").innerHTML = t.list.length ? `
+      <div class="pay-sum">
+        <div class="ps-row"><span>סך שעות החודש</span><span>${fmtHours(t.totalH)}</span></div>
+        <div class="ps-row big"><span>סך הכל</span><span>₪${t.totalPay.toFixed(0)}</span></div>
+        <div class="ps-row"><span>שולם</span><span>₪${t.paidPay.toFixed(0)}</span></div>
+        <div class="ps-row big"><span>נותר לתשלום</span><span class="rem">₪${t.remaining.toFixed(0)}</span></div>
+      </div>` : '';
+  }
+
+  applyEmpNav();
+}
+
+// מחיקת משמרות חד-פעמיות שתאריכן עבר (תוכנית בלבד - בטוח למחוק)
+function cleanupPastOneTimes(){
+  const today=isoDate(new Date());
+  Object.keys(oneTime).forEach(id=>{
+    const o=oneTime[id];
+    if(o && o.date && o.date < today){ db.ref("oneTimeShifts/"+id).remove(); }
+  });
 }
 
 /* ============================================================
@@ -1777,7 +1905,7 @@ function toggleActive(empId){
 
 function saveFeedback(shiftId){
   const v=$("fb_"+shiftId).value.trim();
-  db.ref("shifts/"+shiftId+"/managerFeedback").set(v).then(()=>toast("המשוב נשמר ✓"));
+  db.ref("shifts/"+shiftId).update({ managerFeedback:v, feedbackAt: v?TS:null }).then(()=>toast("המשוב נשמר ✓"));
 }
 
 function deleteShift(shiftId){
