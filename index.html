@@ -298,6 +298,13 @@
     #printArea{display:block !important}
     @page{margin:14mm}
   }
+  /* ---------- דשבורד עובד ---------- */
+  .emp-hero{background:linear-gradient(135deg, var(--primary) 0%, var(--primary-d) 100%);border:none;color:#fff;text-align:center;padding:28px 20px}
+  .emp-hero .eh-label{font-size:14px;font-weight:700;opacity:.9}
+  .emp-hero .eh-amount{font-size:46px;font-weight:800;letter-spacing:-.02em;margin:6px 0 4px;font-variant-numeric:tabular-nums}
+  .emp-hero .eh-sub{font-size:13px;opacity:.85}
+  .emp-next{display:flex;align-items:center;gap:10px;font-size:15.5px;font-weight:700}
+  .emp-next .en-when{color:var(--primary)}
 </style>
 </head>
 <body>
@@ -577,6 +584,37 @@
   </div>
 </div>
 
+<!-- ============================ דשבורד עובד ============================ -->
+<div id="empApp" class="hidden">
+  <div class="topbar">
+    <div class="brand"><span class="dot"></span> <span id="empHello">שלום</span></div>
+    <div class="topbar-actions">
+      <button class="ghost" onclick="doLogout()">יציאה</button>
+    </div>
+  </div>
+  <div class="wrap">
+    <div class="card emp-hero">
+      <div class="eh-label" id="empOwedLabel">מגיע לך</div>
+      <div class="eh-amount" id="empOwed">₪0</div>
+      <div class="eh-sub" id="empOwedSub">—</div>
+    </div>
+
+    <div class="card">
+      <h2>📅 המשמרת הקרובה שלך</h2>
+      <div id="empNext"></div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+        <h2 style="margin:0">🕐 המשמרות שלי</h2>
+        <select id="empMonthSel" onchange="onEmpMonthChange()" style="max-width:170px"></select>
+      </div>
+      <div id="empShifts"></div>
+      <div id="empSummary"></div>
+    </div>
+  </div>
+</div>
+
 <!-- ============================ מודאל: הערת סיום משמרת ============================ -->
 <div id="noteModal" class="modal-bg">
   <div class="modal">
@@ -777,6 +815,12 @@ let payView="list";   let paySubEmpId=null;
 let schedView="list"; let schedSubEmpId=null;
 let empView="list";   let empSubId=null;
 
+// זיהוי תפקיד המשתמש המחובר
+let currentRole=null;     // 'manager' | 'employee'
+let currentEmpId=null;    // מזהה רשומת העובד המחובר (במצב עובד)
+let suppressRouting=false;// השהיית ניתוב בזמן יצירת חשבון עובד בכניסה ראשונה
+let empMonthKey=null;     // החודש הנבחר בדשבורד העובד
+
 // --- בורר שכר ותשלומים ---
 let paySelMonthKey = null; // החודש הנבחר ("YYYY-MM")
 
@@ -863,9 +907,59 @@ function handleAuthSubmit(){
       )
       .catch(err => showErr(authErrText(err)));
   } else {
-    auth.signInWithEmailAndPassword(uname(u), p)
-      .catch(err => showErr(authErrText(err)));
+    doLogin(u, p);
   }
+}
+
+// התחברות (מנהל או עובד) - מסך אחד שמזהה לבד
+function doLogin(u, p){
+  const email=uname(u);
+  auth.signInWithEmailAndPassword(email, p)
+    .then(()=>{ /* onAuthStateChanged ינתב למסך הנכון */ })
+    .catch(err=>{
+      const c=err.code||"";
+      // ייתכן כניסה ראשונה של עובד (אין עדיין חשבון) -> ננסה ליצור ולקשר
+      if(c.includes("user-not-found") || c.includes("invalid-credential") || c.includes("invalid-login-credentials")){
+        firstEmployeeLogin(u, p);
+      } else if(c.includes("wrong-password")){
+        showErr("שם משתמש או סיסמה שגויים.");
+      } else {
+        showErr(authErrText(err));
+      }
+    });
+}
+
+// כניסה ראשונה של עובד: יוצרים חשבון, ומקשרים לרשומת העובד רק אם הסיסמה תואמת
+function firstEmployeeLogin(u, p){
+  const email=uname(u);
+  suppressRouting=true; // לא לנתב עד שנסיים לקשר
+  auth.createUserWithEmailAndPassword(email, p)
+    .then(cred=>{
+      // עכשיו מחוברים כמשתמש החדש - אפשר לקרוא את רשומות העובדים
+      return db.ref("employees").once("value").then(snap=>{
+        const emps=snap.val()||{};
+        let id=null;
+        Object.keys(emps).forEach(k=>{ if((emps[k].username||"").toLowerCase()===u.toLowerCase()) id=k; });
+        if(id && emps[id].tempPassword===p && emps[id].linked!==true){
+          // קישור תקין: שומרים את ה-uid ומסמנים כמקושר
+          return db.ref("employees/"+id).update({ authUid:cred.user.uid, linked:true })
+            .then(()=>{ suppressRouting=false; routeAfterLogin(cred.user); });
+        } else {
+          // אין רשומת עובד תואמת או הסיסמה שגויה -> מבטלים את החשבון שנוצר
+          return cred.user.delete().then(()=>{
+            suppressRouting=false;
+            showErr("שם משתמש או סיסמה שגויים.");
+          });
+        }
+      });
+    })
+    .catch(err=>{
+      suppressRouting=false;
+      const c=err.code||"";
+      if(c.includes("email-already-in-use")) showErr("שם משתמש או סיסמה שגויים.");
+      else if(c.includes("weak-password")) showErr("הסיסמה קצרה מדי (לפחות 6 תווים).");
+      else showErr(authErrText(err));
+    });
 }
 
 function authErrText(err){
@@ -884,13 +978,13 @@ function doLogout(){ if(auth) auth.signOut(); }
    ============================================================ */
 if(auth){
   auth.onAuthStateChanged(user=>{
+    if(suppressRouting) return; // בזמן יצירת חשבון עובד - לא לנתב עדיין
     if(user){
-      $("authScreen").classList.add("hidden");
-      $("app").classList.remove("hidden");
-      $("configBanner").classList.add("hidden");
-      startDataListeners();
+      routeAfterLogin(user);
     } else {
+      currentRole=null; currentEmpId=null;
       $("app").classList.add("hidden");
+      $("empApp").classList.add("hidden");
       $("authScreen").classList.remove("hidden");
     }
   });
@@ -899,13 +993,60 @@ if(auth){
   showErr("יש להזין את הגדרות Firebase בקובץ כדי להפעיל את האפליקציה.");
 }
 
+// ניתוב אחרי התחברות: מנהל -> קונסולה; עובד -> דשבורד אישי
+function routeAfterLogin(user){
+  db.ref("config/managerUid").once("value").then(snap=>{
+    const mgr=snap.val();
+    if(mgr && mgr===user.uid){
+      currentRole="manager"; currentEmpId=null;
+      $("authScreen").classList.add("hidden");
+      $("empApp").classList.add("hidden");
+      $("app").classList.remove("hidden");
+      $("configBanner").classList.add("hidden");
+      startDataListeners();
+    } else {
+      enterEmployeeMode(user);
+    }
+  }).catch(()=> showErr("שגיאה בטעינה. נסה שוב."));
+}
+
+// כניסה למצב עובד: מאתרים את רשומת העובד המקושרת ומציגים את הדשבורד
+function enterEmployeeMode(user){
+  startDataListeners();
+  db.ref("employees").once("value").then(snap=>{
+    const emps=snap.val()||{};
+    let id=null;
+    // קודם לפי authUid
+    Object.keys(emps).forEach(k=>{ if(emps[k].authUid===user.uid) id=k; });
+    // גיבוי: לפי שם המשתמש (אם הקישור עוד לא נשמר) - ולקשר
+    if(!id){
+      const local=(user.email||"").split("@")[0].toLowerCase();
+      Object.keys(emps).forEach(k=>{ if((emps[k].username||"").toLowerCase()===local && emps[k].linked!==true) id=k; });
+      if(id) db.ref("employees/"+id).update({ authUid:user.uid, linked:true });
+    }
+    if(!id){
+      // אין רשומת עובד מקושרת - לא חשבון תקין במערכת
+      $("app").classList.add("hidden"); $("empApp").classList.add("hidden");
+      $("authScreen").classList.remove("hidden");
+      showErr("החשבון אינו משויך לעובד במערכת. פנה למנהל.");
+      auth.signOut();
+      return;
+    }
+    currentRole="employee"; currentEmpId=id; empMonthKey=null;
+    $("authScreen").classList.add("hidden");
+    $("app").classList.add("hidden");
+    $("empApp").classList.remove("hidden");
+    renderEmployeeDashboard();
+  });
+}
+
 let listenersStarted=false;
 function startDataListeners(){
   if(listenersStarted) return; listenersStarted=true;
   db.ref("employees").on("value", snap=>{ employees = snap.val() || {}; renderActive(); });
   db.ref("shifts").on("value",    snap=>{ shifts    = snap.val() || {}; renderActive(); checkAutoClose(); });
-  db.ref("recurringShifts").on("value", snap=>{ recurring = snap.val() || {}; if(currentView==="console") renderSchedule(); });
-  db.ref("oneTimeShifts").on("value",   snap=>{ oneTime   = snap.val() || {}; if(currentView==="console") renderSchedule(); });
+  db.ref("recurringShifts").on("value", snap=>{ recurring = snap.val() || {}; if(currentView==="console") renderSchedule(); if(currentRole==="employee") renderEmployeeDashboard(); });
+  db.ref("oneTimeShifts").on("value",   snap=>{ oneTime   = snap.val() || {}; if(currentView==="console") renderSchedule(); if(currentRole==="employee") renderEmployeeDashboard(); });
   db.ref("config/consolePin").on("value", snap=>{
     pinConfig = snap.val() || null;
     if(currentView==="console") renderPinStatus();
@@ -1001,8 +1142,68 @@ function renderPinStatus(){
   }
 }
 function renderActive(){
+  if(currentRole==="employee"){ renderEmployeeDashboard(); return; }
   if(currentView==="console") renderConsole();
   else renderTerminal();
+}
+
+/* ============================================================
+   7ב. דשבורד עובד (קריאה בלבד)
+   ============================================================ */
+function onEmpMonthChange(){ empMonthKey=$("empMonthSel").value; renderEmployeeDashboard(); }
+
+function renderEmployeeDashboard(){
+  if(currentRole!=="employee" || !currentEmpId) return;
+  const e=employees[currentEmpId];
+  if(!e){ return; } // הנתונים עדיין נטענים
+  const rate=e.hourlyRate||0;
+  $("empHello").textContent="שלום, "+e.name+" 👋";
+
+  // בורר חודש
+  const months=monthsForEmp(currentEmpId);
+  if(!empMonthKey || months.indexOf(empMonthKey)===-1){
+    empMonthKey = months.indexOf(currentMonthKey())!==-1 ? currentMonthKey() : months[0];
+  }
+  $("empMonthSel").innerHTML=months.map(k=>`<option value="${k}" ${k===empMonthKey?'selected':''}>${monthLabel(k)}</option>`).join("");
+
+  // משמרות החודש הנבחר
+  const list=payShiftsFor(currentEmpId, empMonthKey);
+  let totalH=0, totalPay=0, paidPay=0;
+  const rows=list.map(s=>{
+    const h=hoursBetween(s.clockIn, s.clockOut);
+    const amt=h*rate; totalH+=h; totalPay+=amt;
+    const isPaid=s.paid===true; if(isPaid) paidPay+=amt;
+    return `<div class="pay-line ${isPaid?'paid':''}">
+      <div class="pl-main">
+        <div class="pl-date">${fmtDate(s.clockIn)} ${isPaid?'<span class="badge-paid">שולם ✓</span>':''}</div>
+        <div class="pl-times">${fmtTime(s.clockIn)} ← ${fmtTime(s.clockOut)} · ${fmtHours(h)}</div>
+      </div>
+      <div class="pl-amt">₪${amt.toFixed(0)}</div>
+    </div>`;
+  }).join("");
+  const remaining=totalPay-paidPay;
+
+  // כרטיס עליון - מגיע לך
+  $("empOwedLabel").textContent="מגיע לך · "+monthLabel(empMonthKey);
+  $("empOwed").textContent="₪"+remaining.toFixed(0);
+  $("empOwedSub").textContent=`${fmtHours(totalH)} · סך הכל ₪${totalPay.toFixed(0)} · שולם ₪${paidPay.toFixed(0)}`;
+
+  // המשמרת הקרובה
+  const up=computeUpcomingForEmp(currentEmpId, 5);
+  $("empNext").innerHTML = up.length
+    ? `<div class="emp-next"><span class="en-when">${fmtIsoShort(up[0].date)}</span><span class="meta">${up[0].startTime}–${up[0].endTime} · ${up[0].type==='once'?'חד-פעמית':'קבועה'}</span></div>`
+    : '<div class="empty">אין משמרות קרובות בסידור.</div>';
+
+  // רשימת המשמרות + סיכום
+  $("empShifts").innerHTML = list.length ? rows
+    : `<div class="empty">אין משמרות סגורות ב${monthLabel(empMonthKey)}.</div>`;
+  $("empSummary").innerHTML = list.length ? `
+    <div class="pay-sum">
+      <div class="ps-row"><span>סך שעות החודש</span><span>${fmtHours(totalH)}</span></div>
+      <div class="ps-row big"><span>סך הכל</span><span>₪${totalPay.toFixed(0)}</span></div>
+      <div class="ps-row"><span>שולם</span><span>₪${paidPay.toFixed(0)}</span></div>
+      <div class="ps-row big"><span>נותר לתשלום</span><span class="rem">₪${remaining.toFixed(0)}</span></div>
+    </div>` : '';
 }
 
 /* ============================================================
@@ -1201,7 +1402,7 @@ function empDetailHtml(e){
          <div class="det-k"><div class="det-lbl">שם משתמש לדשבורד</div><div class="det-val">${loginVal}</div></div>
        </div>
        <div class="det-row">
-         <div class="det-k"><div class="det-lbl">סיסמה</div><div class="det-val">${(!linked&&e.tempPassword)?esc(e.tempPassword):'•••• (מוסתרת אחרי התחברות)'}</div></div>
+         <div class="det-k"><div class="det-lbl">סיסמה</div><div class="det-val">${e.tempPassword?esc(e.tempPassword):'—'}</div></div>
          <button class="btn line sm" onclick="resetEmpPass('${e.id}')">אפס סיסמה</button>
        </div>`
     : `<div class="det-row">
