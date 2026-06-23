@@ -512,14 +512,22 @@ function handleAuthSubmit(){
   }
 
   if(authMode==="signup"){
-    // לוודא שלא קיים כבר מנהל
-    db.ref("config/managerUid").once("value").then(snap=>{
-      if(snap.exists()){ showErr("כבר קיים חשבון מנהל. עבור להתחברות."); return; }
-      auth.createUserWithEmailAndPassword(uname(u), p)
-        .then(cred => db.ref("config/managerUid").set(cred.user.uid))
-        .then(()=> toast("חשבון המנהל נוצר"))
-        .catch(err => showErr(authErrText(err)));
-    });
+    // יוצרים קודם את המשתמש (זה מחבר אותו), ורק אז קוראים/כותבים את config -
+    // כי החוקים דורשים התחברות לכל קריאה, אז אי אפשר לבדוק את config לפני ההתחברות.
+    auth.createUserWithEmailAndPassword(uname(u), p)
+      .then(cred =>
+        db.ref("config/managerUid").once("value").then(snap=>{
+          if(snap.exists()){
+            // כבר קיים מנהל אחר - מבטלים את החשבון שזה עתה נוצר
+            return cred.user.delete().then(()=>{
+              showErr("כבר קיים חשבון מנהל. עבור להתחברות.");
+            });
+          }
+          return db.ref("config/managerUid").set(cred.user.uid)
+            .then(()=> toast("חשבון המנהל נוצר ✓"));
+        })
+      )
+      .catch(err => showErr(authErrText(err)));
   } else {
     auth.signInWithEmailAndPassword(uname(u), p)
       .catch(err => showErr(authErrText(err)));
