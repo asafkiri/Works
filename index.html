@@ -16,194 +16,270 @@
 
 <style>
   :root{
-    --ink:#14181f;          /* טקסט ראשי / רקע כהה */
-    --muted:#6b7280;        /* טקסט משני */
-    --paper:#f7f6f2;        /* רקע */
+    --ink:#1d2330;          /* טקסט ראשי */
+    --ink-soft:#3a4254;     /* טקסט כהה משני */
+    --muted:#7b8499;        /* טקסט עמום */
+    --paper:#f5f3ee;        /* רקע חמים */
     --panel:#ffffff;        /* כרטיסים */
-    --line:#e6e3dc;         /* קווי הפרדה */
-    --primary:#0f6e66;      /* פעולה ראשית (טורקיז) */
-    --primary-d:#0b524c;
-    --live:#e8a317;         /* "במשמרת" (ענבר) */
-    --live-bg:#fdf4e2;
-    --danger:#c2410c;       /* דגל בעיה / מחיקה */
-    --danger-bg:#fdeee7;
+    --line:#eae6dd;         /* קווי הפרדה עדינים */
+    --line-2:#ddd8cd;       /* קו מודגש מעט */
+    --primary:#0f6e66;      /* טורקיז - פעולה ראשית */
+    --primary-d:#0b524c;    /* טורקיז כהה (hover) */
+    --primary-soft:#e6f1ef; /* רקע טורקיז עדין */
+    --primary-ring:rgba(15,110,102,.16);
+    --live:#e0930f;         /* ענבר - "במשמרת" */
+    --live-d:#a6700a;
+    --live-bg:#fdf4e1;
+    --live-line:#f0d391;
+    --danger:#c2410c;       /* מחיקה / בעיה */
+    --danger-bg:#fceee7;
+    --danger-line:#f3c9b6;
     --ok:#1f9d63;
-    --radius:14px;
-    --shadow:0 1px 2px rgba(20,24,31,.06), 0 8px 24px rgba(20,24,31,.06);
-    font-family:"Segoe UI","Arial Hebrew","Helvetica Neue",Arial,sans-serif;
+    --ok-bg:#eaf7f0;
+    --ok-line:#cfe9da;
+    --r-sm:10px;
+    --r:14px;
+    --r-lg:18px;
+    --r-xl:22px;
+    --shadow-sm:0 1px 2px rgba(20,24,31,.05);
+    --shadow:0 1px 3px rgba(20,24,31,.05), 0 6px 20px rgba(20,24,31,.05);
+    --shadow-lg:0 14px 44px rgba(20,24,31,.16);
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI","Helvetica Neue","Arial Hebrew",Arial,sans-serif;
   }
   *{box-sizing:border-box}
   html,body{margin:0;padding:0}
-  body{background:var(--paper);color:var(--ink);-webkit-tap-highlight-color:transparent}
+  body{background:var(--paper);color:var(--ink);-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 
-  /* ---------- כותרת עליונה ---------- */
+  /* ---------- כותרת עליונה (בהירה) ---------- */
   .topbar{
     position:sticky;top:0;z-index:30;
-    background:var(--ink);color:#fff;
+    background:rgba(255,255,255,.9);
+    -webkit-backdrop-filter:saturate(1.6) blur(12px);backdrop-filter:saturate(1.6) blur(12px);
+    border-bottom:1px solid var(--line);
     display:flex;align-items:center;justify-content:space-between;
-    padding:12px 16px;gap:12px;
+    padding:11px 16px;gap:12px;
   }
-  .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;letter-spacing:.2px}
-  .brand .dot{width:10px;height:10px;border-radius:50%;background:var(--live);box-shadow:0 0 0 4px rgba(232,163,23,.18)}
+  .brand{display:flex;align-items:center;gap:9px;font-weight:800;font-size:16px;letter-spacing:-.01em;color:var(--ink)}
+  .brand .dot{width:10px;height:10px;border-radius:50%;background:var(--live);box-shadow:0 0 0 4px rgba(224,147,15,.16)}
   .topbar-actions{display:flex;align-items:center;gap:8px}
-
-  .seg{display:inline-flex;background:rgba(255,255,255,.10);border-radius:10px;padding:3px}
+  .seg{display:inline-flex;background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:3px}
   .seg button{
-    border:0;background:transparent;color:#cdd2da;
-    padding:7px 14px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;
+    border:0;background:transparent;color:var(--muted);
+    padding:7px 14px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;transition:.15s;font-family:inherit;
   }
-  .seg button.on{background:#fff;color:var(--ink)}
-
+  .seg button.on{background:#fff;color:var(--ink);box-shadow:var(--shadow-sm)}
   .ghost{
-    border:1px solid rgba(255,255,255,.25);background:transparent;color:#fff;
-    padding:7px 12px;border-radius:9px;font-size:13px;cursor:pointer;font-weight:600;
+    border:1px solid var(--line);background:#fff;color:var(--ink-soft);
+    padding:7px 12px;border-radius:10px;font-size:13px;cursor:pointer;font-weight:700;transition:.15s;font-family:inherit;
   }
-  .ghost:hover{background:rgba(255,255,255,.10)}
+  .ghost:hover{background:var(--paper)}
 
   /* ---------- פריסה ---------- */
-  .wrap{max-width:1040px;margin:0 auto;padding:18px 16px 60px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;margin-bottom:18px}
-  .card h2{margin:0 0 4px;font-size:17px}
-  .card .sub{color:var(--muted);font-size:13px;margin:0 0 14px}
-  .section-title{font-size:13px;font-weight:700;color:var(--muted);letter-spacing:.4px;text-transform:none;margin:0 0 10px}
+  .wrap{max-width:920px;margin:0 auto;padding:20px 16px 72px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:20px;margin-bottom:16px}
+  .card h2{margin:0 0 5px;font-size:18px;font-weight:800;letter-spacing:-.01em}
+  .card .sub{color:var(--muted);font-size:13px;margin:0 0 16px;line-height:1.55}
+  .section-title{font-size:12.5px;font-weight:800;color:var(--muted);letter-spacing:.02em;margin:0 0 10px}
 
   /* ---------- כפתורים / שדות ---------- */
   .btn{
-    border:0;border-radius:11px;padding:11px 16px;font-size:15px;font-weight:700;cursor:pointer;
-    background:var(--primary);color:#fff;transition:.15s;
+    border:0;border-radius:12px;padding:12px 18px;font-size:15px;font-weight:700;cursor:pointer;
+    background:var(--primary);color:#fff;transition:.15s;font-family:inherit;
+    box-shadow:0 1px 2px rgba(15,110,102,.22);
   }
   .btn:hover{background:var(--primary-d)}
-  .btn:disabled{opacity:.5;cursor:default}
-  .btn.sm{padding:8px 12px;font-size:13px;border-radius:9px}
-  .btn.line{background:#fff;color:var(--ink);border:1px solid var(--line)}
-  .btn.line:hover{background:#faf9f6}
-  .btn.danger{background:var(--danger-bg);color:var(--danger)}
-  .btn.danger:hover{filter:brightness(.97)}
+  .btn:active{transform:translateY(1px)}
+  .btn:disabled{opacity:.45;cursor:default;box-shadow:none}
+  .btn.sm{padding:8px 13px;font-size:13px;border-radius:10px;box-shadow:none}
+  .btn.line{background:#fff;color:var(--ink);border:1px solid var(--line-2);box-shadow:none}
+  .btn.line:hover{background:var(--paper)}
+  .btn.danger{background:var(--danger-bg);color:var(--danger);box-shadow:none}
+  .btn.danger:hover{filter:brightness(.98)}
 
-  label.fld{display:block;font-size:13px;font-weight:600;color:#374151;margin:0 0 5px}
+  label.fld{display:block;font-size:13px;font-weight:700;color:var(--ink-soft);margin:0 0 6px}
   input[type=text],input[type=password],input[type=number],input[type=datetime-local],input[type=time],input[type=date],select,textarea{
-    width:100%;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:15px;
-    background:#fff;color:var(--ink);font-family:inherit;
+    width:100%;border:1px solid var(--line-2);border-radius:11px;padding:11px 13px;font-size:15px;
+    background:#fff;color:var(--ink);font-family:inherit;transition:.15s;
   }
-  input:focus,select:focus,textarea:focus{outline:2px solid rgba(15,110,102,.35);border-color:var(--primary)}
-
-  /* ---------- סידור עבודה ---------- */
-  .sched-block{margin-top:6px}
-  .sched-sub{font-size:12.5px;font-weight:700;color:var(--muted);margin:14px 0 8px}
-  .sched-row{display:flex;align-items:center;gap:8px;padding:11px;border:1px solid var(--line);border-radius:11px;margin-bottom:9px;background:#fff;flex-wrap:wrap}
-  .sched-row .info{flex:1;min-width:140px}
-  .sched-row .info .t1{font-weight:700;font-size:14.5px}
-  .sched-row .info .t2{font-size:12.5px;color:var(--muted);margin-top:2px}
-  .sched-row.recurring{background:#f4faf9;border-color:#cfe7e3}
-  .day-picker{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
-  .day-picker label{cursor:pointer}
-  .day-picker input{display:none}
-  .day-chip{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:10px;border:1px solid var(--line);font-weight:700;font-size:14px;color:#374151;background:#fff;user-select:none}
-  .day-picker input:checked + .day-chip{background:var(--primary);color:#fff;border-color:var(--primary)}
-  .seg-modal{display:flex;background:#f1f0ec;border-radius:11px;padding:4px;margin-bottom:16px}
-  .seg-modal button{flex:1;border:0;background:transparent;padding:9px;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer;color:var(--muted)}
-  .seg-modal button.on{background:#fff;color:var(--ink);box-shadow:var(--shadow)}
-  .cancel-list{max-height:300px;overflow:auto;margin-top:6px}
-  .cancel-item{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px}
-  .cancel-item.off{background:var(--danger-bg);border-color:#f3c9b6}
-  .cancel-item .d{font-weight:600;font-size:14px}
-  .cancel-item.off .d{text-decoration:line-through;color:var(--danger)}
-  .up-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px dashed var(--line);font-size:14px}
-  .up-row:last-child{border-bottom:0}
-  .up-row .dot2{width:7px;height:7px;border-radius:50%;background:var(--primary);flex:0 0 auto}
-  .up-row .dot2.once{background:var(--live)}
+  input::placeholder,textarea::placeholder{color:#a9b0bd}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-ring)}
   textarea{resize:vertical;min-height:80px}
   .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
   .row > div{flex:1;min-width:120px}
 
+  /* ---------- תפריט תיקיות + ניווט מסכים ---------- */
+  .folder-grid{display:flex;flex-direction:column;gap:11px}
+  .folder{
+    display:flex;align-items:center;gap:14px;width:100%;text-align:right;
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);
+    box-shadow:var(--shadow-sm);padding:15px;cursor:pointer;font-family:inherit;
+    transition:transform .12s, box-shadow .12s, border-color .12s;
+  }
+  .folder:hover{border-color:var(--line-2);box-shadow:var(--shadow);transform:translateY(-1px)}
+  .folder:active{transform:translateY(0)}
+  .folder .f-ico{
+    font-size:21px;width:46px;height:46px;flex:0 0 auto;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--primary-soft);border-radius:13px;
+  }
+  .folder .f-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+  .folder .f-title{font-size:16px;font-weight:800;color:var(--ink)}
+  .folder .f-sub{font-size:12.5px;color:var(--muted)}
+  .folder .f-arr{font-size:17px;color:var(--muted);flex:0 0 auto;opacity:.55}
+  .screen-head{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+  .back-btn{
+    border:1px solid var(--line);background:#fff;color:var(--ink);
+    padding:8px 14px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:var(--shadow-sm);
+  }
+  .back-btn:hover{background:var(--paper)}
+  .screen-title{font-size:21px;font-weight:800;margin:0;letter-spacing:-.01em}
+
+  /* ---------- דף פרטי עובד ---------- */
+  .det-row{display:flex;align-items:center;gap:12px;padding:15px 0;border-bottom:1px solid var(--line)}
+  .det-row:last-child{border-bottom:none}
+  .det-row .det-k{flex:1;min-width:0}
+  .det-row .det-lbl{font-size:12.5px;color:var(--muted);margin-bottom:3px}
+  .det-row .det-val{font-size:15.5px;font-weight:700;word-break:break-word}
+
+  /* ---------- מקלדת קוד החתמה (טרמינל) ---------- */
+  .pad-who{font-size:15px;color:var(--muted);text-align:center;margin:0 0 14px}
+  .pad-dots{display:flex;justify-content:center;gap:14px;margin:6px 0 18px}
+  .pad-dots .dot-cell{width:15px;height:15px;border-radius:50%;border:2px solid var(--line-2);background:transparent;transition:.12s}
+  .pad-dots .dot-cell.on{background:var(--primary);border-color:var(--primary)}
+  .pad-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}
+  .pad-key{
+    border:1px solid var(--line);background:#fff;color:var(--ink);
+    font-size:25px;font-weight:700;padding:17px 0;border-radius:14px;cursor:pointer;
+    font-family:inherit;transition:.1s;-webkit-user-select:none;user-select:none;
+  }
+  .pad-key:active{background:var(--primary-soft);transform:scale(.97)}
+  .pad-key.fn{font-size:16px;font-weight:700;color:var(--muted)}
+  .pad-err{color:var(--danger);text-align:center;font-weight:700;font-size:14px;min-height:20px;margin-top:12px}
+  .pad-shake{animation:padShake .35s}
+  @keyframes padShake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+
+  /* ---------- סידור עבודה ---------- */
+  .sched-block{margin-top:6px}
+  .sched-sub{font-size:12.5px;font-weight:800;color:var(--muted);margin:16px 0 9px}
+  .sched-row{display:flex;align-items:center;gap:8px;padding:12px;border:1px solid var(--line);border-radius:12px;margin-bottom:9px;background:#fff;flex-wrap:wrap}
+  .sched-row .info{flex:1;min-width:140px}
+  .sched-row .info .t1{font-weight:700;font-size:14.5px}
+  .sched-row .info .t2{font-size:12.5px;color:var(--muted);margin-top:2px}
+  .sched-row.recurring{background:var(--primary-soft);border-color:#cfe7e3}
+  .day-picker{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+  .day-picker label{cursor:pointer}
+  .day-picker input{display:none}
+  .day-chip{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:11px;border:1px solid var(--line-2);font-weight:700;font-size:14px;color:var(--ink-soft);background:#fff;user-select:none;transition:.12s}
+  .day-picker input:checked + .day-chip{background:var(--primary);color:#fff;border-color:var(--primary)}
+  .seg-modal{display:flex;background:var(--paper);border-radius:12px;padding:4px;margin-bottom:16px}
+  .seg-modal button{flex:1;border:0;background:transparent;padding:9px;border-radius:9px;font-weight:700;font-size:14px;cursor:pointer;color:var(--muted);font-family:inherit;transition:.12s}
+  .seg-modal button.on{background:#fff;color:var(--ink);box-shadow:var(--shadow-sm)}
+  .cancel-list{max-height:300px;overflow:auto;margin-top:6px}
+  .cancel-item{display:flex;align-items:center;justify-content:space-between;padding:11px 13px;border:1px solid var(--line);border-radius:11px;margin-bottom:8px}
+  .cancel-item.off{background:var(--danger-bg);border-color:var(--danger-line)}
+  .cancel-item .d{font-weight:600;font-size:14px}
+  .cancel-item.off .d{text-decoration:line-through;color:var(--danger)}
+  .up-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px dashed var(--line);font-size:14px}
+  .up-row:last-child{border-bottom:0}
+  .up-row .dot2{width:7px;height:7px;border-radius:50%;background:var(--primary);flex:0 0 auto}
+  .up-row .dot2.once{background:var(--live)}
+
   /* ---------- מסך התחברות ---------- */
-  .auth-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
-  .auth-box{width:100%;max-width:380px;background:var(--panel);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:26px}
-  .auth-box .logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:20px;margin-bottom:4px}
-  .auth-box .logo .dot{width:12px;height:12px;border-radius:50%;background:var(--live)}
+  .auth-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;
+    background:radial-gradient(1200px 500px at 50% -10%, #ecf3f1 0%, var(--paper) 55%);}
+  .auth-box{width:100%;max-width:380px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r-xl);box-shadow:var(--shadow-lg);padding:28px}
+  .auth-box .logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:21px;margin-bottom:4px;letter-spacing:-.01em}
+  .auth-box .logo .dot{width:12px;height:12px;border-radius:50%;background:var(--live);box-shadow:0 0 0 4px rgba(224,147,15,.16)}
   .auth-box p.lead{color:var(--muted);font-size:14px;margin:0 0 20px}
   .auth-box .field{margin-bottom:13px}
-  .auth-toggle{text-align:center;margin-top:16px;font-size:14px;color:var(--muted)}
+  .auth-toggle{text-align:center;margin-top:18px;font-size:14px;color:var(--muted)}
   .auth-toggle a{color:var(--primary);font-weight:700;cursor:pointer;text-decoration:none}
-  .err{background:var(--danger-bg);color:var(--danger);border:1px solid #f3c9b6;border-radius:10px;padding:9px 12px;font-size:13.5px;margin-bottom:12px;display:none}
+  .err{background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-line);border-radius:11px;padding:10px 13px;font-size:13.5px;margin-bottom:12px;display:none}
   .err.show{display:block}
 
   /* ---------- טרמינל (קיוסק) ---------- */
-  .kiosk-head{text-align:center;margin:10px 0 22px}
-  .kiosk-head .clock{font-size:40px;font-weight:800;letter-spacing:1px}
-  .kiosk-head .date{color:var(--muted);font-size:15px;margin-top:2px}
-  .emp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
+  .kiosk-head{text-align:center;margin:14px 0 24px}
+  .kiosk-head .clock{font-size:44px;font-weight:800;letter-spacing:.5px;font-variant-numeric:tabular-nums}
+  .kiosk-head .date{color:var(--muted);font-size:15px;margin-top:4px}
+  .emp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px}
   .emp-tile{
     position:relative;text-align:right;border:1px solid var(--line);background:#fff;
-    border-radius:16px;padding:18px;cursor:pointer;transition:.15s;min-height:104px;
+    border-radius:var(--r-lg);padding:18px;cursor:pointer;transition:transform .14s, box-shadow .14s;min-height:108px;
     display:flex;flex-direction:column;justify-content:space-between;box-shadow:var(--shadow);
   }
-  .emp-tile:hover{transform:translateY(-2px)}
-  .emp-tile .nm{font-size:19px;font-weight:800}
+  .emp-tile:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+  .emp-tile:active{transform:translateY(0)}
+  .emp-tile .nm{font-size:19px;font-weight:800;letter-spacing:-.01em}
   .emp-tile .state{font-size:13px;color:var(--muted);margin-top:6px}
   .emp-tile .cta{font-size:14px;font-weight:800;margin-top:14px;color:var(--primary)}
-  .emp-tile.live{background:var(--live-bg);border-color:#f0d391}
+  .emp-tile.live{background:var(--live-bg);border-color:var(--live-line)}
   .emp-tile.live .cta{color:var(--danger)}
-  .emp-tile .badge{position:absolute;top:14px;left:14px;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:#a6700a}
+  .emp-tile .badge{position:absolute;top:14px;left:14px;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:var(--live-d)}
   .emp-tile .badge .blip{width:8px;height:8px;border-radius:50%;background:var(--live);animation:pulse 1.6s infinite}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
 
   /* ---------- רשימות / שורות ---------- */
-  .list-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+  .list-row{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--line)}
   .list-row:last-child{border-bottom:0}
   .list-row .grow{flex:1;min-width:0}
-  .nm-strong{font-weight:700}
+  .nm-strong{font-weight:800;letter-spacing:-.01em}
   .meta{font-size:13px;color:var(--muted)}
-  .pill{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px}
-  .pill.live{background:var(--live-bg);color:#a6700a}
+  .pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:800;padding:3px 9px;border-radius:999px}
+  .pill.live{background:var(--live-bg);color:var(--live-d)}
   .pill.flag{background:var(--danger-bg);color:var(--danger)}
-  .pill.edit{background:#eef2ff;color:#4338ca}
-  .empty{color:var(--muted);font-size:14px;padding:16px 0;text-align:center}
+  .pill.edit{background:var(--ok-bg);color:var(--ok)}
+  .empty{color:var(--muted);font-size:14px;padding:22px 14px;text-align:center;background:var(--paper);border-radius:12px}
 
-  .shift-card{border:1px solid var(--line);border-radius:12px;padding:13px;margin-bottom:10px;background:#fff}
+  .shift-card{border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:10px;background:#fff;box-shadow:var(--shadow-sm)}
   .shift-card .head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-  .shift-card .times{font-size:14px;margin-top:6px;color:#374151}
-  .shift-card .note{font-size:13.5px;margin-top:8px;background:#f7f6f2;border-radius:9px;padding:8px 10px}
+  .shift-card .times{font-size:14px;margin-top:6px;color:var(--ink-soft)}
+  .shift-card .note{font-size:13.5px;margin-top:8px;background:var(--paper);border-radius:10px;padding:9px 11px}
   .shift-card .note b{color:var(--muted);font-weight:700}
-  .fb-row{display:flex;gap:8px;margin-top:8px}
-  .fb-row input{flex:1}
+  .fb-row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .fb-row input{flex:1;min-width:160px}
 
   .pay-num{font-weight:800;font-size:16px}
   .pay-sub{font-size:12px;color:var(--muted)}
 
+  /* ---------- שכר ותשלומים ---------- */
+  .pay-line{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;background:#fff;flex-wrap:wrap;box-shadow:var(--shadow-sm)}
+  .pay-line.paid{background:var(--ok-bg);border-color:var(--ok-line)}
+  .pay-line .pl-main{flex:1;min-width:150px}
+  .pay-line .pl-date{font-weight:700;font-size:14px}
+  .pay-line .pl-times{font-size:12.5px;color:var(--muted);margin-top:2px}
+  .pay-line .pl-amt{text-align:left;font-weight:800;font-size:15px;min-width:64px;font-variant-numeric:tabular-nums}
+  .pay-sum{margin-top:16px;border-top:2px solid var(--line);padding-top:14px}
+  .pay-sum .ps-row{display:flex;justify-content:space-between;font-size:14px;padding:4px 0}
+  .pay-sum .ps-row.big{font-size:16px;font-weight:800}
+  .pay-sum .ps-row .rem{color:var(--primary);font-weight:800}
+  .badge-paid{font-size:11px;font-weight:800;color:var(--ok);background:var(--ok-bg);border-radius:999px;padding:3px 9px}
+
   /* ---------- מודאל ---------- */
-  .modal-bg{position:fixed;inset:0;background:rgba(20,24,31,.45);display:none;align-items:center;justify-content:center;z-index:50;padding:18px}
+  .modal-bg{position:fixed;inset:0;background:rgba(20,24,31,.5);display:none;align-items:center;justify-content:center;z-index:50;padding:18px;-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}
   .modal-bg.show{display:flex}
-  .modal{background:#fff;border-radius:18px;max-width:420px;width:100%;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
-  .modal h3{margin:0 0 4px;font-size:18px}
+  .modal{background:#fff;border-radius:var(--r-xl);max-width:420px;width:100%;padding:24px;box-shadow:var(--shadow-lg);animation:modalIn .18s ease-out}
+  @keyframes modalIn{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
+  .modal h3{margin:0 0 4px;font-size:18px;font-weight:800;letter-spacing:-.01em}
   .modal .who{color:var(--muted);font-size:14px;margin:0 0 16px}
   .modal-actions{display:flex;gap:10px;margin-top:18px}
   .modal-actions .btn{flex:1}
 
-  .config-banner{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:12px;padding:12px 14px;font-size:13.5px;margin:14px 16px 0;line-height:1.5}
-  .config-banner code{background:#fde7cf;padding:1px 5px;border-radius:5px;font-size:12.5px}
+  .config-banner{background:var(--live-bg);border:1px solid var(--live-line);color:#8a5a08;border-radius:12px;padding:12px 14px;font-size:13.5px;margin:14px 16px 0;line-height:1.5}
+  .config-banner code{background:#fbe6c2;padding:1px 5px;border-radius:5px;font-size:12.5px}
 
   .hidden{display:none !important}
-  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:11px 18px;border-radius:12px;font-size:14px;font-weight:600;z-index:80;opacity:0;transition:.25s;pointer-events:none}
-  .toast.show{opacity:1}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(8px);background:var(--ink);color:#fff;padding:12px 20px;border-radius:13px;font-size:14px;font-weight:600;z-index:80;opacity:0;transition:.25s;pointer-events:none;box-shadow:var(--shadow-lg)}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
   @media(max-width:560px){
-    .kiosk-head .clock{font-size:34px}
-    .topbar{padding:10px 12px}
+    .wrap{padding:16px 13px 72px}
+    .card{padding:17px;border-radius:16px}
+    .kiosk-head .clock{font-size:38px}
+    .topbar{padding:10px 13px}
     .brand{font-size:14px}
+    .seg button{padding:7px 11px}
+    .screen-title{font-size:19px}
   }
-  /* ---------- שכר ותשלומים ---------- */
-  .pay-line{display:flex;align-items:center;gap:10px;padding:11px;border:1px solid var(--line);border-radius:11px;margin-bottom:8px;background:#fff;flex-wrap:wrap}
-  .pay-line.paid{background:#f1f9f4;border-color:#cfe9da}
-  .pay-line .pl-main{flex:1;min-width:150px}
-  .pay-line .pl-date{font-weight:700;font-size:14px}
-  .pay-line .pl-times{font-size:12.5px;color:var(--muted);margin-top:2px}
-  .pay-line .pl-amt{text-align:left;font-weight:800;font-size:15px;min-width:64px}
-  .pay-sum{margin-top:14px;border-top:2px solid var(--line);padding-top:12px}
-  .pay-sum .ps-row{display:flex;justify-content:space-between;font-size:14px;padding:3px 0}
-  .pay-sum .ps-row.big{font-size:16px;font-weight:800}
-  .pay-sum .ps-row .rem{color:var(--primary);font-weight:800}
-  .badge-paid{font-size:11px;font-weight:700;color:#1f9d63;background:#e7f6ee;border-radius:999px;padding:3px 9px}
 
   /* ---------- אזור הדפסה / ייצוא PDF ---------- */
   #printArea{display:none}
@@ -222,43 +298,6 @@
     #printArea{display:block !important}
     @page{margin:14mm}
   }
-  /* ---------- תפריט תיקיות + ניווט מסכים ---------- */
-  .folder-grid{display:flex;flex-direction:column;gap:12px}
-  .folder{
-    display:flex;align-items:center;gap:14px;width:100%;text-align:right;
-    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
-    box-shadow:var(--shadow);padding:18px;cursor:pointer;transition:.15s;font-family:inherit;
-  }
-  .folder:hover{border-color:var(--primary);transform:translateY(-1px)}
-  .folder:active{transform:translateY(0)}
-  .folder .f-ico{font-size:26px;line-height:1;flex:0 0 auto}
-  .folder .f-txt{flex:1;display:flex;flex-direction:column;gap:2px}
-  .folder .f-title{font-size:16px;font-weight:800;color:var(--ink)}
-  .folder .f-sub{font-size:12.5px;color:var(--muted)}
-  .folder .f-arr{font-size:20px;color:var(--muted);flex:0 0 auto}
-  .screen-head{display:flex;align-items:center;gap:12px;margin-bottom:16px}
-  .back-btn{
-    border:1px solid var(--line);background:var(--panel);color:var(--ink);
-    padding:8px 14px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;
-  }
-  .back-btn:hover{background:#f0eee9}
-  .screen-title{font-size:20px;font-weight:800;margin:0}
-  /* ---------- מקלדת קוד החתמה (טרמינל) ---------- */
-  .pad-who{font-size:15px;color:var(--muted);text-align:center;margin:0 0 14px}
-  .pad-dots{display:flex;justify-content:center;gap:14px;margin:6px 0 18px}
-  .pad-dots .dot-cell{width:16px;height:16px;border-radius:50%;border:2px solid var(--line);background:transparent;transition:.12s}
-  .pad-dots .dot-cell.on{background:var(--primary);border-color:var(--primary)}
-  .pad-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-  .pad-key{
-    border:1px solid var(--line);background:#fff;color:var(--ink);
-    font-size:26px;font-weight:700;padding:18px 0;border-radius:14px;cursor:pointer;
-    font-family:inherit;transition:.1s;-webkit-user-select:none;user-select:none;
-  }
-  .pad-key:active{background:#eef6f5;transform:scale(.97)}
-  .pad-key.fn{font-size:17px;font-weight:700;color:var(--muted)}
-  .pad-err{color:var(--danger);text-align:center;font-weight:700;font-size:14px;min-height:20px;margin-top:12px}
-  .pad-shake{animation:padShake .35s}
-  @keyframes padShake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
 </style>
 </head>
 <body>
@@ -358,62 +397,73 @@
 
     <!-- מסך: ניהול עובדים -->
     <div id="screen-employees" class="screen hidden">
-      <div class="screen-head"><button class="back-btn" onclick="backToHome()">→ חזרה</button><h1 class="screen-title">👥 ניהול עובדים</h1></div>
 
-      <div class="card">
-        <h2>הוספת עובד</h2>
-        <p class="sub">קביעת שם, תעריף לשעה, ושם משתמש + סיסמה להתחברות העובד לדשבורד שלו. השכר מחושב אך ורק לפי החתמות בטרמינל.</p>
+      <!-- רשימה ראשית -->
+      <div id="empMainList">
+        <div class="screen-head"><button class="back-btn" onclick="backToHome()">→ חזרה</button><h1 class="screen-title">👥 ניהול עובדים</h1></div>
 
-        <div class="row" style="margin-bottom:10px">
-          <div style="flex:2">
-            <label class="fld">שם העובד</label>
-            <input type="text" id="newEmpName" placeholder="לדוגמה: דני">
+        <div class="card">
+          <h2>הוספת עובד</h2>
+          <p class="sub">שם, תעריף לשעה, שם משתמש + סיסמה להתחברות לדשבורד, וקוד החתמה לטרמינל. השכר מחושב אך ורק לפי החתמות בטרמינל.</p>
+
+          <div class="row" style="margin-bottom:10px">
+            <div style="flex:2">
+              <label class="fld">שם העובד</label>
+              <input type="text" id="newEmpName" placeholder="לדוגמה: דני">
+            </div>
+            <div style="flex:1">
+              <label class="fld">תעריף לשעה (₪)</label>
+              <input type="number" id="newEmpRate" min="0" step="0.5" placeholder="35">
+            </div>
           </div>
-          <div style="flex:1">
-            <label class="fld">תעריף לשעה (₪)</label>
-            <input type="number" id="newEmpRate" min="0" step="0.5" placeholder="35">
+          <div class="row" style="margin-bottom:10px">
+            <div style="flex:1">
+              <label class="fld">שם משתמש (אנגלית/ספרות)</label>
+              <input type="text" id="newEmpUser" autocapitalize="none" autocomplete="off" placeholder="dani">
+            </div>
+            <div style="flex:1">
+              <label class="fld">סיסמה זמנית (6 תווים+)</label>
+              <input type="text" id="newEmpPass" autocomplete="off" placeholder="לפחות 6 תווים">
+            </div>
+          </div>
+          <div class="row" style="margin-bottom:16px">
+            <div style="flex:1">
+              <label class="fld">קוד החתמה בטרמינל (4 ספרות)</label>
+              <input type="text" id="newEmpPin" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="לדוגמה: 1234">
+            </div>
+            <div style="flex:0 0 auto;display:flex;align-items:flex-end">
+              <button class="btn" onclick="addEmployee()">הוסף עובד</button>
+            </div>
           </div>
         </div>
-        <div class="row" style="margin-bottom:16px">
-          <div style="flex:1">
-            <label class="fld">שם משתמש (אנגלית/ספרות)</label>
-            <input type="text" id="newEmpUser" autocapitalize="none" autocomplete="off" placeholder="dani">
-          </div>
-          <div style="flex:1">
-            <label class="fld">סיסמה זמנית (6 תווים+)</label>
-            <input type="text" id="newEmpPass" autocomplete="off" placeholder="לפחות 6 תווים">
-          </div>
-        </div>
-        <div class="row" style="margin-bottom:16px">
-          <div style="flex:1">
-            <label class="fld">קוד החתמה בטרמינל (4 ספרות)</label>
-            <input type="text" id="newEmpPin" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="לדוגמה: 1234">
-          </div>
-          <div style="flex:0 0 auto;display:flex;align-items:flex-end">
-            <button class="btn" onclick="addEmployee()">הוסף עובד</button>
-          </div>
+
+        <div class="card">
+          <h2>צוות</h2>
+          <p class="sub">לחץ על עובד לצפייה ועריכה של הפרטים שלו. עובדים מושבתים נמצאים בארכיון למטה.</p>
+          <div id="empFolders"></div>
+          <button class="folder" style="margin-top:14px" onclick="openEmpArchive()">
+            <span class="f-ico">📦</span>
+            <span class="f-txt"><span class="f-title">עובדים שהושבתו</span><span class="f-sub" id="empArchiveCount">ארכיון</span></span>
+            <span class="f-arr">→</span>
+          </button>
         </div>
       </div>
 
-      <div class="card">
-        <h2>צוות</h2>
-        <p class="sub">העובדים הפעילים. לחיצה על "השבת" מעבירה עובד לארכיון (הנתונים נשמרים).</p>
-        <div id="empList"></div>
-        <button class="folder" style="margin-top:14px" onclick="openFolder('archive')">
-          <span class="f-ico">📦</span>
-          <span class="f-txt"><span class="f-title">עובדים שהושבתו</span><span class="f-sub" id="archiveCount">ארכיון — הנתונים נשמרים</span></span>
-          <span class="f-arr">→</span>
-        </button>
+      <!-- ארכיון עובדים -->
+      <div id="empArchive" class="hidden">
+        <div class="screen-head"><button class="back-btn" onclick="empBackToList()">→ חזרה</button><h1 class="screen-title">📦 עובדים שהושבתו</h1></div>
+        <div class="card">
+          <p class="sub">עובדים שהושבתו אינם מופיעים ברשימה הראשית ואי אפשר להחתים אותם בטרמינל. הנתונים ההיסטוריים שלהם נשמרים. לחץ על עובד לצפייה ולהפעלה מחדש.</p>
+          <div id="empArchiveFolders"></div>
+        </div>
       </div>
-    </div>
 
-    <!-- מסך: ארכיון עובדים שהושבתו -->
-    <div id="screen-archive" class="screen hidden">
-      <div class="screen-head"><button class="back-btn" onclick="openFolder('employees')">→ חזרה</button><h1 class="screen-title">📦 עובדים שהושבתו</h1></div>
-      <div class="card">
-        <p class="sub">עובדים שהושבתו אינם מופיעים ברשימה הראשית ואי אפשר להחתים אותם בטרמינל. הנתונים ההיסטוריים שלהם (משמרות ותשלומים) נשמרים — אפשר לגשת אליהם דרך "שכר ותשלומים". ניתן להפעיל עובד מחדש בכל עת.</p>
-        <div id="archiveList"></div>
+      <!-- פירוט עובד -->
+      <div id="empDetail" class="hidden">
+        <div class="screen-head"><button class="back-btn" onclick="empBackToList()">→ חזרה</button><h1 class="screen-title" id="empDetailTitle">👤</h1></div>
+        <div id="empDetailBody"></div>
       </div>
+
     </div>
 
     <!-- מסך: שכר ותשלומים -->
@@ -722,9 +772,10 @@ let pinConfig = null;        // קוד ה-PIN השמור (או null אם לא ה
 let consoleUnlocked = false; // האם הקונסולה נפתחה בסשן הנוכחי
 let consoleFolder = null;    // התיקייה הפתוחה בקונסולה (null = תפריט הבית)
 
-// תת-ניווט בתוך שכר/סידור: 'list' (תיקיות עובדים) | 'archive' | 'detail'
+// תת-ניווט בתוך שכר/סידור/עובדים: 'list' | 'archive' | 'detail'
 let payView="list";   let paySubEmpId=null;
 let schedView="list"; let schedSubEmpId=null;
+let empView="list";   let empSubId=null;
 
 // --- בורר שכר ותשלומים ---
 let paySelMonthKey = null; // החודש הנבחר ("YYYY-MM")
@@ -886,11 +937,12 @@ function applyView(name){
 }
 
 /* ---------- ניווט תיקיות בקונסולה ---------- */
-const CONSOLE_SCREENS=["overview","employees","pay","schedule","settings","archive"];
+const CONSOLE_SCREENS=["overview","employees","pay","schedule","settings"];
 function openFolder(name){
   consoleFolder=name;
   if(name==="pay"){ payView="list"; paySubEmpId=null; }
   if(name==="schedule"){ schedView="list"; schedSubEmpId=null; }
+  if(name==="employees"){ empView="list"; empSubId=null; }
   applyConsoleNav();
   renderConsole();
   try{window.scrollTo(0,0);}catch(e){}
@@ -1137,74 +1189,86 @@ function empFolderHtml(e, subText, fnName){
     <span class="f-arr">→</span>
   </button>`;
 }
-// כרטיס עובד בודד (משמש גם ברשימה הראשית וגם בארכיון)
-function empRowHtml(e){
+// דף פרטי עובד מלא (תצוגה נקייה עם פעולות)
+function empDetailHtml(e){
   const {hours,pay} = monthTotals(e.id, e.hourlyRate||0);
-  const inactive = e.active===false;
-  const hasLogin = !!e.username;
   const linked = e.linked===true;
-  let cred = '';
-  if(hasLogin){
-    const statusPill = linked
-      ? '<span class="pill edit">התחבר ✓</span>'
-      : '<span class="pill live">טרם התחבר</span>';
-    const passLine = (!linked && e.tempPassword) ? ` · סיסמה: <b>${esc(e.tempPassword)}</b>` : '';
-    cred = `<div class="meta" style="margin-top:4px">כניסה: <b>${esc(e.username)}</b>${passLine} ${statusPill}</div>`;
-  } else {
-    cred = `<div class="meta" style="margin-top:4px">ללא התחברות — <button class="btn line sm" onclick="addLogin('${e.id}')">הוסף שם משתמש</button></div>`;
-  }
-  const pinLine = e.clockPin
-    ? `<div class="meta" style="margin-top:2px">קוד החתמה: <b>${esc(String(e.clockPin))}</b></div>`
-    : `<div class="meta" style="margin-top:2px;color:var(--danger)">⚠ אין קוד החתמה — <button class="btn line sm" onclick="setClockPin('${e.id}')">הגדר קוד</button></div>`;
-  const actions = inactive
-    ? `<button class="btn sm" onclick="toggleActive('${e.id}')">הפעל מחדש</button>`
-    : `<button class="btn line sm" onclick="editRate('${e.id}')">תעריף</button>
-       <button class="btn line sm" onclick="setClockPin('${e.id}')">קוד החתמה</button>
-       <button class="btn line sm" onclick="resetEmpPass('${e.id}')">אפס סיסמה</button>
-       <button class="btn line sm" onclick="toggleActive('${e.id}')">השבת</button>`;
-  return `<div class="list-row" style="${inactive?'opacity:.7':''}">
-    <div class="grow">
-      <div class="nm-strong">${esc(e.name)}</div>
-      <div class="meta">תעריף: ₪${e.hourlyRate||0} לשעה · החודש ${fmtHours(hours)}</div>
-      ${cred}
-      ${pinLine}
+  const loginVal = e.username
+    ? `${esc(e.username)} ${linked?'<span class="pill edit">התחבר ✓</span>':'<span class="pill live">טרם התחבר</span>'}`
+    : 'לא הוגדרה';
+  const loginRow = e.username
+    ? `<div class="det-row">
+         <div class="det-k"><div class="det-lbl">שם משתמש לדשבורד</div><div class="det-val">${loginVal}</div></div>
+       </div>
+       <div class="det-row">
+         <div class="det-k"><div class="det-lbl">סיסמה</div><div class="det-val">${(!linked&&e.tempPassword)?esc(e.tempPassword):'•••• (מוסתרת אחרי התחברות)'}</div></div>
+         <button class="btn line sm" onclick="resetEmpPass('${e.id}')">אפס סיסמה</button>
+       </div>`
+    : `<div class="det-row">
+         <div class="det-k"><div class="det-lbl">התחברות לדשבורד</div><div class="det-val">לא הוגדרה</div></div>
+         <button class="btn line sm" onclick="addLogin('${e.id}')">הוסף</button>
+       </div>`;
+  const pinVal = e.clockPin ? esc(String(e.clockPin)) : '<span style="color:var(--danger)">לא הוגדר ⚠</span>';
+  return `<div class="card">
+    <div class="det-row">
+      <div class="det-k"><div class="det-lbl">תעריף לשעה</div><div class="det-val">₪${e.hourlyRate||0}</div></div>
+      <button class="btn line sm" onclick="editRate('${e.id}')">שנה</button>
     </div>
-    <div style="text-align:left;margin-inline-end:8px">
-      <div class="pay-num">₪${pay.toFixed(0)}</div>
-      <div class="pay-sub">לתשלום החודש</div>
+    ${loginRow}
+    <div class="det-row">
+      <div class="det-k"><div class="det-lbl">קוד החתמה בטרמינל</div><div class="det-val">${pinVal}</div></div>
+      <button class="btn line sm" onclick="setClockPin('${e.id}')">${e.clockPin?'שנה':'הגדר'}</button>
     </div>
-    ${actions}
+    <div class="det-row">
+      <div class="det-k"><div class="det-lbl">שכר החודש (לפי החתמות)</div><div class="det-val">${fmtHours(hours)} · ₪${pay.toFixed(0)}</div></div>
+      <button class="btn line sm" onclick="openPayFromEmp('${e.id}')">פירוט שכר</button>
+    </div>
+    <div style="margin-top:18px">
+      ${e.active===false
+        ? `<button class="btn" onclick="toggleActive('${e.id}')">הפעל עובד מחדש</button>`
+        : `<button class="btn danger" onclick="toggleActive('${e.id}')">השבת עובד</button>`}
+    </div>
   </div>`;
 }
 
 function renderEmpList(){
-  const box=$("empList");
-  const all=Object.keys(employees).map(id=>({id,...employees[id]}))
-    .sort((a,b)=>(a.name||"").localeCompare(b.name||"","he"));
+  const foldersBox=$("empFolders"); if(!foldersBox) return;
+  const all=Object.keys(employees).map(id=>({id,...employees[id]})).sort(byNameHe);
   const active=all.filter(e=> e.active!==false);
   const inactive=all.filter(e=> e.active===false);
 
-  // רשימה ראשית - פעילים בלבד
-  if(active.length===0){
-    box.innerHTML = all.length===0
-      ? '<div class="empty">עדיין אין עובדים. הוסף עובד למעלה כדי להתחיל.</div>'
-      : '<div class="empty">אין עובדים פעילים. עובדים מושבתים נמצאים בארכיון למטה.</div>';
-  } else {
-    box.innerHTML = active.map(empRowHtml).join("");
-  }
+  const folder = e => empFolderHtml(e, `₪${e.hourlyRate||0}/שעה${e.clockPin?'':' · ⚠ אין קוד החתמה'}`, "openEmpDetail");
+  foldersBox.innerHTML = active.length ? active.map(folder).join("")
+    : '<div class="empty">עדיין אין עובדים פעילים. הוסף עובד למעלה כדי להתחיל.</div>';
+  const arch=$("empArchiveFolders");
+  if(arch) arch.innerHTML = inactive.length ? inactive.map(folder).join("")
+    : '<div class="empty">אין עובדים מושבתים.</div>';
+  const cnt=$("empArchiveCount");
+  if(cnt) cnt.textContent = inactive.length ? `${inactive.length} עובדים — הנתונים נשמרים` : "אין עובדים מושבתים";
 
-  // ארכיון - מושבתים בלבד
-  const arch=$("archiveList");
-  if(arch){
-    arch.innerHTML = inactive.length===0
-      ? '<div class="empty">אין עובדים מושבתים.</div>'
-      : inactive.map(empRowHtml).join("");
+  if(empView==="detail"){
+    if(!empSubId || !employees[empSubId]){ empView="list"; }
+    else {
+      const e=employees[empSubId];
+      $("empDetailTitle").textContent="👤 "+e.name;
+      $("empDetailBody").innerHTML=empDetailHtml(e);
+    }
   }
-  // עדכון מונה בכפתור הארכיון
-  const cnt=$("archiveCount");
-  if(cnt) cnt.textContent = inactive.length===0
-    ? "ארכיון — אין עובדים מושבתים"
-    : `${inactive.length} עובדים בארכיון — הנתונים נשמרים`;
+  applyEmpNav();
+}
+
+function applyEmpNav(){
+  $("empMainList").classList.toggle("hidden", empView!=="list");
+  $("empArchive").classList.toggle("hidden", empView!=="archive");
+  $("empDetail").classList.toggle("hidden", empView!=="detail");
+}
+function openEmpDetail(id){ empSubId=id; empView="detail"; renderEmpList(); try{window.scrollTo(0,0);}catch(e){} }
+function openEmpArchive(){ empView="archive"; renderEmpList(); try{window.scrollTo(0,0);}catch(e){} }
+function empBackToList(){ empView="list"; empSubId=null; renderEmpList(); try{window.scrollTo(0,0);}catch(e){} }
+// קפיצה לפירוט שכר של עובד מתוך דף העובד
+function openPayFromEmp(id){
+  consoleFolder="pay"; paySubEmpId=id; paySelMonthKey=null; payView="detail";
+  applyConsoleNav(); renderConsole(); try{window.scrollTo(0,0);}catch(e){}
 }
 
 function monthTotals(empId, rate){
