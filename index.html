@@ -192,6 +192,36 @@
     .topbar{padding:10px 12px}
     .brand{font-size:14px}
   }
+  /* ---------- שכר ותשלומים ---------- */
+  .pay-line{display:flex;align-items:center;gap:10px;padding:11px;border:1px solid var(--line);border-radius:11px;margin-bottom:8px;background:#fff;flex-wrap:wrap}
+  .pay-line.paid{background:#f1f9f4;border-color:#cfe9da}
+  .pay-line .pl-main{flex:1;min-width:150px}
+  .pay-line .pl-date{font-weight:700;font-size:14px}
+  .pay-line .pl-times{font-size:12.5px;color:var(--muted);margin-top:2px}
+  .pay-line .pl-amt{text-align:left;font-weight:800;font-size:15px;min-width:64px}
+  .pay-sum{margin-top:14px;border-top:2px solid var(--line);padding-top:12px}
+  .pay-sum .ps-row{display:flex;justify-content:space-between;font-size:14px;padding:3px 0}
+  .pay-sum .ps-row.big{font-size:16px;font-weight:800}
+  .pay-sum .ps-row .rem{color:var(--primary);font-weight:800}
+  .badge-paid{font-size:11px;font-weight:700;color:#1f9d63;background:#e7f6ee;border-radius:999px;padding:3px 9px}
+
+  /* ---------- אזור הדפסה / ייצוא PDF ---------- */
+  #printArea{display:none}
+  .pr-wrap{padding:26px;color:#000;direction:rtl;font-family:inherit}
+  .pr-h1{font-size:22px;font-weight:800;margin:0 0 2px}
+  .pr-meta{font-size:13px;color:#333;margin:0 0 18px;line-height:1.6}
+  .pr-table{width:100%;border-collapse:collapse;font-size:13px}
+  .pr-table th,.pr-table td{border:1px solid #888;padding:7px 9px;text-align:right}
+  .pr-table th{background:#eee}
+  .pr-table td.num{text-align:left;font-variant-numeric:tabular-nums}
+  .pr-tot{margin-top:18px;font-size:14px;line-height:1.9}
+  .pr-tot b{display:inline-block;min-width:130px}
+  .pr-foot{margin-top:24px;font-size:11px;color:#666}
+  @media print{
+    body > *:not(#printArea){display:none !important}
+    #printArea{display:block !important}
+    @page{margin:14mm}
+  }
 </style>
 </head>
 <body>
@@ -249,18 +279,28 @@
 
     <div class="card">
       <h2>עובדים</h2>
-      <p class="sub">הוספת עובד וקביעת תעריף לשעה. השכר מחושב אך ורק לפי החתמות בטרמינל.</p>
+      <p class="sub">הוספת עובד וקביעת תעריף לשעה. השכר מחושב אך ורק לפי החתמות בטרמינל. שם המשתמש והסיסמה ישמשו את העובד להתחברות לדשבורד האישי שלו.</p>
 
-      <div class="row" style="margin-bottom:16px">
+      <div class="row" style="margin-bottom:10px">
         <div style="flex:2">
           <label class="fld">שם העובד</label>
           <input type="text" id="newEmpName" placeholder="לדוגמה: דני">
         </div>
-        <div>
+        <div style="flex:1">
           <label class="fld">תעריף לשעה (₪)</label>
           <input type="number" id="newEmpRate" min="0" step="0.5" placeholder="35">
         </div>
-        <div style="flex:0 0 auto">
+      </div>
+      <div class="row" style="margin-bottom:16px">
+        <div style="flex:1">
+          <label class="fld">שם משתמש (אנגלית/ספרות)</label>
+          <input type="text" id="newEmpUser" autocapitalize="none" autocomplete="off" placeholder="dani">
+        </div>
+        <div style="flex:1">
+          <label class="fld">סיסמה זמנית (6 תווים+)</label>
+          <input type="text" id="newEmpPass" autocomplete="off" placeholder="לפחות 6 תווים">
+        </div>
+        <div style="flex:0 0 auto;display:flex;align-items:flex-end">
           <button class="btn" onclick="addEmployee()">הוסף עובד</button>
         </div>
       </div>
@@ -290,6 +330,22 @@
       <h2>משמרות אחרונות</h2>
       <p class="sub">אפשר לערוך כניסה/יציאה בכל משמרת (תיקון לפי החלטת המנהל) ולהוסיף משוב לעובד.</p>
       <div id="shiftList"></div>
+    </div>
+
+    <div class="card" id="payCard">
+      <h2>שכר ותשלומים</h2>
+      <p class="sub">בחר עובד וחודש לצפייה בפירוט המשמרות, סך השעות והסכום לתשלום. ניתן לסמן משמרות כשולמו ולייצא דף סיכום מסודר לרואה החשבון.</p>
+      <div class="row" style="margin-bottom:14px">
+        <div style="flex:1">
+          <label class="fld">עובד</label>
+          <select id="paySelEmp" onchange="onPayEmpChange()"></select>
+        </div>
+        <div style="flex:1">
+          <label class="fld">חודש</label>
+          <select id="paySelMonth" onchange="onPayMonthChange()"></select>
+        </div>
+      </div>
+      <div id="payBody"></div>
     </div>
 
     <div class="card">
@@ -424,6 +480,8 @@
   </div>
 </div>
 
+<div id="printArea"></div>
+
 <div id="toast" class="toast"></div>
 
 <script>
@@ -482,11 +540,15 @@ let cancelTargetId = null;        // id של משמרת קבועה במודאל 
 let pinConfig = null;        // קוד ה-PIN השמור (או null אם לא הוגדר)
 let consoleUnlocked = false; // האם הקונסולה נפתחה בסשן הנוכחי
 
+// --- בורר שכר ותשלומים ---
+let paySelEmpId = null;    // העובד הנבחר בכרטיס השכר
+let paySelMonthKey = null; // החודש הנבחר ("YYYY-MM")
+
 /* ============================================================
    4. עזרים
    ============================================================ */
 const $ = id => document.getElementById(id);
-const uname = u => u.trim() + "@" + LOGIN_DOMAIN;
+const uname = u => u.trim().toLowerCase() + "@" + LOGIN_DOMAIN;
 
 function pad(n){ return n < 10 ? "0"+n : ""+n; }
 function fmtTime(ts){ if(!ts) return "—"; const d=new Date(ts); return pad(d.getHours())+":"+pad(d.getMinutes()); }
@@ -494,6 +556,11 @@ function fmtDate(ts){ if(!ts) return ""; const d=new Date(ts); const days=["א",
 function hoursBetween(a,b){ return (b-a)/3600000; }
 function fmtHours(h){ const H=Math.floor(h); const M=Math.round((h-H)*60); return H+":"+pad(M)+" שע'"; }
 function inCurrentMonth(ts){ const d=new Date(ts), n=new Date(); return d.getFullYear()===n.getFullYear() && d.getMonth()===n.getMonth(); }
+
+const HEB_MONTHS=["ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"];
+function monthKeyOf(ts){ const d=new Date(ts); return d.getFullYear()+"-"+pad(d.getMonth()+1); } // "YYYY-MM"
+function monthLabel(key){ const [y,m]=key.split("-"); return HEB_MONTHS[parseInt(m,10)-1]+" "+y; }
+function currentMonthKey(){ const n=new Date(); return n.getFullYear()+"-"+pad(n.getMonth()+1); }
 
 function toLocalInput(ts){ // ms -> "YYYY-MM-DDTHH:mm" בזמן מקומי
   const d=new Date(ts);
@@ -780,6 +847,7 @@ function renderConsole(){
   renderEmpList();
   renderSchedule();
   renderShiftList();
+  renderPayCard();
   renderPinStatus();
 }
 
@@ -811,16 +879,32 @@ function renderEmpList(){
   box.innerHTML = list.map(e=>{
     const {hours,pay} = monthTotals(e.id, e.hourlyRate||0);
     const inactive = e.active===false;
+    const hasLogin = !!e.username;
+    const linked = e.linked===true;
+    let cred = '';
+    if(hasLogin){
+      const statusPill = linked
+        ? '<span class="pill edit">התחבר ✓</span>'
+        : '<span class="pill live">טרם התחבר</span>';
+      const passLine = (!linked && e.tempPassword)
+        ? ` · סיסמה: <b>${esc(e.tempPassword)}</b>`
+        : '';
+      cred = `<div class="meta" style="margin-top:4px">כניסה: <b>${esc(e.username)}</b>${passLine} ${statusPill}</div>`;
+    } else {
+      cred = `<div class="meta" style="margin-top:4px">ללא התחברות — <button class="btn line sm" onclick="addLogin('${e.id}')">הוסף שם משתמש</button></div>`;
+    }
     return `<div class="list-row" style="${inactive?'opacity:.55':''}">
       <div class="grow">
         <div class="nm-strong">${esc(e.name)} ${inactive?'<span class="meta">(לא פעיל)</span>':''}</div>
         <div class="meta">תעריף: ₪${e.hourlyRate||0} לשעה · החודש ${fmtHours(hours)}</div>
+        ${cred}
       </div>
       <div style="text-align:left;margin-inline-end:8px">
         <div class="pay-num">₪${pay.toFixed(0)}</div>
         <div class="pay-sub">לתשלום החודש</div>
       </div>
       <button class="btn line sm" onclick="editRate('${e.id}')">תעריף</button>
+      <button class="btn line sm" onclick="resetEmpPass('${e.id}')">אפס סיסמה</button>
       <button class="btn line sm" onclick="toggleActive('${e.id}')">${inactive?'הפעל':'השבת'}</button>
     </div>`;
   }).join("");
@@ -872,15 +956,189 @@ function renderShiftList(){
 }
 
 /* ============================================================
+   10ד. שכר ותשלומים
+   ============================================================ */
+// אוסף משמרות סגורות של עובד בחודש מסוים, ממוין לפי זמן
+function payShiftsFor(empId, monthKey){
+  return Object.keys(shifts).map(id=>({id,...shifts[id]}))
+    .filter(s=> s.employeeId===empId && s.clockIn && s.clockOut && monthKeyOf(s.clockIn)===monthKey)
+    .sort((a,b)=>(a.clockIn||0)-(b.clockIn||0));
+}
+// רשימת מפתחות-חודש שיש בהם משמרות לעובד (כולל החודש הנוכחי תמיד), מהחדש לישן
+function monthsForEmp(empId){
+  const set={};
+  Object.values(shifts).forEach(s=>{ if(s.employeeId===empId && s.clockIn) set[monthKeyOf(s.clockIn)]=true; });
+  set[currentMonthKey()]=true;
+  return Object.keys(set).sort().reverse();
+}
+
+function renderPayCard(){
+  const selE=$("paySelEmp"); if(!selE) return;
+  const emps=Object.keys(employees).map(id=>({id,...employees[id]}))
+    .sort((a,b)=>(a.name||"").localeCompare(b.name||"","he"));
+  if(emps.length===0){
+    selE.innerHTML=""; $("paySelMonth").innerHTML="";
+    $("payBody").innerHTML='<div class="empty">אין עובדים עדיין. הוסף עובד כדי לראות שכר.</div>';
+    return;
+  }
+  // ודא בחירת עובד תקפה
+  if(!paySelEmpId || !employees[paySelEmpId]) paySelEmpId=emps[0].id;
+  selE.innerHTML=emps.map(e=>`<option value="${e.id}" ${e.id===paySelEmpId?'selected':''}>${esc(e.name)}${e.active===false?' (לא פעיל)':''}</option>`).join("");
+  // חודשים לעובד הנבחר
+  const months=monthsForEmp(paySelEmpId);
+  if(!paySelMonthKey || months.indexOf(paySelMonthKey)===-1){
+    paySelMonthKey = months.indexOf(currentMonthKey())!==-1 ? currentMonthKey() : months[0];
+  }
+  $("paySelMonth").innerHTML=months.map(k=>`<option value="${k}" ${k===paySelMonthKey?'selected':''}>${monthLabel(k)}</option>`).join("");
+  renderPayDetail();
+}
+
+function onPayEmpChange(){
+  paySelEmpId=$("paySelEmp").value;
+  paySelMonthKey=null; // יחושב מחדש לחודש הנוכחי/האחרון של העובד
+  renderPayCard();
+}
+function onPayMonthChange(){
+  paySelMonthKey=$("paySelMonth").value;
+  renderPayDetail();
+}
+
+function renderPayDetail(){
+  const box=$("payBody"); if(!box) return;
+  const e=employees[paySelEmpId]; if(!e){ box.innerHTML=""; return; }
+  const rate=e.hourlyRate||0;
+  const list=payShiftsFor(paySelEmpId, paySelMonthKey);
+
+  if(list.length===0){
+    box.innerHTML=`<div class="empty">אין משמרות סגורות עבור ${esc(e.name)} ב${monthLabel(paySelMonthKey)}.</div>`;
+    return;
+  }
+
+  let totalH=0, totalPay=0, paidPay=0, allPaid=true;
+  const rows=list.map(s=>{
+    const h=hoursBetween(s.clockIn, s.clockOut);
+    const amt=h*rate;
+    totalH+=h; totalPay+=amt;
+    const isPaid=s.paid===true;
+    if(isPaid) paidPay+=amt; else allPaid=false;
+    return `<div class="pay-line ${isPaid?'paid':''}">
+      <div class="pl-main">
+        <div class="pl-date">${fmtDate(s.clockIn)} ${isPaid?'<span class="badge-paid">שולם ✓</span>':''}</div>
+        <div class="pl-times">${fmtTime(s.clockIn)} ← ${fmtTime(s.clockOut)} · ${fmtHours(h)}</div>
+      </div>
+      <div class="pl-amt">₪${amt.toFixed(0)}</div>
+      <button class="btn ${isPaid?'line':''} sm" onclick="togglePaid('${s.id}')">${isPaid?'בטל סימון':'סמן כשולם'}</button>
+    </div>`;
+  }).join("");
+
+  const remaining=totalPay-paidPay;
+  box.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+      <div class="section-title" style="margin:0">${monthLabel(paySelMonthKey)} · ${esc(e.name)} · ₪${rate}/שעה</div>
+      <button class="btn line sm" onclick="setMonthPaid(${allPaid?'false':'true'})">${allPaid?'בטל סימון לכל החודש':'סמן את כל החודש כשולם'}</button>
+    </div>
+    ${rows}
+    <div class="pay-sum">
+      <div class="ps-row"><span>סך שעות החודש</span><span>${fmtHours(totalH)}</span></div>
+      <div class="ps-row big"><span>סך הכל</span><span>₪${totalPay.toFixed(0)}</span></div>
+      <div class="ps-row"><span>שולם</span><span>₪${paidPay.toFixed(0)}</span></div>
+      <div class="ps-row big"><span>נותר לתשלום</span><span class="rem">₪${remaining.toFixed(0)}</span></div>
+    </div>
+    <div style="margin-top:14px">
+      <button class="btn" onclick="exportPayroll()">📄 ייצא דף לרואה החשבון (PDF)</button>
+    </div>`;
+}
+
+function togglePaid(shiftId){
+  const s=shifts[shiftId]; if(!s) return;
+  const newVal = s.paid!==true;
+  db.ref("shifts/"+shiftId).update({ paid:newVal, paidAt: newVal?TS:null })
+    .then(()=> toast(newVal?"סומן כשולם ✓":"הסימון בוטל"));
+}
+
+function setMonthPaid(target){
+  const list=payShiftsFor(paySelEmpId, paySelMonthKey);
+  if(list.length===0) return;
+  const e=employees[paySelEmpId];
+  const verb = target ? "לסמן כשולם" : "לבטל סימון תשלום עבור";
+  if(!confirm(verb+" את כל "+list.length+" המשמרות של "+(e?e.name:"")+" ב"+monthLabel(paySelMonthKey)+"?")) return;
+  const updates={};
+  list.forEach(s=>{ updates["shifts/"+s.id+"/paid"]=target; updates["shifts/"+s.id+"/paidAt"]=target?TS:null; });
+  db.ref().update(updates).then(()=> toast(target?"כל החודש סומן כשולם ✓":"הסימון בוטל לכל החודש"));
+}
+
+function exportPayroll(){
+  const e=employees[paySelEmpId]; if(!e) return;
+  const rate=e.hourlyRate||0;
+  const list=payShiftsFor(paySelEmpId, paySelMonthKey);
+  if(list.length===0){ toast("אין משמרות לייצוא"); return; }
+
+  let totalH=0, totalPay=0, paidPay=0;
+  const rows=list.map(s=>{
+    const h=hoursBetween(s.clockIn, s.clockOut);
+    const amt=h*rate; totalH+=h; totalPay+=amt;
+    if(s.paid===true) paidPay+=amt;
+    const d=new Date(s.clockIn);
+    const days=["א","ב","ג","ד","ה","ו","ש"];
+    return `<tr>
+      <td>${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}</td>
+      <td>יום ${days[d.getDay()]}</td>
+      <td>${fmtTime(s.clockIn)}</td>
+      <td>${fmtTime(s.clockOut)}</td>
+      <td class="num">${fmtHours(h)}</td>
+      <td class="num">₪${amt.toFixed(0)}</td>
+      <td>${s.paid===true?'שולם':'—'}</td>
+    </tr>`;
+  }).join("");
+  const remaining=totalPay-paidPay;
+  const now=new Date();
+  const genDate=pad(now.getDate())+"/"+pad(now.getMonth()+1)+"/"+now.getFullYear();
+
+  $("printArea").innerHTML=`<div class="pr-wrap">
+    <div class="pr-h1">סיכום שכר — ${esc(e.name)}</div>
+    <div class="pr-meta">חודש: ${monthLabel(paySelMonthKey)}<br>תעריף לשעה: ₪${rate}<br>הופק בתאריך: ${genDate}</div>
+    <table class="pr-table">
+      <thead><tr>
+        <th>תאריך</th><th>יום</th><th>כניסה</th><th>יציאה</th><th>שעות</th><th>סכום</th><th>סטטוס</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="pr-tot">
+      <div><b>סך שעות החודש:</b> ${fmtHours(totalH)}</div>
+      <div><b>סך הכל:</b> ₪${totalPay.toFixed(0)}</div>
+      <div><b>שולם:</b> ₪${paidPay.toFixed(0)}</div>
+      <div><b>נותר לתשלום:</b> ₪${remaining.toFixed(0)}</div>
+    </div>
+    <div class="pr-foot">הופק ממערכת שעון נוכחות · הנתונים מבוססים על החתמות בפועל</div>
+  </div>`;
+
+  setTimeout(()=>window.print(), 100);
+}
+
+/* ============================================================
    11. פעולות מנהל
    ============================================================ */
 function addEmployee(){
   const name=$("newEmpName").value.trim();
   const rate=parseFloat($("newEmpRate").value);
+  const user=$("newEmpUser").value.trim().toLowerCase();
+  const pass=$("newEmpPass").value;
   if(!name){ toast("יש להזין שם עובד"); return; }
   if(isNaN(rate)||rate<0){ toast("יש להזין תעריף תקין"); return; }
-  db.ref("employees").push({ name, hourlyRate:rate, active:true, openShiftId:null, createdAt:TS })
-    .then(()=>{ $("newEmpName").value=""; $("newEmpRate").value=""; toast("העובד נוסף ✓"); });
+  if(!user){ toast("יש להזין שם משתמש לעובד"); return; }
+  if(!/^[a-zA-Z0-9._-]+$/.test(user)){ toast("שם המשתמש: אותיות אנגלית, ספרות, . _ - בלבד"); return; }
+  if(!pass || pass.length<6){ toast("הסיסמה חייבת להיות לפחות 6 תווים"); return; }
+  // בדיקת כפילות מול עובדים קיימים (אותיות קטנות)
+  const taken=Object.values(employees).some(e=> (e.username||"").toLowerCase()===user);
+  if(taken){ toast("שם המשתמש כבר תפוס על ידי עובד אחר"); return; }
+  db.ref("employees").push({
+    name, hourlyRate:rate, active:true, openShiftId:null, createdAt:TS,
+    username:user, tempPassword:pass, authUid:null, linked:false
+  }).then(()=>{
+    $("newEmpName").value=""; $("newEmpRate").value="";
+    $("newEmpUser").value=""; $("newEmpPass").value="";
+    toast("העובד נוסף ✓ — מסור לו שם משתמש וסיסמה");
+  });
 }
 
 function editRate(empId){
@@ -892,6 +1150,35 @@ function editRate(empId){
   db.ref("employees/"+empId+"/hourlyRate").set(r).then(()=>toast("התעריף עודכן ✓"));
 }
 
+// הוספת התחברות לעובד שנוצר ללא שם משתמש (עובדים ישנים)
+function addLogin(empId){
+  const e=employees[empId]; if(!e) return;
+  const user=(prompt("שם משתמש עבור "+e.name+" (אנגלית/ספרות):","")||"").trim().toLowerCase();
+  if(!user) return;
+  if(!/^[a-zA-Z0-9._-]+$/.test(user)){ toast("שם המשתמש: אנגלית/ספרות בלבד"); return; }
+  const taken=Object.keys(employees).some(id=> id!==empId && (employees[id].username||"").toLowerCase()===user);
+  if(taken){ toast("שם המשתמש תפוס"); return; }
+  const pass=prompt("סיסמה זמנית (לפחות 6 תווים):","");
+  if(pass===null) return;
+  if(pass.length<6){ toast("הסיסמה קצרה מדי"); return; }
+  db.ref("employees/"+empId).update({ username:user, tempPassword:pass, authUid:null, linked:false })
+    .then(()=>toast("ההתחברות נוספה ✓ — מסור לעובד"));
+}
+
+// איפוס סיסמה. עובד עם accountעדיין לא נוצר -> פשוט; כבר התחבר -> מוסבר שלא נתמך כרגע
+function resetEmpPass(empId){
+  const e=employees[empId]; if(!e) return;
+  if(!e.username){ toast("לעובד אין התחברות עדיין"); return; }
+  if(e.linked===true){
+    alert("העובד כבר התחבר וחשבונו נוצר. איפוס סיסמה לחשבון קיים יתווסף בהמשך (דורש רכיב נוסף). כרגע אפשר לאפס רק לפני הכניסה הראשונה.");
+    return;
+  }
+  const pass=prompt("סיסמה זמנית חדשה עבור "+e.name+" (לפחות 6 תווים):","");
+  if(pass===null) return;
+  if(pass.length<6){ toast("הסיסמה קצרה מדי"); return; }
+  db.ref("employees/"+empId).update({ tempPassword:pass })
+    .then(()=>toast("הסיסמה אופסה ✓ — מסור לעובד"));
+}
 function toggleActive(empId){
   const e=employees[empId]; if(!e) return;
   const newVal = e.active===false; // אם לא פעיל -> הפעל
