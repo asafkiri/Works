@@ -291,6 +291,19 @@
       <p class="sub">אפשר לערוך כניסה/יציאה בכל משמרת (תיקון לפי החלטת המנהל) ולהוסיף משוב לעובד.</p>
       <div id="shiftList"></div>
     </div>
+
+    <div class="card">
+      <h2>הגדרות</h2>
+      <p class="sub">קוד PIN חוסם את הכניסה לקונסולת המנהל מהמכשיר שבחנות, כך שעובדים יוכלו רק להחתים בטרמינל.</p>
+      <div class="list-row">
+        <div class="grow">
+          <div class="nm-strong">קוד כניסה לקונסולה</div>
+          <div class="meta" id="pinStatus">—</div>
+        </div>
+        <button class="btn line sm" id="pinSetBtn" onclick="setPin()">הגדר / שנה</button>
+        <button class="btn danger sm" id="pinRemoveBtn" onclick="removePin()">הסר</button>
+      </div>
+    </div>
   </div>
 
   <!-- ---------------- טרמינל חנות ---------------- -->
@@ -397,6 +410,20 @@
   </div>
 </div>
 
+<!-- ============================ מודאל: קוד כניסה לקונסולה ============================ -->
+<div id="pinModal" class="modal-bg">
+  <div class="modal">
+    <h3>קוד כניסה לקונסולה</h3>
+    <p class="who">הזן את קוד ה-PIN כדי להיכנס לקונסולת המנהל.</p>
+    <div id="pinErr" class="err" style="margin-bottom:12px"></div>
+    <input type="password" id="pinInput" inputmode="numeric" autocomplete="off" placeholder="קוד" style="text-align:center;font-size:22px;letter-spacing:6px">
+    <div class="modal-actions">
+      <button class="btn line" onclick="closePinModal()">ביטול</button>
+      <button class="btn" onclick="submitPin()">כניסה</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast" class="toast"></div>
 
 <script>
@@ -434,34 +461,6 @@ const db   = firebaseReady ? firebase.database() : null;
 const TS   = firebaseReady ? firebase.database.ServerValue.TIMESTAMP : null;
 
 /* ============================================================
-   *** מצב אבחון *** (זמני - להסרה אחרי שנפתור)
-   ============================================================ */
-const APP_VERSION = "v3-DEBUG";
-(function setupDebug(){
-  // תג גרסה - תמיד גלוי בפינה
-  const badge=document.createElement("div");
-  badge.textContent=APP_VERSION + (firebaseReady?" · FB OK":" · אין FB");
-  badge.style.cssText="position:fixed;bottom:6px;left:6px;z-index:9999;background:#14181f;color:#fff;font-size:11px;font-weight:700;padding:4px 8px;border-radius:6px;font-family:monospace";
-  document.body.appendChild(badge);
-  // קופסת שגיאות - מופיעה רק כשיש שגיאה
-  const box=document.createElement("div");
-  box.id="dbgBox";
-  box.style.cssText="position:fixed;top:0;left:0;right:0;z-index:10000;background:#c2410c;color:#fff;font-size:13px;padding:12px;font-family:monospace;display:none;white-space:pre-wrap;word-break:break-word;max-height:50vh;overflow:auto";
-  box.onclick=()=>{ box.style.display="none"; };
-  document.body.appendChild(box);
-  window.DBG=function(msg){
-    box.style.display="block";
-    box.textContent="⚠ אבחון (הקש לסגירה):\n\n"+msg+"\n\n"+(box.textContent||"");
-  };
-  // תפיסת כל שגיאה שלא נתפסה
-  window.addEventListener("error", e=>{ window.DBG("JS ERROR: "+(e.message||e)+"\n"+(e.filename||"")+":"+(e.lineno||"")); });
-  window.addEventListener("unhandledrejection", e=>{
-    const r=e.reason||{};
-    window.DBG("PROMISE נדחה (לא נתפס):\ncode="+(r.code||"?")+"\nmsg="+(r.message||JSON.stringify(r)));
-  });
-})();
-
-/* ============================================================
    3. מצב (cache מקומי של הנתונים)
    ============================================================ */
 let employees = {};   // id -> {name, hourlyRate, active, openShiftId, createdAt}
@@ -478,6 +477,10 @@ let shiftModalMode = "add";       // "add" | "editRecurring" | "editOnetime"
 let shiftModalType = "recurring"; // "recurring" | "onetime"
 let editingPlanId = null;         // id של משמרת מתוכננת בעריכה
 let cancelTargetId = null;        // id של משמרת קבועה במודאל ביטול מופע
+
+// --- נעילת קונסולה (PIN) ---
+let pinConfig = null;        // קוד ה-PIN השמור (או null אם לא הוגדר)
+let consoleUnlocked = false; // האם הקונסולה נפתחה בסשן הנוכחי
 
 /* ============================================================
    4. עזרים
@@ -540,26 +543,22 @@ function handleAuthSubmit(){
   }
 
   if(authMode==="signup"){
-    window.DBG && window.DBG("מתחיל יצירת מנהל... user="+uname(u));
     // יוצרים קודם את המשתמש (זה מחבר אותו), ורק אז קוראים/כותבים את config -
     // כי החוקים דורשים התחברות לכל קריאה, אז אי אפשר לבדוק את config לפני ההתחברות.
     auth.createUserWithEmailAndPassword(uname(u), p)
-      .then(cred => {
-        window.DBG && window.DBG("✓ משתמש נוצר ב-Auth! uid="+cred.user.uid+"\nכותב config...");
-        return db.ref("config/managerUid").once("value").then(snap=>{
+      .then(cred =>
+        db.ref("config/managerUid").once("value").then(snap=>{
           if(snap.exists()){
+            // כבר קיים מנהל אחר - מבטלים את החשבון שזה עתה נוצר
             return cred.user.delete().then(()=>{
               showErr("כבר קיים חשבון מנהל. עבור להתחברות.");
             });
           }
           return db.ref("config/managerUid").set(cred.user.uid)
-            .then(()=>{ window.DBG && window.DBG("✓✓ הכל הצליח! managerUid נשמר."); toast("חשבון המנהל נוצר ✓"); });
-        });
-      })
-      .catch(err => {
-        window.DBG && window.DBG("שגיאה ביצירת מנהל:\ncode="+(err.code||"?")+"\nmsg="+(err.message||err));
-        showErr(authErrText(err));
-      });
+            .then(()=> toast("חשבון המנהל נוצר ✓"));
+        })
+      )
+      .catch(err => showErr(authErrText(err)));
   } else {
     auth.signInWithEmailAndPassword(uname(u), p)
       .catch(err => showErr(authErrText(err)));
@@ -604,18 +603,77 @@ function startDataListeners(){
   db.ref("shifts").on("value",    snap=>{ shifts    = snap.val() || {}; renderActive(); checkAutoClose(); });
   db.ref("recurringShifts").on("value", snap=>{ recurring = snap.val() || {}; if(currentView==="console") renderSchedule(); });
   db.ref("oneTimeShifts").on("value",   snap=>{ oneTime   = snap.val() || {}; if(currentView==="console") renderSchedule(); });
+  db.ref("config/consolePin").on("value", snap=>{
+    pinConfig = snap.val() || null;
+    if(currentView==="console") renderPinStatus();
+    // נעילה בטעינה: אם הוגדר PIN ועדיין לא נפתח בסשן - מפנים לטרמינל
+    if(pinConfig && !consoleUnlocked && currentView==="console"){ applyView("terminal"); }
+  });
 }
 
 /* ============================================================
    7. ניווט בין תצוגות
    ============================================================ */
 function showView(name){
+  // נעילת קונסולה ב-PIN: אם מוגדר PIN ועדיין לא נפתח בסשן - לבקש קוד
+  if(name==="console" && pinConfig && !consoleUnlocked){
+    openPinModal();
+    return;
+  }
+  if(name==="terminal"){ consoleUnlocked=false; } // יציאה מהקונסולה נועלת אותה מחדש
+  applyView(name);
+}
+function applyView(name){
   currentView = name;
   $("viewConsole").classList.toggle("hidden", name!=="console");
   $("viewTerminal").classList.toggle("hidden", name!=="terminal");
   $("tabConsole").classList.toggle("on", name==="console");
   $("tabTerminal").classList.toggle("on", name==="terminal");
   renderActive();
+}
+
+/* ---------- נעילת קונסולה ב-PIN ---------- */
+function openPinModal(){
+  $("pinInput").value="";
+  $("pinErr").classList.remove("show");
+  openModal("pinModal");
+  setTimeout(()=>{ try{ $("pinInput").focus(); }catch(e){} }, 60);
+}
+function closePinModal(){ closeModal("pinModal"); }
+function submitPin(){
+  const entered=$("pinInput").value.trim();
+  if(entered && pinConfig && entered===String(pinConfig)){
+    consoleUnlocked=true;
+    closeModal("pinModal");
+    applyView("console");
+  } else {
+    const e=$("pinErr"); e.textContent="קוד שגוי, נסה שוב."; e.classList.add("show");
+    $("pinInput").value="";
+  }
+}
+function setPin(){
+  const v=prompt("הזן קוד PIN חדש לכניסה לקונסולה (ספרות בלבד, לפחות 4):", "");
+  if(v===null) return;
+  const code=v.trim();
+  if(!/^\d{4,}$/.test(code)){ toast("הקוד חייב להיות לפחות 4 ספרות"); return; }
+  db.ref("config/consolePin").set(code).then(()=>{ consoleUnlocked=true; toast("קוד ה-PIN נשמר ✓"); });
+}
+function removePin(){
+  if(!pinConfig){ toast("אין קוד מוגדר"); return; }
+  if(!confirm("להסיר את קוד ה-PIN? הקונסולה תהיה פתוחה לכל מי שמחובר למכשיר.")) return;
+  db.ref("config/consolePin").remove().then(()=>toast("קוד ה-PIN הוסר"));
+}
+function renderPinStatus(){
+  const st=$("pinStatus"); if(!st) return;
+  if(pinConfig){
+    st.textContent="מוגן בקוד PIN ✓";
+    $("pinSetBtn").textContent="שנה קוד";
+    $("pinRemoveBtn").style.display="";
+  } else {
+    st.textContent="לא מוגדר — הקונסולה פתוחה לכל מי שמחובר";
+    $("pinSetBtn").textContent="הגדר קוד";
+    $("pinRemoveBtn").style.display="none";
+  }
 }
 function renderActive(){
   if(currentView==="console") renderConsole();
@@ -722,6 +780,7 @@ function renderConsole(){
   renderEmpList();
   renderSchedule();
   renderShiftList();
+  renderPinStatus();
 }
 
 // 10א. כרגע במשמרת
@@ -806,6 +865,7 @@ function renderShiftList(){
         <input type="text" id="fb_${s.id}" placeholder="משוב מנהל לעובד..." value="${esc(s.managerFeedback||'')}">
         <button class="btn line sm" onclick="saveFeedback('${s.id}')">שמור משוב</button>
         <button class="btn line sm" onclick="openEditShift('${s.id}')">ערוך שעות</button>
+        <button class="btn danger sm" onclick="deleteShift('${s.id}')">מחק</button>
       </div>
     </div>`;
   }).join("");
@@ -841,6 +901,21 @@ function toggleActive(empId){
 function saveFeedback(shiftId){
   const v=$("fb_"+shiftId).value.trim();
   db.ref("shifts/"+shiftId+"/managerFeedback").set(v).then(()=>toast("המשוב נשמר ✓"));
+}
+
+function deleteShift(shiftId){
+  const s=shifts[shiftId]; if(!s) return;
+  const name=employees[s.employeeId] ? employees[s.employeeId].name : "(עובד שנמחק)";
+  const when=fmtDate(s.clockIn)+" "+fmtTime(s.clockIn);
+  if(!confirm("למחוק לצמיתות את המשמרת של "+name+" ("+when+")?\nפעולה זו אינה הפיכה.")) return;
+  // אם זו משמרת פתוחה - לנקות גם את ה-openShiftId של העובד כדי שלא ייתקע "במשמרת"
+  const clearOpen = (!s.clockOut && s.employeeId && employees[s.employeeId] && employees[s.employeeId].openShiftId===shiftId)
+    ? db.ref("employees/"+s.employeeId+"/openShiftId").set(null)
+    : Promise.resolve();
+  clearOpen
+    .then(()=> db.ref("shifts/"+shiftId).remove())
+    .then(()=> toast("המשמרת נמחקה"))
+    .catch(()=> toast("שגיאה במחיקה"));
 }
 
 function openEditShift(shiftId){
@@ -1107,6 +1182,7 @@ setInterval(tickClock,1000); tickClock();
 $("authSubmit").addEventListener("click", handleAuthSubmit);
 $("authToggleLink").addEventListener("click", ()=> setAuthMode(authMode==="login"?"signup":"login"));
 $("authPass").addEventListener("keydown", e=>{ if(e.key==="Enter") handleAuthSubmit(); });
+$("pinInput").addEventListener("keydown", e=>{ if(e.key==="Enter") submitPin(); });
 
 // אם אין הגדרות - הצג באנר בתוך האפליקציה (אם בכל זאת ניגשים)
 if(!firebaseReady){ $("configBanner")?.classList.remove("hidden"); }
