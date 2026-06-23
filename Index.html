@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>שעון נוכחות עובדים</title>
+
+<!-- ============================================================
+     Firebase SDK (גרסה 8 - namespaced, פשוטה לקובץ יחיד)
+     אם התצוגה בתוך Claude לא מתחברת - זה תקין. הורד את הקובץ
+     והרץ אותו אצלך (או העלה לאחסון), שם Firebase יעבוד רגיל.
+     ============================================================ -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+<style>
+  :root{
+    --ink:#14181f;          /* טקסט ראשי / רקע כהה */
+    --muted:#6b7280;        /* טקסט משני */
+    --paper:#f7f6f2;        /* רקע */
+    --panel:#ffffff;        /* כרטיסים */
+    --line:#e6e3dc;         /* קווי הפרדה */
+    --primary:#0f6e66;      /* פעולה ראשית (טורקיז) */
+    --primary-d:#0b524c;
+    --live:#e8a317;         /* "במשמרת" (ענבר) */
+    --live-bg:#fdf4e2;
+    --danger:#c2410c;       /* דגל בעיה / מחיקה */
+    --danger-bg:#fdeee7;
+    --ok:#1f9d63;
+    --radius:14px;
+    --shadow:0 1px 2px rgba(20,24,31,.06), 0 8px 24px rgba(20,24,31,.06);
+    font-family:"Segoe UI","Arial Hebrew","Helvetica Neue",Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:var(--paper);color:var(--ink);-webkit-tap-highlight-color:transparent}
+
+  /* ---------- כותרת עליונה ---------- */
+  .topbar{
+    position:sticky;top:0;z-index:30;
+    background:var(--ink);color:#fff;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:12px 16px;gap:12px;
+  }
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;letter-spacing:.2px}
+  .brand .dot{width:10px;height:10px;border-radius:50%;background:var(--live);box-shadow:0 0 0 4px rgba(232,163,23,.18)}
+  .topbar-actions{display:flex;align-items:center;gap:8px}
+
+  .seg{display:inline-flex;background:rgba(255,255,255,.10);border-radius:10px;padding:3px}
+  .seg button{
+    border:0;background:transparent;color:#cdd2da;
+    padding:7px 14px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;
+  }
+  .seg button.on{background:#fff;color:var(--ink)}
+
+  .ghost{
+    border:1px solid rgba(255,255,255,.25);background:transparent;color:#fff;
+    padding:7px 12px;border-radius:9px;font-size:13px;cursor:pointer;font-weight:600;
+  }
+  .ghost:hover{background:rgba(255,255,255,.10)}
+
+  /* ---------- פריסה ---------- */
+  .wrap{max-width:1040px;margin:0 auto;padding:18px 16px 60px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;margin-bottom:18px}
+  .card h2{margin:0 0 4px;font-size:17px}
+  .card .sub{color:var(--muted);font-size:13px;margin:0 0 14px}
+  .section-title{font-size:13px;font-weight:700;color:var(--muted);letter-spacing:.4px;text-transform:none;margin:0 0 10px}
+
+  /* ---------- כפתורים / שדות ---------- */
+  .btn{
+    border:0;border-radius:11px;padding:11px 16px;font-size:15px;font-weight:700;cursor:pointer;
+    background:var(--primary);color:#fff;transition:.15s;
+  }
+  .btn:hover{background:var(--primary-d)}
+  .btn:disabled{opacity:.5;cursor:default}
+  .btn.sm{padding:8px 12px;font-size:13px;border-radius:9px}
+  .btn.line{background:#fff;color:var(--ink);border:1px solid var(--line)}
+  .btn.line:hover{background:#faf9f6}
+  .btn.danger{background:var(--danger-bg);color:var(--danger)}
+  .btn.danger:hover{filter:brightness(.97)}
+
+  label.fld{display:block;font-size:13px;font-weight:600;color:#374151;margin:0 0 5px}
+  input[type=text],input[type=password],input[type=number],input[type=datetime-local],input[type=time],input[type=date],select,textarea{
+    width:100%;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:15px;
+    background:#fff;color:var(--ink);font-family:inherit;
+  }
+  input:focus,select:focus,textarea:focus{outline:2px solid rgba(15,110,102,.35);border-color:var(--primary)}
+
+  /* ---------- סידור עבודה ---------- */
+  .sched-block{margin-top:6px}
+  .sched-sub{font-size:12.5px;font-weight:700;color:var(--muted);margin:14px 0 8px}
+  .sched-row{display:flex;align-items:center;gap:8px;padding:11px;border:1px solid var(--line);border-radius:11px;margin-bottom:9px;background:#fff;flex-wrap:wrap}
+  .sched-row .info{flex:1;min-width:140px}
+  .sched-row .info .t1{font-weight:700;font-size:14.5px}
+  .sched-row .info .t2{font-size:12.5px;color:var(--muted);margin-top:2px}
+  .sched-row.recurring{background:#f4faf9;border-color:#cfe7e3}
+  .day-picker{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+  .day-picker label{cursor:pointer}
+  .day-picker input{display:none}
+  .day-chip{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:10px;border:1px solid var(--line);font-weight:700;font-size:14px;color:#374151;background:#fff;user-select:none}
+  .day-picker input:checked + .day-chip{background:var(--primary);color:#fff;border-color:var(--primary)}
+  .seg-modal{display:flex;background:#f1f0ec;border-radius:11px;padding:4px;margin-bottom:16px}
+  .seg-modal button{flex:1;border:0;background:transparent;padding:9px;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer;color:var(--muted)}
+  .seg-modal button.on{background:#fff;color:var(--ink);box-shadow:var(--shadow)}
+  .cancel-list{max-height:300px;overflow:auto;margin-top:6px}
+  .cancel-item{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px}
+  .cancel-item.off{background:var(--danger-bg);border-color:#f3c9b6}
+  .cancel-item .d{font-weight:600;font-size:14px}
+  .cancel-item.off .d{text-decoration:line-through;color:var(--danger)}
+  .up-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px dashed var(--line);font-size:14px}
+  .up-row:last-child{border-bottom:0}
+  .up-row .dot2{width:7px;height:7px;border-radius:50%;background:var(--primary);flex:0 0 auto}
+  .up-row .dot2.once{background:var(--live)}
+  textarea{resize:vertical;min-height:80px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+  .row > div{flex:1;min-width:120px}
+
+  /* ---------- מסך התחברות ---------- */
+  .auth-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .auth-box{width:100%;max-width:380px;background:var(--panel);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:26px}
+  .auth-box .logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:20px;margin-bottom:4px}
+  .auth-box .logo .dot{width:12px;height:12px;border-radius:50%;background:var(--live)}
+  .auth-box p.lead{color:var(--muted);font-size:14px;margin:0 0 20px}
+  .auth-box .field{margin-bottom:13px}
+  .auth-toggle{text-align:center;margin-top:16px;font-size:14px;color:var(--muted)}
+  .auth-toggle a{color:var(--primary);font-weight:700;cursor:pointer;text-decoration:none}
+  .err{background:var(--danger-bg);color:var(--danger);border:1px solid #f3c9b6;border-radius:10px;padding:9px 12px;font-size:13.5px;margin-bottom:12px;display:none}
+  .err.show{display:block}
+
+  /* ---------- טרמינל (קיוסק) ---------- */
+  .kiosk-head{text-align:center;margin:10px 0 22px}
+  .kiosk-head .clock{font-size:40px;font-weight:800;letter-spacing:1px}
+  .kiosk-head .date{color:var(--muted);font-size:15px;margin-top:2px}
+  .emp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
+  .emp-tile{
+    position:relative;text-align:right;border:1px solid var(--line);background:#fff;
+    border-radius:16px;padding:18px;cursor:pointer;transition:.15s;min-height:104px;
+    display:flex;flex-direction:column;justify-content:space-between;box-shadow:var(--shadow);
+  }
+  .emp-tile:hover{transform:translateY(-2px)}
+  .emp-tile .nm{font-size:19px;font-weight:800}
+  .emp-tile .state{font-size:13px;color:var(--muted);margin-top:6px}
+  .emp-tile .cta{font-size:14px;font-weight:800;margin-top:14px;color:var(--primary)}
+  .emp-tile.live{background:var(--live-bg);border-color:#f0d391}
+  .emp-tile.live .cta{color:var(--danger)}
+  .emp-tile .badge{position:absolute;top:14px;left:14px;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:#a6700a}
+  .emp-tile .badge .blip{width:8px;height:8px;border-radius:50%;background:var(--live);animation:pulse 1.6s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+  /* ---------- רשימות / שורות ---------- */
+  .list-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+  .list-row:last-child{border-bottom:0}
+  .list-row .grow{flex:1;min-width:0}
+  .nm-strong{font-weight:700}
+  .meta{font-size:13px;color:var(--muted)}
+  .pill{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px}
+  .pill.live{background:var(--live-bg);color:#a6700a}
+  .pill.flag{background:var(--danger-bg);color:var(--danger)}
+  .pill.edit{background:#eef2ff;color:#4338ca}
+  .empty{color:var(--muted);font-size:14px;padding:16px 0;text-align:center}
+
+  .shift-card{border:1px solid var(--line);border-radius:12px;padding:13px;margin-bottom:10px;background:#fff}
+  .shift-card .head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .shift-card .times{font-size:14px;margin-top:6px;color:#374151}
+  .shift-card .note{font-size:13.5px;margin-top:8px;background:#f7f6f2;border-radius:9px;padding:8px 10px}
+  .shift-card .note b{color:var(--muted);font-weight:700}
+  .fb-row{display:flex;gap:8px;margin-top:8px}
+  .fb-row input{flex:1}
+
+  .pay-num{font-weight:800;font-size:16px}
+  .pay-sub{font-size:12px;color:var(--muted)}
+
+  /* ---------- מודאל ---------- */
+  .modal-bg{position:fixed;inset:0;background:rgba(20,24,31,.45);display:none;align-items:center;justify-content:center;z-index:50;padding:18px}
+  .modal-bg.show{display:flex}
+  .modal{background:#fff;border-radius:18px;max-width:420px;width:100%;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+  .modal h3{margin:0 0 4px;font-size:18px}
+  .modal .who{color:var(--muted);font-size:14px;margin:0 0 16px}
+  .modal-actions{display:flex;gap:10px;margin-top:18px}
+  .modal-actions .btn{flex:1}
+
+  .config-banner{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:12px;padding:12px 14px;font-size:13.5px;margin:14px 16px 0;line-height:1.5}
+  .config-banner code{background:#fde7cf;padding:1px 5px;border-radius:5px;font-size:12.5px}
+
+  .hidden{display:none !important}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:11px 18px;border-radius:12px;font-size:14px;font-weight:600;z-index:80;opacity:0;transition:.25s;pointer-events:none}
+  .toast.show{opacity:1}
+
+  @media(max-width:560px){
+    .kiosk-head .clock{font-size:34px}
+    .topbar{padding:10px 12px}
+    .brand{font-size:14px}
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================ מסך התחברות ============================ -->
+<div id="authScreen" class="auth-screen">
+  <div class="auth-box">
+    <div class="logo"><span class="dot"></span> שעון נוכחות</div>
+    <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
+    <div id="authErr" class="err"></div>
+
+    <div class="field">
+      <label class="fld">שם משתמש</label>
+      <input type="text" id="authUser" autocomplete="username" placeholder="שם המשתמש שלך">
+    </div>
+    <div class="field">
+      <label class="fld">סיסמה</label>
+      <input type="password" id="authPass" autocomplete="current-password" placeholder="הסיסמה שלך">
+    </div>
+
+    <button class="btn" id="authSubmit" style="width:100%;margin-top:6px">התחבר</button>
+
+    <div class="auth-toggle">
+      <span id="authToggleText">אין עדיין חשבון מנהל?</span>
+      <a id="authToggleLink">צור חשבון מנהל ראשון</a>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ אפליקציה ============================ -->
+<div id="app" class="hidden">
+  <div class="topbar">
+    <div class="brand"><span class="dot"></span> שעון נוכחות</div>
+    <div class="topbar-actions">
+      <div class="seg">
+        <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
+        <button id="tabTerminal" onclick="showView('terminal')">טרמינל</button>
+      </div>
+      <button class="ghost" onclick="doLogout()">יציאה</button>
+    </div>
+  </div>
+
+  <div id="configBanner" class="config-banner hidden">
+    ⚙️ עדיין לא הוזנו הגדרות Firebase. פתח את הקובץ, מצא את <code>firebaseConfig</code> בראש ה־&lt;script&gt; והדבק את ההגדרות מהפרויקט שלך כדי שהנתונים יישמרו.
+  </div>
+
+  <!-- ---------------- קונסולת מנהל ---------------- -->
+  <div id="viewConsole" class="wrap">
+
+    <div class="card">
+      <h2>כרגע במשמרת</h2>
+      <p class="sub">עובדים שהחתימו כניסה ועדיין לא יצאו</p>
+      <div id="openShifts"></div>
+    </div>
+
+    <div class="card">
+      <h2>עובדים</h2>
+      <p class="sub">הוספת עובד וקביעת תעריף לשעה. השכר מחושב אך ורק לפי החתמות בטרמינל.</p>
+
+      <div class="row" style="margin-bottom:16px">
+        <div style="flex:2">
+          <label class="fld">שם העובד</label>
+          <input type="text" id="newEmpName" placeholder="לדוגמה: דני">
+        </div>
+        <div>
+          <label class="fld">תעריף לשעה (₪)</label>
+          <input type="number" id="newEmpRate" min="0" step="0.5" placeholder="35">
+        </div>
+        <div style="flex:0 0 auto">
+          <button class="btn" onclick="addEmployee()">הוסף עובד</button>
+        </div>
+      </div>
+
+      <div class="section-title">צוות החודש</div>
+      <div id="empList"></div>
+    </div>
+
+    <div class="card">
+      <h2>סידור עבודה</h2>
+      <p class="sub">תכנון משמרות קדימה. זו תוכנית בלבד ולא משפיעה על השכר — שכר נקבע אך ורק מהחתמות בטרמינל.</p>
+
+      <div class="row" style="margin-bottom:14px">
+        <div style="flex:2">
+          <label class="fld">בחר עובד</label>
+          <select id="schedEmp" onchange="renderSchedule()"></select>
+        </div>
+        <div style="flex:0 0 auto">
+          <button class="btn" id="addShiftBtn" onclick="openAddShift()">+ הוסף משמרת</button>
+        </div>
+      </div>
+
+      <div id="schedBody"></div>
+    </div>
+
+    <div class="card">
+      <h2>משמרות אחרונות</h2>
+      <p class="sub">אפשר לערוך כניסה/יציאה בכל משמרת (תיקון לפי החלטת המנהל) ולהוסיף משוב לעובד.</p>
+      <div id="shiftList"></div>
+    </div>
+  </div>
+
+  <!-- ---------------- טרמינל חנות ---------------- -->
+  <div id="viewTerminal" class="wrap hidden">
+    <div class="kiosk-head">
+      <div class="clock" id="kioskClock">--:--</div>
+      <div class="date" id="kioskDate"></div>
+    </div>
+    <div id="empGrid" class="emp-grid"></div>
+  </div>
+</div>
+
+<!-- ============================ מודאל: הערת סיום משמרת ============================ -->
+<div id="noteModal" class="modal-bg">
+  <div class="modal">
+    <h3>סיום משמרת</h3>
+    <p class="who" id="noteWho"></p>
+    <label class="fld">משהו לציין מהמשמרת? (לא חובה)</label>
+    <textarea id="noteText" placeholder="לדוגמה: המקרר התקלקל / נשארתי לסדר מלאי..."></textarea>
+    <div class="modal-actions">
+      <button class="btn line" onclick="confirmClockOut(true)">דלג ושמור</button>
+      <button class="btn" onclick="confirmClockOut(false)">שמור הערה</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ מודאל: עריכת שעות ============================ -->
+<div id="editModal" class="modal-bg">
+  <div class="modal">
+    <h3>עריכת שעות משמרת</h3>
+    <p class="who" id="editWho"></p>
+    <div class="field" style="margin-bottom:12px">
+      <label class="fld">כניסה</label>
+      <input type="datetime-local" id="editIn">
+    </div>
+    <div class="field">
+      <label class="fld">יציאה</label>
+      <input type="datetime-local" id="editOut">
+    </div>
+    <div class="modal-actions">
+      <button class="btn line" onclick="closeModal('editModal')">ביטול</button>
+      <button class="btn" onclick="saveEditShift()">שמור שינויים</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ מודאל: הוספת/עריכת משמרת מתוכננת ============================ -->
+<div id="shiftModal" class="modal-bg">
+  <div class="modal">
+    <h3 id="shiftModalTitle">הוספת משמרת</h3>
+    <p class="who" id="shiftModalWho"></p>
+
+    <div class="seg-modal" id="shiftTypeSeg">
+      <button id="typeRecurring" class="on" onclick="setShiftType('recurring')">קבועה (חוזרת)</button>
+      <button id="typeOnetime" onclick="setShiftType('onetime')">חד-פעמית</button>
+    </div>
+
+    <div id="recurringFields">
+      <label class="fld">ימים בשבוע</label>
+      <div class="day-picker" id="dayPicker">
+        <label><input type="checkbox" value="0"><span class="day-chip">א</span></label>
+        <label><input type="checkbox" value="1"><span class="day-chip">ב</span></label>
+        <label><input type="checkbox" value="2"><span class="day-chip">ג</span></label>
+        <label><input type="checkbox" value="3"><span class="day-chip">ד</span></label>
+        <label><input type="checkbox" value="4"><span class="day-chip">ה</span></label>
+        <label><input type="checkbox" value="5"><span class="day-chip">ו</span></label>
+        <label><input type="checkbox" value="6"><span class="day-chip">ש</span></label>
+      </div>
+    </div>
+
+    <div id="onetimeFields" class="hidden">
+      <label class="fld">תאריך</label>
+      <input type="date" id="shiftDate">
+    </div>
+
+    <div class="row" style="margin-top:14px">
+      <div>
+        <label class="fld">שעת התחלה</label>
+        <input type="time" id="shiftStart" value="16:00">
+      </div>
+      <div>
+        <label class="fld">שעת סיום</label>
+        <input type="time" id="shiftEnd" value="22:00">
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn line" onclick="closeModal('shiftModal')">ביטול</button>
+      <button class="btn" onclick="saveShift()">שמור</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ מודאל: ביטול מופע בודד ============================ -->
+<div id="cancelModal" class="modal-bg">
+  <div class="modal">
+    <h3>ביטול מופע בודד</h3>
+    <p class="who" id="cancelWho"></p>
+    <p class="meta" style="margin:-8px 0 12px">ביטול משמרת בתאריך מסוים בלי למחוק את המשמרת הקבועה. אפשר לשחזר בכל רגע.</p>
+    <div class="cancel-list" id="cancelList"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('cancelModal')">סגור</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+/* ============================================================
+   1. הגדרות
+   ============================================================ */
+
+// ⬇️ הדבק כאן את ההגדרות מהפרויקט שלך ב-Firebase (Project settings → SDK setup)
+const firebaseConfig = {
+  apiKey:            "AIzaSyABsjzRYpa2Kr6RPHOP4qgAmQtgUpHWuCM",
+  authDomain:        "mini-market-shalom.firebaseapp.com",
+  databaseURL:       "https://mini-market-shalom-default-rtdb.firebaseio.com", // Realtime Database
+  projectId:         "mini-market-shalom",
+  storageBucket:     "mini-market-shalom.firebasestorage.app",
+  messagingSenderId: "1057478582958",
+  appId:             "1:1057478582958:web:842ee59a54a70d99f2033f"
+};
+
+const LOGIN_DOMAIN   = "store.local"; // שם משתמש "דני" => "דני@store.local" מאחורי הקלעים
+const AUTO_CLOSE_HOURS = 12;          // סגירה אוטומטית למשמרת ששכחו לסגור
+
+/* ============================================================
+   2. אתחול
+   ============================================================ */
+let firebaseReady = false;
+try {
+  if (!firebaseConfig.apiKey.startsWith("PASTE")) {
+    firebase.initializeApp(firebaseConfig);
+    firebaseReady = true;
+  }
+} catch (e) { console.error(e); }
+
+const auth = firebaseReady ? firebase.auth() : null;
+const db   = firebaseReady ? firebase.database() : null;
+const TS   = firebaseReady ? firebase.database.ServerValue.TIMESTAMP : null;
+
+/* ============================================================
+   3. מצב (cache מקומי של הנתונים)
+   ============================================================ */
+let employees = {};   // id -> {name, hourlyRate, active, openShiftId, createdAt}
+let shifts    = {};   // id -> {employeeId, clockIn, clockOut, autoCloseFlag, employeeNote, managerFeedback, edited}
+let currentView = "console";
+let authMode = "login"; // "login" | "signup"
+let pendingClockOutEmp = null; // עובד שבתהליך סיום משמרת
+let editingShiftId = null;     // משמרת בעריכה (החתמה אמיתית)
+
+// --- סידור עבודה ---
+let recurring = {};   // id -> {employeeId, daysOfWeek[], startTime, endTime, cancelledDates{}}
+let oneTime   = {};   // id -> {employeeId, date, startTime, endTime}
+let shiftModalMode = "add";       // "add" | "editRecurring" | "editOnetime"
+let shiftModalType = "recurring"; // "recurring" | "onetime"
+let editingPlanId = null;         // id של משמרת מתוכננת בעריכה
+let cancelTargetId = null;        // id של משמרת קבועה במודאל ביטול מופע
+
+/* ============================================================
+   4. עזרים
+   ============================================================ */
+const $ = id => document.getElementById(id);
+const uname = u => u.trim() + "@" + LOGIN_DOMAIN;
+
+function pad(n){ return n < 10 ? "0"+n : ""+n; }
+function fmtTime(ts){ if(!ts) return "—"; const d=new Date(ts); return pad(d.getHours())+":"+pad(d.getMinutes()); }
+function fmtDate(ts){ if(!ts) return ""; const d=new Date(ts); const days=["א","ב","ג","ד","ה","ו","ש"]; return "יום "+days[d.getDay()]+", "+pad(d.getDate())+"/"+pad(d.getMonth()+1)+"/"+d.getFullYear(); }
+function hoursBetween(a,b){ return (b-a)/3600000; }
+function fmtHours(h){ const H=Math.floor(h); const M=Math.round((h-H)*60); return H+":"+pad(M)+" שע'"; }
+function inCurrentMonth(ts){ const d=new Date(ts), n=new Date(); return d.getFullYear()===n.getFullYear() && d.getMonth()===n.getMonth(); }
+
+function toLocalInput(ts){ // ms -> "YYYY-MM-DDTHH:mm" בזמן מקומי
+  const d=new Date(ts);
+  return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+"T"+pad(d.getHours())+":"+pad(d.getMinutes());
+}
+function fromLocalInput(str){ return new Date(str).getTime(); }
+
+function toast(msg){
+  const t=$("toast"); t.textContent=msg; t.classList.add("show");
+  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("show"),2200);
+}
+function openModal(id){ $(id).classList.add("show"); }
+function closeModal(id){ $(id).classList.remove("show"); }
+
+/* ============================================================
+   5. התחברות / הרשמה
+   ============================================================ */
+function setAuthMode(mode){
+  authMode = mode;
+  if(mode==="signup"){
+    $("authLead").textContent = "יצירת חשבון מנהל ראשון";
+    $("authSubmit").textContent = "צור חשבון מנהל";
+    $("authToggleText").textContent = "כבר יש חשבון מנהל?";
+    $("authToggleLink").textContent = "חזרה להתחברות";
+  } else {
+    $("authLead").textContent = "התחברות לחשבון המנהל";
+    $("authSubmit").textContent = "התחבר";
+    $("authToggleText").textContent = "אין עדיין חשבון מנהל?";
+    $("authToggleLink").textContent = "צור חשבון מנהל ראשון";
+  }
+  showErr("");
+}
+function showErr(msg){
+  const e=$("authErr");
+  if(msg){ e.textContent=msg; e.classList.add("show"); }
+  else { e.classList.remove("show"); }
+}
+
+function handleAuthSubmit(){
+  if(!firebaseReady){ showErr("יש להזין קודם את הגדרות Firebase בקובץ."); return; }
+  const u=$("authUser").value.trim();
+  const p=$("authPass").value;
+  if(!u || !p){ showErr("יש למלא שם משתמש וסיסמה."); return; }
+  if(!/^[a-zA-Z0-9._-]+$/.test(u)){
+    showErr("שם המשתמש יכול להכיל אותיות באנגלית, ספרות, נקודה, מקף וקו תחתון בלבד.");
+    return;
+  }
+
+  if(authMode==="signup"){
+    // לוודא שלא קיים כבר מנהל
+    db.ref("config/managerUid").once("value").then(snap=>{
+      if(snap.exists()){ showErr("כבר קיים חשבון מנהל. עבור להתחברות."); return; }
+      auth.createUserWithEmailAndPassword(uname(u), p)
+        .then(cred => db.ref("config/managerUid").set(cred.user.uid))
+        .then(()=> toast("חשבון המנהל נוצר"))
+        .catch(err => showErr(authErrText(err)));
+    });
+  } else {
+    auth.signInWithEmailAndPassword(uname(u), p)
+      .catch(err => showErr(authErrText(err)));
+  }
+}
+
+function authErrText(err){
+  const c=err.code||"";
+  if(c.includes("email-already-in-use")) return "שם המשתמש כבר תפוס.";
+  if(c.includes("wrong-password")||c.includes("invalid-credential")) return "שם משתמש או סיסמה שגויים.";
+  if(c.includes("user-not-found")) return "המשתמש לא נמצא.";
+  if(c.includes("weak-password")) return "הסיסמה קצרה מדי (לפחות 6 תווים).";
+  return "שגיאה: " + (err.message||c);
+}
+
+function doLogout(){ if(auth) auth.signOut(); }
+
+/* ============================================================
+   6. מאזין מצב התחברות + טעינת נתונים
+   ============================================================ */
+if(auth){
+  auth.onAuthStateChanged(user=>{
+    if(user){
+      $("authScreen").classList.add("hidden");
+      $("app").classList.remove("hidden");
+      $("configBanner").classList.add("hidden");
+      startDataListeners();
+    } else {
+      $("app").classList.add("hidden");
+      $("authScreen").classList.remove("hidden");
+    }
+  });
+} else {
+  // אין Firebase מוגדר - מציגים את מסך ההתחברות עם הסבר
+  showErr("יש להזין את הגדרות Firebase בקובץ כדי להפעיל את האפליקציה.");
+}
+
+let listenersStarted=false;
+function startDataListeners(){
+  if(listenersStarted) return; listenersStarted=true;
+  db.ref("employees").on("value", snap=>{ employees = snap.val() || {}; renderActive(); });
+  db.ref("shifts").on("value",    snap=>{ shifts    = snap.val() || {}; renderActive(); checkAutoClose(); });
+  db.ref("recurringShifts").on("value", snap=>{ recurring = snap.val() || {}; if(currentView==="console") renderSchedule(); });
+  db.ref("oneTimeShifts").on("value",   snap=>{ oneTime   = snap.val() || {}; if(currentView==="console") renderSchedule(); });
+}
+
+/* ============================================================
+   7. ניווט בין תצוגות
+   ============================================================ */
+function showView(name){
+  currentView = name;
+  $("viewConsole").classList.toggle("hidden", name!=="console");
+  $("viewTerminal").classList.toggle("hidden", name!=="terminal");
+  $("tabConsole").classList.toggle("on", name==="console");
+  $("tabTerminal").classList.toggle("on", name==="terminal");
+  renderActive();
+}
+function renderActive(){
+  if(currentView==="console") renderConsole();
+  else renderTerminal();
+}
+
+/* ============================================================
+   8. טרמינל (קיוסק) - כניסה/יציאה
+   ============================================================ */
+function renderTerminal(){
+  const grid=$("empGrid");
+  const list=Object.keys(employees)
+    .map(id=>({id,...employees[id]}))
+    .filter(e=>e.active!==false)
+    .sort((a,b)=>(a.name||"").localeCompare(b.name||"","he"));
+
+  if(list.length===0){
+    grid.innerHTML='<div class="empty">אין עובדים פעילים. הוסף עובדים בקונסולת המנהל.</div>';
+    return;
+  }
+  grid.innerHTML = list.map(e=>{
+    const live = !!e.openShiftId;
+    const since = live && shifts[e.openShiftId] ? fmtTime(shifts[e.openShiftId].clockIn) : "";
+    return `
+      <div class="emp-tile ${live?'live':''}" onclick="onEmployeeTap('${e.id}')">
+        ${live?`<div class="badge"><span class="blip"></span> במשמרת</div>`:''}
+        <div>
+          <div class="nm">${esc(e.name)}</div>
+          <div class="state">${live?('נכנס/ה בשעה '+since):'לא במשמרת'}</div>
+        </div>
+        <div class="cta">${live?'סיים משמרת ←':'התחל משמרת ←'}</div>
+      </div>`;
+  }).join("");
+}
+
+function onEmployeeTap(empId){
+  const e=employees[empId]; if(!e) return;
+  if(e.openShiftId){
+    // יש משמרת פתוחה -> סיום (עם הערה אופציונלית)
+    pendingClockOutEmp = empId;
+    $("noteWho").textContent = e.name + " · סיום משמרת";
+    $("noteText").value = "";
+    openModal("noteModal");
+  } else {
+    clockIn(empId);
+  }
+}
+
+function clockIn(empId){
+  const ref = db.ref("shifts").push();
+  ref.set({
+    employeeId: empId,
+    clockIn: TS,
+    clockOut: null,
+    autoCloseFlag: false,
+    employeeNote: "",
+    managerFeedback: "",
+    edited: false
+  }).then(()=>{
+    return db.ref("employees/"+empId+"/openShiftId").set(ref.key);
+  }).then(()=> toast(employees[empId].name + " — תחילת משמרת ✓"))
+    .catch(e=> toast("שגיאה בשמירה"));
+}
+
+function confirmClockOut(skip){
+  const empId = pendingClockOutEmp;
+  const note  = skip ? "" : $("noteText").value.trim();
+  closeModal("noteModal");
+  if(!empId) return;
+  const shiftId = employees[empId].openShiftId;
+  if(!shiftId){ pendingClockOutEmp=null; return; }
+
+  db.ref("shifts/"+shiftId).update({ clockOut: TS, employeeNote: note })
+    .then(()=> db.ref("employees/"+empId+"/openShiftId").set(null))
+    .then(()=> toast(employees[empId].name + " — סיום משמרת ✓"))
+    .catch(e=> toast("שגיאה בשמירה"));
+  pendingClockOutEmp=null;
+}
+
+/* ============================================================
+   9. סגירה אוטומטית אחרי 12 שעות (שכח לסגור)
+   ============================================================ */
+function checkAutoClose(){
+  const now = Date.now();
+  Object.keys(employees).forEach(empId=>{
+    const sid = employees[empId].openShiftId;
+    if(!sid) return;
+    const s = shifts[sid];
+    if(!s || !s.clockIn || s.clockOut) return;
+    if(now - s.clockIn >= AUTO_CLOSE_HOURS*3600000){
+      const forcedOut = s.clockIn + AUTO_CLOSE_HOURS*3600000;
+      db.ref("shifts/"+sid).update({ clockOut: forcedOut, autoCloseFlag: true });
+      db.ref("employees/"+empId+"/openShiftId").set(null);
+    }
+  });
+}
+setInterval(()=>{ if(firebaseReady) checkAutoClose(); }, 60000);
+
+/* ============================================================
+   10. קונסולת מנהל
+   ============================================================ */
+function renderConsole(){
+  renderOpenShifts();
+  renderEmpList();
+  renderSchedule();
+  renderShiftList();
+}
+
+// 10א. כרגע במשמרת
+function renderOpenShifts(){
+  const box=$("openShifts");
+  const open=Object.keys(employees)
+    .filter(id=>employees[id].openShiftId)
+    .map(id=>({id, e:employees[id], s:shifts[employees[id].openShiftId]}))
+    .filter(x=>x.s);
+  if(open.length===0){ box.innerHTML='<div class="empty">אף אחד לא במשמרת כרגע.</div>'; return; }
+  box.innerHTML = open.map(x=>{
+    const dur = fmtHours(hoursBetween(x.s.clockIn, Date.now()));
+    return `<div class="list-row">
+      <span class="pill live"><span class="blip" style="width:7px;height:7px;border-radius:50%;background:#e8a317;display:inline-block"></span> במשמרת</span>
+      <div class="grow"><div class="nm-strong">${esc(x.e.name)}</div>
+      <div class="meta">נכנס/ה ${fmtTime(x.s.clockIn)} · כבר ${dur}</div></div>
+    </div>`;
+  }).join("");
+}
+
+// 10ב. רשימת עובדים + שכר החודש
+function renderEmpList(){
+  const box=$("empList");
+  const list=Object.keys(employees).map(id=>({id,...employees[id]}))
+    .sort((a,b)=>(a.name||"").localeCompare(b.name||"","he"));
+  if(list.length===0){ box.innerHTML='<div class="empty">עדיין אין עובדים.</div>'; return; }
+
+  box.innerHTML = list.map(e=>{
+    const {hours,pay} = monthTotals(e.id, e.hourlyRate||0);
+    const inactive = e.active===false;
+    return `<div class="list-row" style="${inactive?'opacity:.55':''}">
+      <div class="grow">
+        <div class="nm-strong">${esc(e.name)} ${inactive?'<span class="meta">(לא פעיל)</span>':''}</div>
+        <div class="meta">תעריף: ₪${e.hourlyRate||0} לשעה · החודש ${fmtHours(hours)}</div>
+      </div>
+      <div style="text-align:left;margin-inline-end:8px">
+        <div class="pay-num">₪${pay.toFixed(0)}</div>
+        <div class="pay-sub">לתשלום החודש</div>
+      </div>
+      <button class="btn line sm" onclick="editRate('${e.id}')">תעריף</button>
+      <button class="btn line sm" onclick="toggleActive('${e.id}')">${inactive?'הפעל':'השבת'}</button>
+    </div>`;
+  }).join("");
+}
+
+function monthTotals(empId, rate){
+  let hours=0;
+  Object.values(shifts).forEach(s=>{
+    if(s.employeeId===empId && s.clockOut && inCurrentMonth(s.clockIn)){
+      hours += hoursBetween(s.clockIn, s.clockOut);
+    }
+  });
+  return {hours, pay: hours*rate};
+}
+
+// 10ג. משמרות אחרונות (עריכה + משוב)
+function renderShiftList(){
+  const box=$("shiftList");
+  const list=Object.keys(shifts).map(id=>({id,...shifts[id]}))
+    .sort((a,b)=>(b.clockIn||0)-(a.clockIn||0))
+    .slice(0,60);
+  if(list.length===0){ box.innerHTML='<div class="empty">עדיין אין משמרות.</div>'; return; }
+
+  box.innerHTML = list.map(s=>{
+    const name = employees[s.employeeId] ? employees[s.employeeId].name : "(עובד שנמחק)";
+    const open = !s.clockOut;
+    const dur = open ? "" : fmtHours(hoursBetween(s.clockIn, s.clockOut));
+    const pills =
+      (open?'<span class="pill live">פתוחה</span>':'')+
+      (s.autoCloseFlag?'<span class="pill flag">⚠ נסגרה אוטומטית · בדוק שעות</span>':'')+
+      (s.edited?'<span class="pill edit">נערך</span>':'');
+    const empNote = s.employeeNote ? `<div class="note"><b>הערת עובד:</b> ${esc(s.employeeNote)}</div>` : '';
+    return `<div class="shift-card">
+      <div class="head">
+        <span class="nm-strong">${esc(name)}</span>
+        <span class="meta">· ${fmtDate(s.clockIn)}</span>
+        ${pills}
+      </div>
+      <div class="times">כניסה ${fmtTime(s.clockIn)} ← יציאה ${open?'—':fmtTime(s.clockOut)} &nbsp;·&nbsp; ${open?'<span style="color:#a6700a">במהלך משמרת</span>':('סה״כ '+dur)}</div>
+      ${empNote}
+      <div class="fb-row">
+        <input type="text" id="fb_${s.id}" placeholder="משוב מנהל לעובד..." value="${esc(s.managerFeedback||'')}">
+        <button class="btn line sm" onclick="saveFeedback('${s.id}')">שמור משוב</button>
+        <button class="btn line sm" onclick="openEditShift('${s.id}')">ערוך שעות</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+/* ============================================================
+   11. פעולות מנהל
+   ============================================================ */
+function addEmployee(){
+  const name=$("newEmpName").value.trim();
+  const rate=parseFloat($("newEmpRate").value);
+  if(!name){ toast("יש להזין שם עובד"); return; }
+  if(isNaN(rate)||rate<0){ toast("יש להזין תעריף תקין"); return; }
+  db.ref("employees").push({ name, hourlyRate:rate, active:true, openShiftId:null, createdAt:TS })
+    .then(()=>{ $("newEmpName").value=""; $("newEmpRate").value=""; toast("העובד נוסף ✓"); });
+}
+
+function editRate(empId){
+  const e=employees[empId]; if(!e) return;
+  const v=prompt("תעריף חדש לשעה (₪) עבור "+e.name+":", e.hourlyRate||0);
+  if(v===null) return;
+  const r=parseFloat(v);
+  if(isNaN(r)||r<0){ toast("תעריף לא תקין"); return; }
+  db.ref("employees/"+empId+"/hourlyRate").set(r).then(()=>toast("התעריף עודכן ✓"));
+}
+
+function toggleActive(empId){
+  const e=employees[empId]; if(!e) return;
+  const newVal = e.active===false; // אם לא פעיל -> הפעל
+  db.ref("employees/"+empId+"/active").set(newVal).then(()=>toast(newVal?"העובד הופעל":"העובד הושבת"));
+}
+
+function saveFeedback(shiftId){
+  const v=$("fb_"+shiftId).value.trim();
+  db.ref("shifts/"+shiftId+"/managerFeedback").set(v).then(()=>toast("המשוב נשמר ✓"));
+}
+
+function openEditShift(shiftId){
+  const s=shifts[shiftId]; if(!s) return;
+  editingShiftId=shiftId;
+  const name=employees[s.employeeId]?employees[s.employeeId].name:"";
+  $("editWho").textContent = name + " · " + fmtDate(s.clockIn);
+  $("editIn").value  = s.clockIn  ? toLocalInput(s.clockIn)  : "";
+  $("editOut").value = s.clockOut ? toLocalInput(s.clockOut) : "";
+  openModal("editModal");
+}
+
+function saveEditShift(){
+  if(!editingShiftId) return;
+  const inV=$("editIn").value, outV=$("editOut").value;
+  if(!inV || !outV){ toast("יש למלא כניסה ויציאה"); return; }
+  const inMs=fromLocalInput(inV), outMs=fromLocalInput(outV);
+  if(outMs<=inMs){ toast("היציאה חייבת להיות אחרי הכניסה"); return; }
+  db.ref("shifts/"+editingShiftId).update({
+    clockIn:inMs, clockOut:outMs, edited:true, autoCloseFlag:false
+  }).then(()=>{
+    closeModal("editModal");
+    editingShiftId=null;
+    toast("השעות עודכנו ✓");
+  });
+}
+
+/* ============================================================
+   11ב. סידור עבודה (תוכנית בלבד — לא נוגע בשכר!)
+   ============================================================ */
+const HE_DAYS_SHORT = ["א","ב","ג","ד","ה","ו","ש"];
+const HE_DAYS_LONG  = ["ראשון","שני","שלישי","רביעי","חמישי","שישי","שבת"];
+
+function isoDate(d){ return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()); }
+function parseIso(s){ const p=s.split("-").map(Number); return new Date(p[0],p[1]-1,p[2]); }
+function fmtIsoShort(s){ const d=parseIso(s); return "יום "+HE_DAYS_SHORT[d.getDay()]+" "+pad(d.getDate())+"/"+pad(d.getMonth()+1); }
+
+// מילוי תיבת בחירת העובד (שומר על הבחירה הקיימת)
+function fillSchedEmpSelect(){
+  const sel=$("schedEmp"); const prev=sel.value;
+  const list=Object.keys(employees).map(id=>({id,...employees[id]}))
+    .filter(e=>e.active!==false)
+    .sort((a,b)=>(a.name||"").localeCompare(b.name||"","he"));
+  sel.innerHTML='<option value="">— בחר עובד —</option>'+
+    list.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join("");
+  if(prev && employees[prev]) sel.value=prev;
+}
+
+function renderSchedule(){
+  fillSchedEmpSelect();
+  const empId=$("schedEmp").value;
+  const body=$("schedBody");
+  $("addShiftBtn").disabled=!empId;
+  if(!empId){ body.innerHTML='<div class="empty">בחר עובד כדי לראות ולנהל את הסידור שלו.</div>'; return; }
+
+  const recList=Object.keys(recurring).map(id=>({id,...recurring[id]})).filter(r=>r.employeeId===empId);
+  const todayIso=isoDate(new Date());
+  const onceList=Object.keys(oneTime).map(id=>({id,...oneTime[id]}))
+    .filter(o=>o.employeeId===empId && o.date>=todayIso)
+    .sort((a,b)=>a.date.localeCompare(b.date));
+
+  let html="";
+
+  // קבועות
+  html+='<div class="sched-sub">משמרות קבועות</div>';
+  if(recList.length===0){ html+='<div class="empty" style="padding:6px 0">אין משמרות קבועות.</div>'; }
+  else recList.forEach(r=>{
+    const days=(r.daysOfWeek||[]).slice().sort((a,b)=>a-b).map(d=>HE_DAYS_LONG[d]).join(", ");
+    const cc=Object.keys(r.cancelledDates||{}).length;
+    html+=`<div class="sched-row recurring">
+      <div class="info"><div class="t1">ימים: ${days||'—'}</div>
+      <div class="t2">${r.startTime}–${r.endTime}${cc?(' · '+cc+' מופעים בוטלו'):''}</div></div>
+      <button class="btn line sm" onclick="openEditRecurring('${r.id}')">ערוך</button>
+      <button class="btn line sm" onclick="openCancelOccurrence('${r.id}')">בטל מופע</button>
+      <button class="btn danger sm" onclick="deleteRecurring('${r.id}')">מחק</button>
+    </div>`;
+  });
+
+  // חד-פעמיות
+  html+='<div class="sched-sub">משמרות חד-פעמיות</div>';
+  if(onceList.length===0){ html+='<div class="empty" style="padding:6px 0">אין משמרות חד-פעמיות קרובות.</div>'; }
+  else onceList.forEach(o=>{
+    html+=`<div class="sched-row">
+      <div class="info"><div class="t1">${fmtIsoShort(o.date)}</div>
+      <div class="t2">${o.startTime}–${o.endTime}</div></div>
+      <button class="btn line sm" onclick="openEditOnetime('${o.id}')">ערוך</button>
+      <button class="btn danger sm" onclick="deleteOnetime('${o.id}')">מחק</button>
+    </div>`;
+  });
+
+  // המשמרות הקרובות (מחושב מהחוקים)
+  const upcoming=computeUpcomingForEmp(empId, 5).slice(0,12);
+  html+='<div class="sched-sub">המשמרות הקרובות</div>';
+  if(upcoming.length===0){ html+='<div class="empty" style="padding:6px 0">אין משמרות קרובות.</div>'; }
+  else html+=upcoming.map(u=>`<div class="up-row">
+      <span class="dot2 ${u.type==='once'?'once':''}"></span>
+      <span style="flex:1">${fmtIsoShort(u.date)}</span>
+      <span class="meta">${u.startTime}–${u.endTime}</span>
+      <span class="meta">${u.type==='once'?'חד-פעמית':'קבועה'}</span>
+    </div>`).join("");
+
+  body.innerHTML=html;
+}
+
+// מופעים קרובים של משמרת קבועה
+function recurringOccurrences(r, weeks, includeCancelled){
+  const out=[]; const today=new Date(); today.setHours(0,0,0,0);
+  const days=r.daysOfWeek||[]; const cancelled=r.cancelledDates||{};
+  for(let w=0; w<weeks; w++){
+    days.forEach(dow=>{
+      const delta=(dow - today.getDay() + 7) % 7;
+      const d=new Date(today); d.setDate(today.getDate()+delta+w*7);
+      const iso=isoDate(d); const isC=!!cancelled[iso];
+      if(isC && !includeCancelled) return;
+      out.push({date:iso, cancelled:isC});
+    });
+  }
+  const seen={};
+  return out.filter(x=>{ if(seen[x.date]) return false; seen[x.date]=1; return true; })
+            .sort((a,b)=>a.date.localeCompare(b.date));
+}
+
+// איחוד קבועות + חד-פעמיות לתצוגת "המשמרות הקרובות"
+function computeUpcomingForEmp(empId, weeks){
+  const list=[];
+  Object.values(recurring).forEach(r=>{
+    if(r.employeeId!==empId) return;
+    recurringOccurrences(r, weeks, false).forEach(o=>
+      list.push({date:o.date, startTime:r.startTime, endTime:r.endTime, type:'recurring'}));
+  });
+  const todayIso=isoDate(new Date());
+  Object.values(oneTime).forEach(o=>{
+    if(o.employeeId===empId && o.date>=todayIso)
+      list.push({date:o.date, startTime:o.startTime, endTime:o.endTime, type:'once'});
+  });
+  return list.sort((a,b)=> a.date===b.date ? a.startTime.localeCompare(b.startTime) : a.date.localeCompare(b.date));
+}
+
+/* ---------- הוספה / עריכה ---------- */
+function setShiftType(type){
+  shiftModalType=type;
+  $("typeRecurring").classList.toggle("on", type==="recurring");
+  $("typeOnetime").classList.toggle("on", type==="onetime");
+  $("recurringFields").classList.toggle("hidden", type!=="recurring");
+  $("onetimeFields").classList.toggle("hidden", type!=="onetime");
+}
+function clearShiftModal(){
+  $("dayPicker").querySelectorAll("input").forEach(c=>c.checked=false);
+  $("shiftDate").value=""; $("shiftStart").value="16:00"; $("shiftEnd").value="22:00";
+}
+function openAddShift(){
+  const empId=$("schedEmp").value;
+  if(!empId){ toast("בחר עובד קודם"); return; }
+  shiftModalMode="add"; editingPlanId=null;
+  $("shiftModalTitle").textContent="הוספת משמרת";
+  $("shiftModalWho").textContent=employees[empId].name;
+  $("shiftTypeSeg").classList.remove("hidden");
+  clearShiftModal(); setShiftType("recurring");
+  openModal("shiftModal");
+}
+function openEditRecurring(id){
+  const r=recurring[id]; if(!r) return;
+  shiftModalMode="editRecurring"; editingPlanId=id;
+  $("shiftModalTitle").textContent="עריכת משמרת קבועה";
+  $("shiftModalWho").textContent=employees[r.employeeId]?employees[r.employeeId].name:"";
+  $("shiftTypeSeg").classList.add("hidden");
+  clearShiftModal(); setShiftType("recurring");
+  (r.daysOfWeek||[]).forEach(d=>{ const cb=$("dayPicker").querySelector('input[value="'+d+'"]'); if(cb) cb.checked=true; });
+  $("shiftStart").value=r.startTime; $("shiftEnd").value=r.endTime;
+  openModal("shiftModal");
+}
+function openEditOnetime(id){
+  const o=oneTime[id]; if(!o) return;
+  shiftModalMode="editOnetime"; editingPlanId=id;
+  $("shiftModalTitle").textContent="עריכת משמרת חד-פעמית";
+  $("shiftModalWho").textContent=employees[o.employeeId]?employees[o.employeeId].name:"";
+  $("shiftTypeSeg").classList.add("hidden");
+  clearShiftModal(); setShiftType("onetime");
+  $("shiftDate").value=o.date; $("shiftStart").value=o.startTime; $("shiftEnd").value=o.endTime;
+  openModal("shiftModal");
+}
+function saveShift(){
+  const start=$("shiftStart").value, end=$("shiftEnd").value;
+  if(!start || !end){ toast("יש למלא שעות"); return; }
+  if(end<=start){ toast("שעת הסיום חייבת להיות אחרי ההתחלה"); return; }
+  const empId=$("schedEmp").value;
+
+  if(shiftModalType==="recurring"){
+    const days=[...$("dayPicker").querySelectorAll("input:checked")].map(c=>parseInt(c.value));
+    if(days.length===0){ toast("בחר לפחות יום אחד"); return; }
+    if(shiftModalMode==="editRecurring" && editingPlanId){
+      db.ref("recurringShifts/"+editingPlanId).update({daysOfWeek:days, startTime:start, endTime:end})
+        .then(()=>{ closeModal("shiftModal"); toast("המשמרת הקבועה עודכנה ✓"); });
+    } else {
+      db.ref("recurringShifts").push({employeeId:empId, daysOfWeek:days, startTime:start, endTime:end, cancelledDates:{}, createdAt:TS})
+        .then(()=>{ closeModal("shiftModal"); toast("משמרת קבועה נוספה ✓"); });
+    }
+  } else {
+    const date=$("shiftDate").value;
+    if(!date){ toast("בחר תאריך"); return; }
+    if(shiftModalMode==="editOnetime" && editingPlanId){
+      db.ref("oneTimeShifts/"+editingPlanId).update({date, startTime:start, endTime:end})
+        .then(()=>{ closeModal("shiftModal"); toast("המשמרת עודכנה ✓"); });
+    } else {
+      db.ref("oneTimeShifts").push({employeeId:empId, date, startTime:start, endTime:end, createdAt:TS})
+        .then(()=>{ closeModal("shiftModal"); toast("משמרת חד-פעמית נוספה ✓"); });
+    }
+  }
+}
+function deleteRecurring(id){
+  if(!confirm("למחוק לגמרי את המשמרת הקבועה מהעובד?")) return;
+  db.ref("recurringShifts/"+id).remove().then(()=>toast("נמחק"));
+}
+function deleteOnetime(id){
+  if(!confirm("למחוק את המשמרת החד-פעמית?")) return;
+  db.ref("oneTimeShifts/"+id).remove().then(()=>toast("נמחק"));
+}
+
+/* ---------- ביטול / שחזור מופע בודד ---------- */
+function openCancelOccurrence(id){
+  cancelTargetId=id;
+  const r=recurring[id]; if(!r) return;
+  $("cancelWho").textContent=(employees[r.employeeId]?employees[r.employeeId].name:"")+" · "+r.startTime+"–"+r.endTime;
+  renderCancelList();
+  openModal("cancelModal");
+}
+function renderCancelList(){
+  const r=recurring[cancelTargetId]; if(!r){ $("cancelList").innerHTML=""; return; }
+  const occ=recurringOccurrences(r, 6, true).slice(0,16);
+  const box=$("cancelList");
+  if(occ.length===0){ box.innerHTML='<div class="empty">אין מופעים קרובים.</div>'; return; }
+  box.innerHTML=occ.map(o=>`<div class="cancel-item ${o.cancelled?'off':''}">
+      <span class="d">${fmtIsoShort(o.date)}${o.cancelled?' · בוטל':''}</span>
+      <button class="btn ${o.cancelled?'line':'danger'} sm" onclick="toggleCancelDate('${o.date}')">${o.cancelled?'שחזר':'בטל'}</button>
+    </div>`).join("");
+}
+function toggleCancelDate(dateIso){
+  const r=recurring[cancelTargetId]; if(!r) return;
+  const isCancelled=(r.cancelledDates||{})[dateIso];
+  const ref=db.ref("recurringShifts/"+cancelTargetId+"/cancelledDates/"+dateIso);
+  const op = isCancelled ? ref.remove() : ref.set(true);
+  op.then(()=>renderCancelList());
+}
+
+/* ============================================================
+   12. שעון בטרמינל + הגנת XSS בסיסית
+   ============================================================ */
+function esc(str){
+  return String(str==null?"":str)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+function tickClock(){
+  const d=new Date();
+  $("kioskClock").textContent = pad(d.getHours())+":"+pad(d.getMinutes());
+  const days=["ראשון","שני","שלישי","רביעי","חמישי","שישי","שבת"];
+  $("kioskDate").textContent = "יום "+days[d.getDay()]+", "+pad(d.getDate())+"/"+pad(d.getMonth()+1)+"/"+d.getFullYear();
+}
+setInterval(tickClock,1000); tickClock();
+
+/* ============================================================
+   13. חיבור אירועים למסך ההתחברות
+   ============================================================ */
+$("authSubmit").addEventListener("click", handleAuthSubmit);
+$("authToggleLink").addEventListener("click", ()=> setAuthMode(authMode==="login"?"signup":"login"));
+$("authPass").addEventListener("keydown", e=>{ if(e.key==="Enter") handleAuthSubmit(); });
+
+// אם אין הגדרות - הצג באנר בתוך האפליקציה (אם בכל זאת ניגשים)
+if(!firebaseReady){ $("configBanner")?.classList.remove("hidden"); }
+</script>
+</body>
+</html>
