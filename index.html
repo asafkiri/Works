@@ -1218,7 +1218,7 @@ function renderActive(){
 let empNav="home";       // 'home' | 'pay' | 'paymonth' | 'upcoming' | 'notes'
 let empNavMonth=null;    // מפתח החודש בתצוגת פירוט חודש
 
-function applyEmpNav(){
+function applyEmpDashNav(){
   const map={home:"empHome",pay:"empPay",paymonth:"empPayMonth",upcoming:"empUpcoming",notes:"empNotes"};
   Object.keys(map).forEach(k=>{ const el=$(map[k]); if(el) el.classList.toggle("hidden", empNav!==k); });
 }
@@ -1320,7 +1320,7 @@ function renderEmployeeDashboard(){
       </div>` : '';
   }
 
-  applyEmpNav();
+  applyEmpDashNav();
 }
 
 // מחיקת משמרות חד-פעמיות שתאריכן עבר (תוכנית בלבד - בטוח למחוק)
