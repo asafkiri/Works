@@ -222,6 +222,27 @@
     #printArea{display:block !important}
     @page{margin:14mm}
   }
+  /* ---------- תפריט תיקיות + ניווט מסכים ---------- */
+  .folder-grid{display:flex;flex-direction:column;gap:12px}
+  .folder{
+    display:flex;align-items:center;gap:14px;width:100%;text-align:right;
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:18px;cursor:pointer;transition:.15s;font-family:inherit;
+  }
+  .folder:hover{border-color:var(--primary);transform:translateY(-1px)}
+  .folder:active{transform:translateY(0)}
+  .folder .f-ico{font-size:26px;line-height:1;flex:0 0 auto}
+  .folder .f-txt{flex:1;display:flex;flex-direction:column;gap:2px}
+  .folder .f-title{font-size:16px;font-weight:800;color:var(--ink)}
+  .folder .f-sub{font-size:12.5px;color:var(--muted)}
+  .folder .f-arr{font-size:20px;color:var(--muted);flex:0 0 auto}
+  .screen-head{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+  .back-btn{
+    border:1px solid var(--line);background:var(--panel);color:var(--ink);
+    padding:8px 14px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;
+  }
+  .back-btn:hover{background:#f0eee9}
+  .screen-title{font-size:20px;font-weight:800;margin:0}
 </style>
 </head>
 <body>
@@ -271,95 +292,153 @@
   <!-- ---------------- קונסולת מנהל ---------------- -->
   <div id="viewConsole" class="wrap">
 
-    <div class="card">
-      <h2>כרגע במשמרת</h2>
-      <p class="sub">עובדים שהחתימו כניסה ועדיין לא יצאו</p>
-      <div id="openShifts"></div>
-    </div>
-
-    <div class="card">
-      <h2>עובדים</h2>
-      <p class="sub">הוספת עובד וקביעת תעריף לשעה. השכר מחושב אך ורק לפי החתמות בטרמינל. שם המשתמש והסיסמה ישמשו את העובד להתחברות לדשבורד האישי שלו.</p>
-
-      <div class="row" style="margin-bottom:10px">
-        <div style="flex:2">
-          <label class="fld">שם העובד</label>
-          <input type="text" id="newEmpName" placeholder="לדוגמה: דני">
-        </div>
-        <div style="flex:1">
-          <label class="fld">תעריף לשעה (₪)</label>
-          <input type="number" id="newEmpRate" min="0" step="0.5" placeholder="35">
-        </div>
-      </div>
-      <div class="row" style="margin-bottom:16px">
-        <div style="flex:1">
-          <label class="fld">שם משתמש (אנגלית/ספרות)</label>
-          <input type="text" id="newEmpUser" autocapitalize="none" autocomplete="off" placeholder="dani">
-        </div>
-        <div style="flex:1">
-          <label class="fld">סיסמה זמנית (6 תווים+)</label>
-          <input type="text" id="newEmpPass" autocomplete="off" placeholder="לפחות 6 תווים">
-        </div>
-        <div style="flex:0 0 auto;display:flex;align-items:flex-end">
-          <button class="btn" onclick="addEmployee()">הוסף עובד</button>
-        </div>
-      </div>
-
-      <div class="section-title">צוות החודש</div>
-      <div id="empList"></div>
-    </div>
-
-    <div class="card">
-      <h2>סידור עבודה</h2>
-      <p class="sub">תכנון משמרות קדימה. זו תוכנית בלבד ולא משפיעה על השכר — שכר נקבע אך ורק מהחתמות בטרמינל.</p>
-
-      <div class="row" style="margin-bottom:14px">
-        <div style="flex:2">
-          <label class="fld">בחר עובד</label>
-          <select id="schedEmp" onchange="renderSchedule()"></select>
-        </div>
-        <div style="flex:0 0 auto">
-          <button class="btn" id="addShiftBtn" onclick="openAddShift()">+ הוסף משמרת</button>
-        </div>
-      </div>
-
-      <div id="schedBody"></div>
-    </div>
-
-    <div class="card">
-      <h2>משמרות אחרונות</h2>
-      <p class="sub">אפשר לערוך כניסה/יציאה בכל משמרת (תיקון לפי החלטת המנהל) ולהוסיף משוב לעובד.</p>
-      <div id="shiftList"></div>
-    </div>
-
-    <div class="card" id="payCard">
-      <h2>שכר ותשלומים</h2>
-      <p class="sub">בחר עובד וחודש לצפייה בפירוט המשמרות, סך השעות והסכום לתשלום. ניתן לסמן משמרות כשולמו ולייצא דף סיכום מסודר לרואה החשבון.</p>
-      <div class="row" style="margin-bottom:14px">
-        <div style="flex:1">
-          <label class="fld">עובד</label>
-          <select id="paySelEmp" onchange="onPayEmpChange()"></select>
-        </div>
-        <div style="flex:1">
-          <label class="fld">חודש</label>
-          <select id="paySelMonth" onchange="onPayMonthChange()"></select>
-        </div>
-      </div>
-      <div id="payBody"></div>
-    </div>
-
-    <div class="card">
-      <h2>הגדרות</h2>
-      <p class="sub">קוד PIN חוסם את הכניסה לקונסולת המנהל מהמכשיר שבחנות, כך שעובדים יוכלו רק להחתים בטרמינל.</p>
-      <div class="list-row">
-        <div class="grow">
-          <div class="nm-strong">קוד כניסה לקונסולה</div>
-          <div class="meta" id="pinStatus">—</div>
-        </div>
-        <button class="btn line sm" id="pinSetBtn" onclick="setPin()">הגדר / שנה</button>
-        <button class="btn danger sm" id="pinRemoveBtn" onclick="removePin()">הסר</button>
+    <!-- תפריט ראשי (בית) -->
+    <div id="consoleHome">
+      <div class="folder-grid">
+        <button class="folder" onclick="openFolder('overview')">
+          <span class="f-ico">📊</span>
+          <span class="f-txt"><span class="f-title">סקירה</span><span class="f-sub">מי במשמרת עכשיו ומשמרות אחרונות</span></span>
+          <span class="f-arr">→</span>
+        </button>
+        <button class="folder" onclick="openFolder('employees')">
+          <span class="f-ico">👥</span>
+          <span class="f-txt"><span class="f-title">ניהול עובדים</span><span class="f-sub">הוספה, השבתה, שמות משתמש וסיסמאות</span></span>
+          <span class="f-arr">→</span>
+        </button>
+        <button class="folder" onclick="openFolder('pay')">
+          <span class="f-ico">💰</span>
+          <span class="f-txt"><span class="f-title">שכר ותשלומים</span><span class="f-sub">פירוט חודשי, סימון תשלומים וייצוא לרו״ח</span></span>
+          <span class="f-arr">→</span>
+        </button>
+        <button class="folder" onclick="openFolder('schedule')">
+          <span class="f-ico">📅</span>
+          <span class="f-txt"><span class="f-title">סידור עבודה</span><span class="f-sub">תכנון משמרות קדימה</span></span>
+          <span class="f-arr">→</span>
+        </button>
+        <button class="folder" onclick="openFolder('settings')">
+          <span class="f-ico">⚙️</span>
+          <span class="f-txt"><span class="f-title">הגדרות</span><span class="f-sub">קוד כניסה לקונסולה</span></span>
+          <span class="f-arr">→</span>
+        </button>
       </div>
     </div>
+
+    <!-- מסך: סקירה -->
+    <div id="screen-overview" class="screen hidden">
+      <div class="screen-head"><button class="back-btn" onclick="backToHome()">→ חזרה</button><h1 class="screen-title">📊 סקירה</h1></div>
+
+      <div class="card">
+        <h2>כרגע במשמרת</h2>
+        <p class="sub">עובדים שהחתימו כניסה ועדיין לא יצאו</p>
+        <div id="openShifts"></div>
+      </div>
+
+      <div class="card">
+        <h2>משמרות אחרונות</h2>
+        <p class="sub">אפשר לערוך כניסה/יציאה בכל משמרת (תיקון לפי החלטת המנהל) ולהוסיף משוב לעובד.</p>
+        <div id="shiftList"></div>
+      </div>
+    </div>
+
+    <!-- מסך: ניהול עובדים -->
+    <div id="screen-employees" class="screen hidden">
+      <div class="screen-head"><button class="back-btn" onclick="backToHome()">→ חזרה</button><h1 class="screen-title">👥 ניהול עובדים</h1></div>
+
+      <div class="card">
+        <h2>הוספת עובד</h2>
+        <p class="sub">קביעת שם, תעריף לשעה, ושם משתמש + סיסמה להתחברות העובד לדשבורד שלו. השכר מחושב אך ורק לפי החתמות בטרמינל.</p>
+
+        <div class="row" style="margin-bottom:10px">
+          <div style="flex:2">
+            <label class="fld">שם העובד</label>
+            <input type="text" id="newEmpName" placeholder="לדוגמה: דני">
+          </div>
+          <div style="flex:1">
+            <label class="fld">תעריף לשעה (₪)</label>
+            <input type="number" id="newEmpRate" min="0" step="0.5" placeholder="35">
+          </div>
+        </div>
+        <div class="row" style="margin-bottom:16px">
+          <div style="flex:1">
+            <label class="fld">שם משתמש (אנגלית/ספרות)</label>
+            <input type="text" id="newEmpUser" autocapitalize="none" autocomplete="off" placeholder="dani">
+          </div>
+          <div style="flex:1">
+            <label class="fld">סיסמה זמנית (6 תווים+)</label>
+            <input type="text" id="newEmpPass" autocomplete="off" placeholder="לפחות 6 תווים">
+          </div>
+          <div style="flex:0 0 auto;display:flex;align-items:flex-end">
+            <button class="btn" onclick="addEmployee()">הוסף עובד</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>צוות</h2>
+        <p class="sub">העובדים הפעילים. לחיצה על השבת מעבירה עובד לארכיון העובדים שהושבתו (הנתונים נשמרים).</p>
+        <div id="empList"></div>
+      </div>
+    </div>
+
+    <!-- מסך: שכר ותשלומים -->
+    <div id="screen-pay" class="screen hidden">
+      <div class="screen-head"><button class="back-btn" onclick="backToHome()">→ חזרה</button><h1 class="screen-title">💰 שכר ותשלומים</h1></div>
+
+      <div class="card" id="payCard">
+        <p class="sub">בחר עובד וחודש לצפייה בפירוט המשמרות, סך השעות והסכום לתשלום. ניתן לסמן משמרות כשולמו ולייצא דף סיכום מסודר לרואה החשבון.</p>
+        <div class="row" style="margin-bottom:14px">
+          <div style="flex:1">
+            <label class="fld">עובד</label>
+            <select id="paySelEmp" onchange="onPayEmpChange()"></select>
+          </div>
+          <div style="flex:1">
+            <label class="fld">חודש</label>
+            <select id="paySelMonth" onchange="onPayMonthChange()"></select>
+          </div>
+        </div>
+        <div id="payBody"></div>
+      </div>
+    </div>
+
+    <!-- מסך: סידור עבודה -->
+    <div id="screen-schedule" class="screen hidden">
+      <div class="screen-head"><button class="back-btn" onclick="backToHome()">→ חזרה</button><h1 class="screen-title">📅 סידור עבודה</h1></div>
+
+      <div class="card">
+        <p class="sub">תכנון משמרות קדימה. זו תוכנית בלבד ולא משפיעה על השכר — שכר נקבע אך ורק מהחתמות בטרמינל.</p>
+
+        <div class="row" style="margin-bottom:14px">
+          <div style="flex:2">
+            <label class="fld">בחר עובד</label>
+            <select id="schedEmp" onchange="renderSchedule()"></select>
+          </div>
+          <div style="flex:0 0 auto;display:flex;align-items:flex-end">
+            <button class="btn" id="addShiftBtn" onclick="openAddShift()">+ הוסף משמרת</button>
+          </div>
+        </div>
+
+        <div id="schedBody"></div>
+      </div>
+    </div>
+
+    <!-- מסך: הגדרות -->
+    <div id="screen-settings" class="screen hidden">
+      <div class="screen-head"><button class="back-btn" onclick="backToHome()">→ חזרה</button><h1 class="screen-title">⚙️ הגדרות</h1></div>
+
+      <div class="card">
+        <h2>קוד כניסה לקונסולה</h2>
+        <p class="sub">קוד PIN חוסם את הכניסה לקונסולת המנהל מהמכשיר שבחנות, כך שעובדים יוכלו רק להחתים בטרמינל.</p>
+        <div class="list-row">
+          <div class="grow">
+            <div class="nm-strong">קוד כניסה</div>
+            <div class="meta" id="pinStatus">—</div>
+          </div>
+          <button class="btn line sm" id="pinSetBtn" onclick="setPin()">הגדר / שנה</button>
+          <button class="btn danger sm" id="pinRemoveBtn" onclick="removePin()">הסר</button>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <!-- ---------------- טרמינל חנות ---------------- -->
@@ -539,6 +618,7 @@ let cancelTargetId = null;        // id של משמרת קבועה במודאל 
 // --- נעילת קונסולה (PIN) ---
 let pinConfig = null;        // קוד ה-PIN השמור (או null אם לא הוגדר)
 let consoleUnlocked = false; // האם הקונסולה נפתחה בסשן הנוכחי
+let consoleFolder = null;    // התיקייה הפתוחה בקונסולה (null = תפריט הבית)
 
 // --- בורר שכר ותשלומים ---
 let paySelEmpId = null;    // העובד הנבחר בכרטיס השכר
@@ -696,7 +776,21 @@ function applyView(name){
   $("viewTerminal").classList.toggle("hidden", name!=="terminal");
   $("tabConsole").classList.toggle("on", name==="console");
   $("tabTerminal").classList.toggle("on", name==="terminal");
+  if(name==="console"){ consoleFolder=null; applyConsoleNav(); }
   renderActive();
+}
+
+/* ---------- ניווט תיקיות בקונסולה ---------- */
+const CONSOLE_SCREENS=["overview","employees","pay","schedule","settings"];
+function openFolder(name){ consoleFolder=name; applyConsoleNav(); try{window.scrollTo(0,0);}catch(e){} }
+function backToHome(){ consoleFolder=null; applyConsoleNav(); try{window.scrollTo(0,0);}catch(e){} }
+function applyConsoleNav(){
+  const home=$("consoleHome");
+  if(home) home.classList.toggle("hidden", consoleFolder!==null);
+  CONSOLE_SCREENS.forEach(s=>{
+    const el=$("screen-"+s);
+    if(el) el.classList.toggle("hidden", consoleFolder!==s);
+  });
 }
 
 /* ---------- נעילת קונסולה ב-PIN ---------- */
