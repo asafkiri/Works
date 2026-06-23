@@ -434,6 +434,34 @@ const db   = firebaseReady ? firebase.database() : null;
 const TS   = firebaseReady ? firebase.database.ServerValue.TIMESTAMP : null;
 
 /* ============================================================
+   *** מצב אבחון *** (זמני - להסרה אחרי שנפתור)
+   ============================================================ */
+const APP_VERSION = "v3-DEBUG";
+(function setupDebug(){
+  // תג גרסה - תמיד גלוי בפינה
+  const badge=document.createElement("div");
+  badge.textContent=APP_VERSION + (firebaseReady?" · FB OK":" · אין FB");
+  badge.style.cssText="position:fixed;bottom:6px;left:6px;z-index:9999;background:#14181f;color:#fff;font-size:11px;font-weight:700;padding:4px 8px;border-radius:6px;font-family:monospace";
+  document.body.appendChild(badge);
+  // קופסת שגיאות - מופיעה רק כשיש שגיאה
+  const box=document.createElement("div");
+  box.id="dbgBox";
+  box.style.cssText="position:fixed;top:0;left:0;right:0;z-index:10000;background:#c2410c;color:#fff;font-size:13px;padding:12px;font-family:monospace;display:none;white-space:pre-wrap;word-break:break-word;max-height:50vh;overflow:auto";
+  box.onclick=()=>{ box.style.display="none"; };
+  document.body.appendChild(box);
+  window.DBG=function(msg){
+    box.style.display="block";
+    box.textContent="⚠ אבחון (הקש לסגירה):\n\n"+msg+"\n\n"+(box.textContent||"");
+  };
+  // תפיסת כל שגיאה שלא נתפסה
+  window.addEventListener("error", e=>{ window.DBG("JS ERROR: "+(e.message||e)+"\n"+(e.filename||"")+":"+(e.lineno||"")); });
+  window.addEventListener("unhandledrejection", e=>{
+    const r=e.reason||{};
+    window.DBG("PROMISE נדחה (לא נתפס):\ncode="+(r.code||"?")+"\nmsg="+(r.message||JSON.stringify(r)));
+  });
+})();
+
+/* ============================================================
    3. מצב (cache מקומי של הנתונים)
    ============================================================ */
 let employees = {};   // id -> {name, hourlyRate, active, openShiftId, createdAt}
@@ -512,22 +540,26 @@ function handleAuthSubmit(){
   }
 
   if(authMode==="signup"){
+    window.DBG && window.DBG("מתחיל יצירת מנהל... user="+uname(u));
     // יוצרים קודם את המשתמש (זה מחבר אותו), ורק אז קוראים/כותבים את config -
     // כי החוקים דורשים התחברות לכל קריאה, אז אי אפשר לבדוק את config לפני ההתחברות.
     auth.createUserWithEmailAndPassword(uname(u), p)
-      .then(cred =>
-        db.ref("config/managerUid").once("value").then(snap=>{
+      .then(cred => {
+        window.DBG && window.DBG("✓ משתמש נוצר ב-Auth! uid="+cred.user.uid+"\nכותב config...");
+        return db.ref("config/managerUid").once("value").then(snap=>{
           if(snap.exists()){
-            // כבר קיים מנהל אחר - מבטלים את החשבון שזה עתה נוצר
             return cred.user.delete().then(()=>{
               showErr("כבר קיים חשבון מנהל. עבור להתחברות.");
             });
           }
           return db.ref("config/managerUid").set(cred.user.uid)
-            .then(()=> toast("חשבון המנהל נוצר ✓"));
-        })
-      )
-      .catch(err => showErr(authErrText(err)));
+            .then(()=>{ window.DBG && window.DBG("✓✓ הכל הצליח! managerUid נשמר."); toast("חשבון המנהל נוצר ✓"); });
+        });
+      })
+      .catch(err => {
+        window.DBG && window.DBG("שגיאה ביצירת מנהל:\ncode="+(err.code||"?")+"\nmsg="+(err.message||err));
+        showErr(authErrText(err));
+      });
   } else {
     auth.signInWithEmailAndPassword(uname(u), p)
       .catch(err => showErr(authErrText(err)));
