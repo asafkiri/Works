@@ -917,15 +917,11 @@ function doLogin(u, p){
   auth.signInWithEmailAndPassword(email, p)
     .then(()=>{ /* onAuthStateChanged ינתב למסך הנכון */ })
     .catch(err=>{
-      const c=err.code||"";
-      // ייתכן כניסה ראשונה של עובד (אין עדיין חשבון) -> ננסה ליצור ולקשר
-      if(c.includes("user-not-found") || c.includes("invalid-credential") || c.includes("invalid-login-credentials")){
-        firstEmployeeLogin(u, p);
-      } else if(c.includes("wrong-password")){
-        showErr("שם משתמש או סיסמה שגויים.");
-      } else {
-        showErr(authErrText(err));
-      }
+      const c=((err&&err.code)||"")+" "+((err&&err.message)||"");
+      if(/network/i.test(c)){ showErr("בעיית רשת. בדוק את החיבור ונסה שוב."); return; }
+      // כל כישלון אחר -> ייתכן כניסה ראשונה של עובד. ננסה ליצור חשבון ולקשר.
+      // (אם זה חשבון קיים עם סיסמה שגויה, היצירה תיכשל ונציג הודעה ברורה.)
+      firstEmployeeLogin(u, p);
     });
 }
 
@@ -963,12 +959,14 @@ function firstEmployeeLogin(u, p){
 }
 
 function authErrText(err){
-  const c=err.code||"";
-  if(c.includes("email-already-in-use")) return "שם המשתמש כבר תפוס.";
-  if(c.includes("wrong-password")||c.includes("invalid-credential")) return "שם משתמש או סיסמה שגויים.";
-  if(c.includes("user-not-found")) return "המשתמש לא נמצא.";
-  if(c.includes("weak-password")) return "הסיסמה קצרה מדי (לפחות 6 תווים).";
-  return "שגיאה: " + (err.message||c);
+  const c=((err&&err.code)||"")+" "+((err&&err.message)||"");
+  if(/email-already-in-use/i.test(c)) return "שם המשתמש כבר תפוס.";
+  if(/wrong-password|invalid-credential|invalid_login_credentials|invalid-login-credentials/i.test(c)) return "שם משתמש או סיסמה שגויים.";
+  if(/user-not-found/i.test(c)) return "המשתמש לא נמצא.";
+  if(/weak-password/i.test(c)) return "הסיסמה קצרה מדי (לפחות 6 תווים).";
+  if(/network/i.test(c)) return "בעיית רשת. בדוק את החיבור ונסה שוב.";
+  if(/too-many-requests/i.test(c)) return "יותר מדי ניסיונות. נסה שוב בעוד מספר דקות.";
+  return "שגיאה בהתחברות. נסה שוב.";
 }
 
 function doLogout(){ if(auth) auth.signOut(); }
