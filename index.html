@@ -1254,7 +1254,7 @@ function firstEmployeeLogin(u, p){
         Object.keys(emps).forEach(k=>{ if((emps[k].username||"").toLowerCase()===u.toLowerCase()) id=k; });
         if(id && emps[id].tempPassword===p && emps[id].linked!==true){
           // קישור תקין: שומרים את ה-uid ומסמנים כמקושר
-          return db.ref("employees/"+id).update({ authUid:cred.user.uid, linked:true })
+          return db.ref("employees/"+id).update({ authUid:cred.user.uid, linked:true, tempPassword:null })
             .then(()=>{ suppressRouting=false; routeAfterLogin(cred.user); });
         } else {
           // אין רשומת עובד תואמת או הסיסמה שגויה -> מבטלים את החשבון שנוצר
@@ -1336,7 +1336,7 @@ function enterEmployeeMode(user){
     if(!id){
       const local=(user.email||"").split("@")[0].toLowerCase();
       Object.keys(emps).forEach(k=>{ if((emps[k].username||"").toLowerCase()===local && emps[k].linked!==true) id=k; });
-      if(id) db.ref("employees/"+id).update({ authUid:user.uid, linked:true });
+      if(id) db.ref("employees/"+id).update({ authUid:user.uid, linked:true, tempPassword:null });
     }
     if(!id){
       // אין רשומת עובד מקושרת - לא חשבון תקין במערכת
@@ -1776,6 +1776,7 @@ function hideClockSuccess(){
    9. סגירה אוטומטית אחרי 12 שעות (שכח לסגור)
    ============================================================ */
 function checkAutoClose(){
+  if(currentRole!=="manager") return; // סגירה אוטומטית מתבצעת רק בסשן המנהל (טרמינל), לא בדשבורד עובד
   const now = Date.now();
   Object.keys(employees).forEach(empId=>{
     const sid = employees[empId].openShiftId;
