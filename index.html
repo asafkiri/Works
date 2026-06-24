@@ -291,6 +291,23 @@
   .pay-sum .ps-row .rem{color:var(--primary);font-weight:800}
   .badge-paid{font-size:11px;font-weight:800;color:var(--ok);background:var(--ok-bg);border-radius:999px;padding:3px 9px}
 
+  /* ---------- הערכת נטו ---------- */
+  .net-box{margin-top:14px;border:1px solid var(--line);border-radius:13px;padding:14px 16px;background:var(--paper)}
+  .net-box .nb-row{display:flex;justify-content:space-between;font-size:14px;padding:5px 0;color:var(--ink-soft)}
+  .net-box .nb-row.minus span:last-child{color:var(--danger);font-variant-numeric:tabular-nums}
+  .net-box .nb-net{display:flex;justify-content:space-between;align-items:baseline;font-size:18px;font-weight:800;border-top:2px solid var(--line-2);margin-top:8px;padding-top:10px}
+  .net-box .nb-net .v{color:var(--primary);font-variant-numeric:tabular-nums}
+  .net-note{font-size:11.5px;color:var(--muted);margin-top:9px;line-height:1.5}
+  .net-field{margin-bottom:14px}
+  .net-toggle-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+  .net-toggle-row .lbl{font-weight:700;font-size:14.5px}
+  .switch{position:relative;display:inline-block;width:46px;height:27px;flex:0 0 auto}
+  .switch input{opacity:0;width:0;height:0;position:absolute}
+  .switch .sl{position:absolute;inset:0;background:var(--line-2);border-radius:999px;transition:.18s;cursor:pointer}
+  .switch .sl::before{content:"";position:absolute;height:21px;width:21px;right:3px;top:3px;background:#fff;border-radius:50%;transition:.18s;box-shadow:var(--shadow-sm)}
+  .switch input:checked + .sl{background:var(--primary)}
+  .switch input:checked + .sl::before{transform:translateX(-19px)}
+
   /* ---------- מודאל ---------- */
   .modal-bg{position:fixed;inset:0;background:rgba(20,24,31,.5);display:none;align-items:center;justify-content:center;z-index:50;padding:18px;-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}
   .modal-bg.show{display:flex}
@@ -536,6 +553,12 @@
             <div style="flex:1">
               <label class="fld">סיסמה זמנית (6 תווים+)</label>
               <input type="text" id="newEmpPass" autocomplete="off" placeholder="לפחות 6 תווים">
+            </div>
+          </div>
+          <div class="row" style="margin-bottom:10px">
+            <div style="flex:1">
+              <label class="fld">תאריך לידה <span style="font-weight:500;color:var(--muted)">(לא חובה — לזיהוי מתחת ל-18)</span></label>
+              <input type="date" id="newEmpBirth">
             </div>
           </div>
           <div class="row" style="margin-bottom:16px">
@@ -948,6 +971,45 @@
     <div class="modal-actions">
       <button class="btn line" id="uiConfirmCancel" onclick="uiConfirmCancel()">ביטול</button>
       <button class="btn" id="uiConfirmOk" onclick="uiConfirmOk()">אישור</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ מודאל פרטי שכר ונטו ============================ -->
+<div id="netModal" class="modal-bg">
+  <div class="modal">
+    <h3>פרטי שכר ונטו</h3>
+    <p class="who" id="netModalWho"></p>
+    <div class="net-toggle-row">
+      <span class="lbl">נטו זה נטו <span style="font-weight:500;color:var(--muted);font-size:12px">(תעריף נטו לשעה)</span></span>
+      <label class="switch"><input type="checkbox" id="netIsNet" onchange="netSyncMode()"><span class="sl"></span></label>
+    </div>
+    <div id="netSimpleNote" class="net-note hidden" style="margin:-6px 0 14px">השכר יחושב כתעריף לשעה × שעות, ללא ניכויים מהשכר — הסכום הוא מה שהעובד מקבל ליד.</div>
+    <div id="netCalcFields">
+      <div class="net-field">
+        <label class="fld">תאריך לידה <span style="font-weight:500;color:var(--muted)">(לזיהוי אוטומטי של גיל מתחת ל-18)</span></label>
+        <input type="date" id="netBirth">
+      </div>
+      <div class="net-field">
+        <label class="fld">נקודות זיכוי <span style="font-weight:500;color:var(--muted)">(תושב = 2.25, אישה +0.5)</span></label>
+        <input type="number" id="netPoints" inputmode="decimal" step="0.25" min="0">
+      </div>
+      <div class="net-toggle-row">
+        <span class="lbl">מנכים פנסיה?</span>
+        <label class="switch"><input type="checkbox" id="netPension" onchange="netSyncPensionRate()"><span class="sl"></span></label>
+      </div>
+      <div class="net-field hidden" id="netPensionRateWrap">
+        <label class="fld">אחוז הפרשת עובד (%)</label>
+        <input type="number" id="netPensionRate" inputmode="decimal" step="0.5" min="0" max="25" value="6">
+      </div>
+      <div class="net-toggle-row">
+        <span class="lbl">פטור מביטוח לאומי <span style="font-weight:500;color:var(--muted);font-size:12px">(18–21 לפני צבא / חייל)</span></span>
+        <label class="switch"><input type="checkbox" id="netNiExempt"><span class="sl"></span></label>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn line" onclick="closeModal('netModal')">ביטול</button>
+      <button class="btn" onclick="saveNetSettings()">שמור</button>
     </div>
   </div>
 </div>
@@ -1521,7 +1583,8 @@ function renderEmployeeDashboard(){
         <div class="ps-row big"><span>סך הכל</span><span>₪${t.totalPay.toFixed(0)}</span></div>
         <div class="ps-row"><span>שולם</span><span>₪${t.paidPay.toFixed(0)}</span></div>
         <div class="ps-row big"><span>נותר לתשלום</span><span class="rem">₪${t.remaining.toFixed(0)}</span></div>
-      </div>` : '';
+      </div>
+      ${netSummaryHtml(t.totalPay, employees[currentEmpId], monthRefDate(empNavMonth))}` : '';
   }
 
   applyEmpDashNav();
@@ -1818,6 +1881,20 @@ function empDetailHtml(e){
       <div class="det-k"><div class="det-lbl">שכר החודש (לפי החתמות)</div><div class="det-val">${fmtHours(hours)} · ₪${pay.toFixed(0)}</div></div>
       <button class="btn line sm" onclick="openPayFromEmp('${e.id}')">פירוט שכר</button>
     </div>
+    <div class="det-row">
+      <div class="det-k">
+        <div class="det-lbl">פרטים לחישוב נטו (הערכה)</div>
+        <div class="det-val" style="font-size:13.5px;font-weight:600;color:var(--ink-soft);line-height:1.7">
+          ${e.netIsNet
+            ? 'חישוב: <b>נטו זה נטו</b> — תעריף נטו לשעה (ללא ניכויים מהשכר)'
+            : `תאריך לידה: ${e.birthDate ? esc(fmtBirth(e.birthDate))+(ageAtDate(e.birthDate,new Date())!=null?' · גיל '+ageAtDate(e.birthDate,new Date()):'') : 'לא הוגדר'}<br>נקודות זיכוי: ${e.creditPoints!=null?e.creditPoints:2.25} · פנסיה: ${e.pensionOn?'כן '+(e.pensionRate!=null?e.pensionRate:6)+'%':'לא'}${e.niExempt?' · פטור בל״ל':''}`}
+        </div>
+      </div>
+      <button class="btn line sm" onclick="openNetModal('${e.id}')">ערוך</button>
+    </div>
+    <div class="det-row">
+      <div class="det-k"><div class="det-lbl">נטו משוער החודש</div><div class="det-val">${pay>0?'₪'+estimateNet(pay,e,new Date()).net.toFixed(0):'—'}</div></div>
+    </div>
     <div style="margin-top:18px">
       ${e.active===false
         ? `<button class="btn" onclick="toggleActive('${e.id}')">הפעל עובד מחדש</button>`
@@ -1874,6 +1951,153 @@ function monthTotals(empId, rate){
     }
   });
   return {hours, pay: hours*rate};
+}
+
+/* ============================================================
+   10ב. הערכת שכר נטו (הערכה בלבד — לא תחליף לתלוש רשמי)
+   נתוני 2026: מדרגות מס, נקודת זיכוי 242₪, ביטוח לאומי+בריאות, פנסיה
+   ============================================================ */
+const CREDIT_POINT_VALUE = 242;            // שווי נקודת זיכוי לחודש (2026)
+const NI_REDUCED_CEIL = 7703;              // מדרגת גבייה מופחתת (60% מהשכר הממוצע)
+const NI_MAX_CEIL = 51910;                 // תקרת הכנסה לדמי ביטוח
+// חלק העובד (כולל תיקון 252):
+const NI_EMP_RED = 0.0104, NI_EMP_FULL = 0.07;     // ביטוח לאומי
+const HEALTH_RED = 0.0323, HEALTH_FULL = 0.0517;   // מס בריאות
+// מדרגות מס הכנסה חודשיות (יגיעה אישית) — לאחר ריווח 2026
+const TAX_BRACKETS = [
+  {upTo:7010,     rate:0.10},
+  {upTo:10060,    rate:0.14},
+  {upTo:19000,    rate:0.20},
+  {upTo:25100,    rate:0.31},
+  {upTo:46690,    rate:0.35},
+  {upTo:60130,    rate:0.47},
+  {upTo:Infinity, rate:0.50}
+];
+
+function ageAtDate(birthIso, asOf){
+  if(!birthIso) return null;
+  const b=parseIso(birthIso); if(isNaN(b.getTime())) return null;
+  let a=asOf.getFullYear()-b.getFullYear();
+  const m=asOf.getMonth()-b.getMonth();
+  if(m<0 || (m===0 && asOf.getDate()<b.getDate())) a--;
+  return a;
+}
+function incomeTaxMonthly(gross){
+  let tax=0, prev=0;
+  for(const br of TAX_BRACKETS){
+    if(gross<=prev) break;
+    tax += (Math.min(gross,br.upTo)-prev)*br.rate;
+    prev=br.upTo;
+  }
+  return tax;
+}
+// emp: רשומת העובד. asOf: תאריך ייחוס לגיל. gross: ברוטו חודשי משוער.
+function estimateNet(gross, emp, asOf){
+  emp=emp||{}; asOf=asOf||new Date(); gross=Math.max(0, gross||0);
+  if(emp.netIsNet){
+    return {gross, age:null, isMinor:false, isNet:true, incomeTax:0, ni:0, health:0, niHealth:0, pension:0, deductions:0, net:gross};
+  }
+  const age=ageAtDate(emp.birthDate, asOf);
+  const isMinor = (age!=null && age<18);
+  let incomeTax=0, ni=0, health=0, pension=0;
+  if(!isMinor){
+    const points = (emp.creditPoints!=null ? Number(emp.creditPoints) : 2.25);
+    incomeTax = Math.max(0, incomeTaxMonthly(gross) - points*CREDIT_POINT_VALUE);
+    if(!emp.niExempt){
+      const capped=Math.min(gross, NI_MAX_CEIL);
+      const red=Math.min(capped, NI_REDUCED_CEIL);
+      const full=Math.max(0, capped-NI_REDUCED_CEIL);
+      ni = red*NI_EMP_RED + full*NI_EMP_FULL;
+      health = red*HEALTH_RED + full*HEALTH_FULL;
+    }
+  }
+  if(emp.pensionOn){
+    const r=(emp.pensionRate!=null?Number(emp.pensionRate):6)/100;
+    pension = gross*r;
+  }
+  const deductions = incomeTax+ni+health+pension;
+  return {gross, age, isMinor, incomeTax, ni, health, niHealth:ni+health, pension, deductions, net:Math.max(0,gross-deductions)};
+}
+// תאריך ייחוס לגיל לפי מפתח חודש "YYYY-MM" (אמצע החודש)
+function monthRefDate(monthKey){
+  if(!monthKey) return new Date();
+  const p=String(monthKey).split("-");
+  if(p.length<2) return new Date();
+  return new Date(parseInt(p[0],10), parseInt(p[1],10)-1, 15);
+}
+// בלוק תצוגה אחיד: ברוטו → ניכויים → נטו (משמש גם מנהל וגם עובד)
+function netSummaryHtml(gross, emp, asOf){
+  emp=emp||{};
+  if(emp.netIsNet){
+    return `<div class="net-box">
+      <div class="nb-net"><span>נטו (תעריף נטו לשעה)</span><span class="v">₪${gross.toFixed(0)}</span></div>
+      <div class="net-note">סוכם תעריף נטו לשעה — הסכום הוא מה שהעובד מקבל ליד, ללא ניכויים מהשכר. ההפרשות והניכויים מטופלים בנפרד על ידי המעסיק.</div>
+    </div>`;
+  }
+  const n=estimateNet(gross, emp, asOf);
+  if(n.isMinor){
+    return `<div class="net-box">
+      <div class="nb-row"><span>ברוטו</span><span>₪${gross.toFixed(0)}</span></div>
+      <div class="nb-row"><span>ניכויים</span><span>אין</span></div>
+      <div class="nb-net"><span>נטו משוער</span><span class="v">₪${n.net.toFixed(0)}</span></div>
+      <div class="net-note">עובד/ת מתחת לגיל 18 — לפי חוק אין ניכוי ביטוח לאומי/בריאות, ובשכר זה גם אין מס הכנסה. הערכה בלבד; הנטו הסופי נקבע בתלוש הרשמי.</div>
+    </div>`;
+  }
+  const rows=[`<div class="nb-row"><span>ברוטו</span><span>₪${gross.toFixed(0)}</span></div>`];
+  const hasDed = n.incomeTax>0.5 || n.niHealth>0.5 || n.pension>0.5;
+  if(n.incomeTax>0.5) rows.push(`<div class="nb-row minus"><span>מס הכנסה</span><span>−₪${n.incomeTax.toFixed(0)}</span></div>`);
+  if(n.niHealth>0.5) rows.push(`<div class="nb-row minus"><span>ביטוח לאומי + בריאות</span><span>−₪${n.niHealth.toFixed(0)}</span></div>`);
+  if(n.pension>0.5) rows.push(`<div class="nb-row minus"><span>פנסיה (${emp.pensionRate!=null?emp.pensionRate:6}%)</span><span>−₪${n.pension.toFixed(0)}</span></div>`);
+  if(!hasDed) rows.push(`<div class="nb-row"><span>ניכויים</span><span>אין (מתחת לסף המס)</span></div>`);
+  return `<div class="net-box">
+    ${rows.join("")}
+    <div class="nb-net"><span>נטו משוער</span><span class="v">₪${n.net.toFixed(0)}</span></div>
+    <div class="net-note">הערכה בלבד לפי נתוני 2026${emp.niExempt?' · מסומן כפטור מביטוח לאומי':''} — הנטו הסופי נקבע בתלוש הרשמי (ייתכנו תוספות, תיאום מס והפרשות נוספות).</div>
+  </div>`;
+}
+function fmtBirth(iso){ if(!iso) return ""; const d=parseIso(iso); return pad(d.getDate())+"/"+pad(d.getMonth()+1)+"/"+d.getFullYear(); }
+
+/* ---------- עריכת פרטי שכר ונטו לעובד (מנהל) ---------- */
+let netEditEmpId=null;
+function openNetModal(empId){
+  const e=employees[empId]; if(!e) return;
+  netEditEmpId=empId;
+  $("netModalWho").textContent=e.name;
+  $("netIsNet").checked = e.netIsNet===true;
+  $("netBirth").value = e.birthDate || "";
+  $("netPoints").value = (e.creditPoints!=null ? e.creditPoints : 2.25);
+  $("netPension").checked = e.pensionOn===true;
+  $("netPensionRate").value = (e.pensionRate!=null ? e.pensionRate : 6);
+  $("netNiExempt").checked = e.niExempt===true;
+  netSyncPensionRate();
+  netSyncMode();
+  openModal("netModal");
+}
+function netSyncPensionRate(){
+  $("netPensionRateWrap").classList.toggle("hidden", !$("netPension").checked);
+}
+function netSyncMode(){
+  const on=$("netIsNet").checked;
+  $("netCalcFields").classList.toggle("hidden", on);
+  $("netSimpleNote").classList.toggle("hidden", !on);
+}
+function saveNetSettings(){
+  const empId=netEditEmpId; if(!empId || !employees[empId]) return;
+  const netIsNet=$("netIsNet").checked;
+  const birth=$("netBirth").value || null;
+  let points=parseFloat($("netPoints").value);
+  const pensionOn=$("netPension").checked;
+  let rate=parseFloat($("netPensionRate").value);
+  const niExempt=$("netNiExempt").checked;
+  if(!netIsNet){
+    if(isNaN(points) || points<0){ toast("מספר נקודות זיכוי לא תקין"); return; }
+    if(pensionOn && (isNaN(rate)||rate<0||rate>25)){ toast("אחוז פנסיה לא תקין (0–25)"); return; }
+  }
+  if(isNaN(points)) points=2.25;
+  if(isNaN(rate)) rate=6;
+  db.ref("employees/"+empId).update({
+    netIsNet:netIsNet, birthDate:birth, creditPoints:points, pensionOn:pensionOn, pensionRate:rate, niExempt:niExempt
+  }).then(()=>{ closeModal("netModal"); toast("פרטי השכר נשמרו ✓"); });
 }
 
 // 10ג. משמרות אחרונות (עריכה + משוב)
@@ -2048,6 +2272,7 @@ function renderPayDetail(){
       <div class="ps-row"><span>שולם</span><span>₪${paidPay.toFixed(0)}</span></div>
       <div class="ps-row big"><span>נותר לתשלום</span><span class="rem">₪${remaining.toFixed(0)}</span></div>
     </div>
+    ${netSummaryHtml(totalPay, e, monthRefDate(paySelMonthKey))}
     <div style="margin-top:14px">
       <button class="btn" onclick="exportPayroll()">📄 ייצא דף לרואה החשבון (PDF)</button>
     </div>`;
@@ -2129,6 +2354,7 @@ function addEmployee(){
   const user=$("newEmpUser").value.trim().toLowerCase();
   const pass=$("newEmpPass").value;
   const pin=$("newEmpPin").value.trim();
+  const birth=$("newEmpBirth").value || null;
   if(!name){ toast("יש להזין שם עובד"); return; }
   if(isNaN(rate)||rate<0){ toast("יש להזין תעריף תקין"); return; }
   if(!user){ toast("יש להזין שם משתמש לעובד"); return; }
@@ -2140,10 +2366,10 @@ function addEmployee(){
   if(taken){ toast("שם המשתמש כבר תפוס על ידי עובד אחר"); return; }
   db.ref("employees").push({
     name, hourlyRate:rate, active:true, openShiftId:null, createdAt:TS,
-    username:user, tempPassword:pass, authUid:null, linked:false, clockPin:pin
+    username:user, tempPassword:pass, authUid:null, linked:false, clockPin:pin, birthDate:birth
   }).then(()=>{
     $("newEmpName").value=""; $("newEmpRate").value="";
-    $("newEmpUser").value=""; $("newEmpPass").value=""; $("newEmpPin").value="";
+    $("newEmpUser").value=""; $("newEmpPass").value=""; $("newEmpPin").value=""; $("newEmpBirth").value="";
     toast("העובד נוסף ✓ — מסור לו שם משתמש, סיסמה וקוד החתמה");
   });
 }
