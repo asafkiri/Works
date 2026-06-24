@@ -195,6 +195,32 @@
   .up-row .dot2{width:7px;height:7px;border-radius:50%;background:var(--primary);flex:0 0 auto}
   .up-row .dot2.once{background:var(--live)}
 
+  /* ---------- סידור שבועי (כל העובדים) ---------- */
+  .wk-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}
+  .wk-label{font-weight:800;font-size:15px;text-align:center;flex:1;letter-spacing:-.01em}
+  .wk-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+  .wk-sum{font-size:12.5px;color:var(--muted);font-weight:600;text-align:left}
+  .wk-day{border:1px solid var(--line);border-radius:13px;margin-bottom:10px;overflow:hidden;background:#fff}
+  .wk-day-head{display:flex;align-items:center;justify-content:space-between;padding:10px 13px;background:var(--paper);border-bottom:1px solid var(--line)}
+  .wk-day-name{font-weight:800;font-size:14.5px}
+  .wk-day-meta{display:flex;align-items:center;gap:8px}
+  .wk-day-date{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .wk-day-count{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:var(--primary-soft);color:var(--primary-d);font-size:11.5px;font-weight:800}
+  .wk-day-body{padding:4px 13px 8px}
+  .wk-shift{display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:1px dashed var(--line);font-size:14px}
+  .wk-shift:last-child{border-bottom:0}
+  .wk-shift .dot2{width:7px;height:7px;border-radius:50%;background:var(--primary);flex:0 0 auto}
+  .wk-shift .dot2.once{background:var(--live)}
+  .wk-time{font-variant-numeric:tabular-nums;font-weight:700;color:var(--ink);flex:0 0 auto;min-width:96px}
+  .wk-name{flex:1;min-width:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .wk-tag{font-size:11px;font-weight:800;color:var(--muted);background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:2px 8px;flex:0 0 auto}
+  .wk-shift.once .wk-tag{color:var(--live-d);background:var(--live-bg);border-color:var(--live-line)}
+  .wk-empty{color:var(--muted);font-size:13px;padding:8px 0}
+  .wk-day.today{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-ring)}
+  .wk-day.today .wk-day-head{background:var(--primary-soft)}
+  .wk-day.today .wk-day-name{color:var(--primary-d)}
+  .wk-day.past{opacity:.6}
+
   /* ---------- מסך התחברות ---------- */
   .auth-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;
     background:radial-gradient(1200px 500px at 50% -10%, #ecf3f1 0%, var(--paper) 55%);}
@@ -603,6 +629,11 @@
         <div class="screen-head"><button class="back-btn" onclick="backToHome()">→ חזרה</button><h1 class="screen-title">📅 סידור עבודה</h1></div>
         <div class="card">
           <p class="sub">בחר עובד לתכנון וניהול הסידור שלו. זו תוכנית בלבד ולא משפיעה על השכר — שכר נקבע אך ורק מהחתמות בטרמינל.</p>
+          <button class="folder" style="border-color:#cfe7e3;background:var(--primary-soft);margin-bottom:14px" onclick="openSchedWeek()">
+            <span class="f-ico">🗓️</span>
+            <span class="f-txt"><span class="f-title">סידור שבועי — כל העובדים</span><span class="f-sub">תצוגת שבוע מלאה של כל המשמרות יחד</span></span>
+            <span class="f-arr">→</span>
+          </button>
           <div id="schedEmpFolders"></div>
           <button class="folder" style="margin-top:14px" onclick="openSchedArchive()">
             <span class="f-ico">📦</span>
@@ -629,6 +660,23 @@
             <button class="btn" id="addShiftBtn" onclick="openAddShift()">+ הוסף משמרת</button>
           </div>
           <div id="schedBody"></div>
+        </div>
+      </div>
+
+      <!-- סידור שבועי — כל העובדים -->
+      <div id="schedWeek" class="hidden">
+        <div class="screen-head"><button class="back-btn" onclick="schedBackToList()">→ חזרה</button><h1 class="screen-title">🗓️ סידור שבועי</h1></div>
+        <div class="card">
+          <div class="wk-nav">
+            <button class="btn line sm" onclick="weekPrev()">שבוע קודם</button>
+            <div class="wk-label" id="weekLabel">—</div>
+            <button class="btn line sm" onclick="weekNext()">שבוע הבא</button>
+          </div>
+          <div class="wk-toolbar">
+            <button class="btn line sm" onclick="weekThis()">קפוץ לשבוע הנוכחי</button>
+            <div class="wk-sum" id="weekSummary"></div>
+          </div>
+          <div id="weekBody"></div>
         </div>
       </div>
 
@@ -2244,6 +2292,7 @@ function renderSchedule(){
     if(!schedSubEmpId || !employees[schedSubEmpId]){ schedView="list"; }
     else renderScheduleDetail(schedSubEmpId);
   }
+  if(schedView==="week"){ renderSchedWeek(); }
   applySchedNav();
 }
 
@@ -2251,10 +2300,108 @@ function applySchedNav(){
   $("schedList").classList.toggle("hidden", schedView!=="list");
   $("schedArchive").classList.toggle("hidden", schedView!=="archive");
   $("schedDetail").classList.toggle("hidden", schedView!=="detail");
+  $("schedWeek").classList.toggle("hidden", schedView!=="week");
 }
 function openSchedEmp(empId){ schedSubEmpId=empId; schedView="detail"; renderSchedule(); try{window.scrollTo(0,0);}catch(e){} }
 function openSchedArchive(){ schedView="archive"; renderSchedule(); try{window.scrollTo(0,0);}catch(e){} }
 function schedBackToList(){ schedView="list"; schedSubEmpId=null; renderSchedule(); try{window.scrollTo(0,0);}catch(e){} }
+
+/* ---------- סידור שבועי — כל העובדים יחד ---------- */
+function startOfWeek(d){ const x=new Date(d); x.setHours(0,0,0,0); x.setDate(x.getDate()-x.getDay()); return x; } // יום ראשון
+function addDaysDate(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
+let weekStart = startOfWeek(new Date()); // יום ראשון של השבוע המוצג
+
+function openSchedWeek(){ weekStart=startOfWeek(new Date()); schedView="week"; renderSchedule(); try{window.scrollTo(0,0);}catch(e){} }
+function weekPrev(){ weekStart=addDaysDate(weekStart,-7); renderSchedWeek(); }
+function weekNext(){ weekStart=addDaysDate(weekStart, 7); renderSchedWeek(); }
+function weekThis(){ weekStart=startOfWeek(new Date()); renderSchedWeek(); }
+
+function weekRangeLabel(start){
+  const end=addDaysDate(start,6);
+  const sM=HEB_MONTHS[start.getMonth()], eM=HEB_MONTHS[end.getMonth()];
+  if(start.getMonth()===end.getMonth() && start.getFullYear()===end.getFullYear())
+    return start.getDate()+"–"+end.getDate()+" ב"+sM+" "+end.getFullYear();
+  if(start.getFullYear()===end.getFullYear())
+    return start.getDate()+" ב"+sM+" – "+end.getDate()+" ב"+eM+" "+end.getFullYear();
+  return start.getDate()+" ב"+sM+" "+start.getFullYear()+" – "+end.getDate()+" ב"+eM+" "+end.getFullYear();
+}
+
+// כל המשמרות של עובדים פעילים בתאריך נתון (קבועות שלא בוטלו + חד-פעמיות)
+function shiftsForDate(iso){
+  const dow=parseIso(iso).getDay();
+  const out=[];
+  Object.values(recurring).forEach(r=>{
+    if(!(r.daysOfWeek||[]).includes(dow)) return;
+    if((r.cancelledDates||{})[iso]) return;
+    const emp=employees[r.employeeId];
+    if(!emp || emp.active===false) return;
+    out.push({name:emp.name, startTime:r.startTime, endTime:r.endTime, type:'recurring'});
+  });
+  Object.values(oneTime).forEach(o=>{
+    if(o.date!==iso) return;
+    const emp=employees[o.employeeId];
+    if(!emp || emp.active===false) return;
+    out.push({name:emp.name, startTime:o.startTime, endTime:o.endTime, type:'once'});
+  });
+  return out.sort((a,b)=> a.startTime===b.startTime
+    ? (a.name||"").localeCompare(b.name||"","he")
+    : a.startTime.localeCompare(b.startTime));
+}
+
+function hhmmToMin(s){ const p=String(s||"0:0").split(":"); return (parseInt(p[0],10)||0)*60 + (parseInt(p[1],10)||0); }
+
+function renderSchedWeek(){
+  const body=$("weekBody"); if(!body) return;
+  const lbl=$("weekLabel"); if(lbl) lbl.textContent=weekRangeLabel(weekStart);
+
+  const todayIso=isoDate(new Date());
+  let totalShifts=0, totalMin=0; const empSet={};
+  let html="";
+
+  for(let i=0;i<7;i++){
+    const d=addDaysDate(weekStart,i);
+    const iso=isoDate(d);
+    const shifts=shiftsForDate(iso);
+    const isToday=iso===todayIso;
+    const isPast=iso<todayIso;
+
+    let rows;
+    if(shifts.length===0){
+      rows='<div class="wk-empty">אין משמרות</div>';
+    } else {
+      rows=shifts.map(s=>{
+        totalShifts++; totalMin+=Math.max(0, hhmmToMin(s.endTime)-hhmmToMin(s.startTime)); empSet[s.name]=1;
+        const once=s.type==='once';
+        return `<div class="wk-shift ${once?'once':''}">
+          <span class="dot2 ${once?'once':''}"></span>
+          <span class="wk-time">${s.startTime}–${s.endTime}</span>
+          <span class="wk-name">${esc(s.name)}</span>
+          <span class="wk-tag">${once?'חד-פעמית':'קבועה'}</span>
+        </div>`;
+      }).join("");
+    }
+
+    html+=`<div class="wk-day ${isToday?'today':''} ${isPast?'past':''}">
+      <div class="wk-day-head">
+        <span class="wk-day-name">יום ${HE_DAYS_LONG[d.getDay()]}${isToday?' · היום':''}</span>
+        <span class="wk-day-meta">
+          <span class="wk-day-date">${pad(d.getDate())}/${pad(d.getMonth()+1)}</span>
+          ${shifts.length?`<span class="wk-day-count">${shifts.length}</span>`:''}
+        </span>
+      </div>
+      <div class="wk-day-body">${rows}</div>
+    </div>`;
+  }
+
+  body.innerHTML=html;
+
+  const hrs=Math.round(totalMin/6)/10; // שעות עם ספרה אחת אחרי הנקודה
+  const nEmp=Object.keys(empSet).length;
+  const sum=$("weekSummary");
+  if(sum) sum.textContent = totalShifts
+    ? `${totalShifts} משמרות · ${nEmp} עובדים · כ-${hrs} שע' מתוכננות`
+    : "אין משמרות מתוכננות השבוע";
+}
 
 function renderScheduleDetail(empId){
   const body=$("schedBody");
