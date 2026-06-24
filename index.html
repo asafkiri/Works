@@ -827,6 +827,31 @@
   </div>
 </div>
 
+<!-- ============================ מודאל קלט כללי (מחליף prompt) ============================ -->
+<div id="uiPromptModal" class="modal-bg">
+  <div class="modal">
+    <h3 id="uiPromptTitle"></h3>
+    <label class="fld" id="uiPromptLabel" style="margin-top:6px"></label>
+    <input type="text" id="uiPromptInput" autocomplete="off" autocapitalize="off">
+    <div class="modal-actions">
+      <button class="btn line" onclick="uiPromptCancel()">ביטול</button>
+      <button class="btn" onclick="uiPromptOk()">אישור</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ מודאל אישור כללי (מחליף confirm/alert) ============================ -->
+<div id="uiConfirmModal" class="modal-bg">
+  <div class="modal">
+    <h3 id="uiConfirmTitle">אישור</h3>
+    <p class="who" id="uiConfirmMsg" style="white-space:pre-line;margin-bottom:0"></p>
+    <div class="modal-actions">
+      <button class="btn line" id="uiConfirmCancel" onclick="uiConfirmCancel()">ביטול</button>
+      <button class="btn" id="uiConfirmOk" onclick="uiConfirmOk()">אישור</button>
+    </div>
+  </div>
+</div>
+
 <div id="printArea"></div>
 
 <div id="toast" class="toast"></div>
@@ -932,6 +957,48 @@ function toast(msg){
 }
 function openModal(id){ $(id).classList.add("show"); }
 function closeModal(id){ $(id).classList.remove("show"); }
+
+/* ---- מודאלים שמחליפים prompt/confirm/alert (עובדים גם במצב אפליקציה מהמסך הבית) ---- */
+let _uiPromptResolve=null;
+function uiPrompt(opts){
+  opts=opts||{};
+  return new Promise(resolve=>{
+    _uiPromptResolve=resolve;
+    $("uiPromptTitle").textContent=opts.title||"";
+    $("uiPromptLabel").textContent=opts.label||"";
+    const inp=$("uiPromptInput");
+    inp.value=(opts.value!=null?opts.value:"");
+    inp.placeholder=opts.placeholder||"";
+    if(opts.inputmode) inp.setAttribute("inputmode",opts.inputmode); else inp.removeAttribute("inputmode");
+    if(opts.maxlength) inp.setAttribute("maxlength",opts.maxlength); else inp.removeAttribute("maxlength");
+    openModal("uiPromptModal");
+    setTimeout(()=>{ try{ inp.focus(); inp.select(); }catch(e){} },60);
+  });
+}
+function uiPromptOk(){
+  const v=$("uiPromptInput").value;
+  closeModal("uiPromptModal");
+  const r=_uiPromptResolve; _uiPromptResolve=null; if(r) r(v);
+}
+function uiPromptCancel(){
+  closeModal("uiPromptModal");
+  const r=_uiPromptResolve; _uiPromptResolve=null; if(r) r(null);
+}
+let _uiConfirmResolve=null;
+function uiConfirm(message,opts){
+  opts=opts||{};
+  return new Promise(resolve=>{
+    _uiConfirmResolve=resolve;
+    $("uiConfirmTitle").textContent=opts.title||"אישור";
+    $("uiConfirmMsg").textContent=message||"";
+    const ok=$("uiConfirmOk"); ok.textContent=opts.okText||"אישור"; ok.className="btn"+(opts.danger?" danger":"");
+    $("uiConfirmCancel").style.display=opts.alert?"none":"";
+    openModal("uiConfirmModal");
+  });
+}
+function uiConfirmOk(){ closeModal("uiConfirmModal"); const r=_uiConfirmResolve; _uiConfirmResolve=null; if(r) r(true); }
+function uiConfirmCancel(){ closeModal("uiConfirmModal"); const r=_uiConfirmResolve; _uiConfirmResolve=null; if(r) r(false); }
+function uiAlert(message,title){ return uiConfirm(message,{alert:true,title:title||"שים לב",okText:"הבנתי"}); }
 
 /* ============================================================
    5. התחברות / הרשמה
@@ -1193,16 +1260,17 @@ function submitPin(){
     $("pinInput").value="";
   }
 }
-function setPin(){
-  const v=prompt("הזן קוד PIN חדש לכניסה לקונסולה (ספרות בלבד, לפחות 4):", "");
+async function setPin(){
+  const v=await uiPrompt({title:"קוד כניסה לקונסולה", label:"קוד חדש (ספרות בלבד, לפחות 4):", value:"", inputmode:"numeric"});
   if(v===null) return;
   const code=v.trim();
   if(!/^\d{4,}$/.test(code)){ toast("הקוד חייב להיות לפחות 4 ספרות"); return; }
   db.ref("config/consolePin").set(code).then(()=>{ consoleUnlocked=true; toast("קוד ה-PIN נשמר ✓"); });
 }
-function removePin(){
+async function removePin(){
   if(!pinConfig){ toast("אין קוד מוגדר"); return; }
-  if(!confirm("להסיר את קוד ה-PIN? הקונסולה תהיה פתוחה לכל מי שמחובר למכשיר.")) return;
+  const ok=await uiConfirm("להסיר את קוד ה-PIN? הקונסולה תהיה פתוחה לכל מי שמחובר למכשיר.", {danger:true, okText:"הסר"});
+  if(!ok) return;
   db.ref("config/consolePin").remove().then(()=>toast("קוד ה-PIN הוסר"));
 }
 function renderPinStatus(){
@@ -1392,7 +1460,7 @@ let clockPadBuf="";
 function openClockPad(empId){
   const e=employees[empId]; if(!e) return;
   if(!e.clockPin){
-    alert("לעובד "+e.name+" עדיין לא הוגדר קוד החתמה.\nהמנהל יכול להגדיר קוד בקונסולה (ניהול עובדים).");
+    uiAlert("לעובד "+e.name+" עדיין לא הוגדר קוד החתמה.\nהמנהל יכול להגדיר קוד בקונסולה (ניהול עובדים).");
     return;
   }
   clockPadEmpId=empId;
@@ -1773,12 +1841,13 @@ function togglePaid(shiftId){
     .then(()=> toast(newVal?"סומן כשולם ✓":"הסימון בוטל"));
 }
 
-function setMonthPaid(target){
+async function setMonthPaid(target){
   const list=payShiftsFor(paySubEmpId, paySelMonthKey);
   if(list.length===0) return;
   const e=employees[paySubEmpId];
   const verb = target ? "לסמן כשולם" : "לבטל סימון תשלום עבור";
-  if(!confirm(verb+" את כל "+list.length+" המשמרות של "+(e?e.name:"")+" ב"+monthLabel(paySelMonthKey)+"?")) return;
+  const ok=await uiConfirm(verb+" את כל "+list.length+" המשמרות של "+(e?e.name:"")+" ב"+monthLabel(paySelMonthKey)+"?", {okText: target?"סמן הכל":"בטל סימון"});
+  if(!ok) return;
   const updates={};
   list.forEach(s=>{ updates["shifts/"+s.id+"/paid"]=target; updates["shifts/"+s.id+"/paidAt"]=target?TS:null; });
   db.ref().update(updates).then(()=> toast(target?"כל החודש סומן כשולם ✓":"הסימון בוטל לכל החודש"));
@@ -1861,18 +1930,18 @@ function addEmployee(){
 }
 
 // הגדרה/שינוי של קוד החתמה (4 ספרות) לעובד
-function setClockPin(empId){
+async function setClockPin(empId){
   const e=employees[empId]; if(!e) return;
-  const v=prompt("קוד החתמה (4 ספרות) עבור "+e.name+":", e.clockPin||"");
+  const v=await uiPrompt({title:"קוד החתמה בטרמינל", label:"קוד 4 ספרות עבור "+e.name+":", value:e.clockPin||"", inputmode:"numeric", maxlength:4});
   if(v===null) return;
   const pin=v.trim();
   if(!/^\d{4}$/.test(pin)){ toast("הקוד חייב להיות 4 ספרות בדיוק"); return; }
   db.ref("employees/"+empId+"/clockPin").set(pin).then(()=>toast("קוד ההחתמה עודכן ✓"));
 }
 
-function editRate(empId){
+async function editRate(empId){
   const e=employees[empId]; if(!e) return;
-  const v=prompt("תעריף חדש לשעה (₪) עבור "+e.name+":", e.hourlyRate||0);
+  const v=await uiPrompt({title:"תעריף לשעה", label:"תעריף חדש (₪) עבור "+e.name+":", value:e.hourlyRate||0, inputmode:"decimal"});
   if(v===null) return;
   const r=parseFloat(v);
   if(isNaN(r)||r<0){ toast("תעריף לא תקין"); return; }
@@ -1880,14 +1949,16 @@ function editRate(empId){
 }
 
 // הוספת התחברות לעובד שנוצר ללא שם משתמש (עובדים ישנים)
-function addLogin(empId){
+async function addLogin(empId){
   const e=employees[empId]; if(!e) return;
-  const user=(prompt("שם משתמש עבור "+e.name+" (אנגלית/ספרות):","")||"").trim().toLowerCase();
+  let user=await uiPrompt({title:"הוספת התחברות", label:"שם משתמש עבור "+e.name+" (אנגלית/ספרות):", value:""});
+  if(user===null) return;
+  user=user.trim().toLowerCase();
   if(!user) return;
   if(!/^[a-zA-Z0-9._-]+$/.test(user)){ toast("שם המשתמש: אנגלית/ספרות בלבד"); return; }
   const taken=Object.keys(employees).some(id=> id!==empId && (employees[id].username||"").toLowerCase()===user);
   if(taken){ toast("שם המשתמש תפוס"); return; }
-  const pass=prompt("סיסמה זמנית (לפחות 6 תווים):","");
+  const pass=await uiPrompt({title:"הוספת התחברות", label:"סיסמה זמנית (לפחות 6 תווים):", value:""});
   if(pass===null) return;
   if(pass.length<6){ toast("הסיסמה קצרה מדי"); return; }
   db.ref("employees/"+empId).update({ username:user, tempPassword:pass, authUid:null, linked:false })
@@ -1895,14 +1966,14 @@ function addLogin(empId){
 }
 
 // איפוס סיסמה. עובד עם accountעדיין לא נוצר -> פשוט; כבר התחבר -> מוסבר שלא נתמך כרגע
-function resetEmpPass(empId){
+async function resetEmpPass(empId){
   const e=employees[empId]; if(!e) return;
   if(!e.username){ toast("לעובד אין התחברות עדיין"); return; }
   if(e.linked===true){
-    alert("העובד כבר התחבר וחשבונו נוצר. איפוס סיסמה לחשבון קיים יתווסף בהמשך (דורש רכיב נוסף). כרגע אפשר לאפס רק לפני הכניסה הראשונה.");
+    await uiAlert("העובד כבר התחבר וחשבונו נוצר. איפוס סיסמה לחשבון קיים יתווסף בהמשך (דורש רכיב נוסף). כרגע אפשר לאפס רק לפני הכניסה הראשונה.");
     return;
   }
-  const pass=prompt("סיסמה זמנית חדשה עבור "+e.name+" (לפחות 6 תווים):","");
+  const pass=await uiPrompt({title:"איפוס סיסמה", label:"סיסמה זמנית חדשה עבור "+e.name+" (לפחות 6 תווים):", value:""});
   if(pass===null) return;
   if(pass.length<6){ toast("הסיסמה קצרה מדי"); return; }
   db.ref("employees/"+empId).update({ tempPassword:pass })
@@ -1919,11 +1990,12 @@ function saveFeedback(shiftId){
   db.ref("shifts/"+shiftId).update({ managerFeedback:v, feedbackAt: v?TS:null }).then(()=>toast("המשוב נשמר ✓"));
 }
 
-function deleteShift(shiftId){
+async function deleteShift(shiftId){
   const s=shifts[shiftId]; if(!s) return;
   const name=employees[s.employeeId] ? employees[s.employeeId].name : "(עובד שנמחק)";
   const when=fmtDate(s.clockIn)+" "+fmtTime(s.clockIn);
-  if(!confirm("למחוק לצמיתות את המשמרת של "+name+" ("+when+")?\nפעולה זו אינה הפיכה.")) return;
+  const ok=await uiConfirm("למחוק לצמיתות את המשמרת של "+name+" ("+when+")?\nפעולה זו אינה הפיכה.", {danger:true, okText:"מחק"});
+  if(!ok) return;
   // אם זו משמרת פתוחה - לנקות גם את ה-openShiftId של העובד כדי שלא ייתקע "במשמרת"
   const clearOpen = (!s.clockOut && s.employeeId && employees[s.employeeId] && employees[s.employeeId].openShiftId===shiftId)
     ? db.ref("employees/"+s.employeeId+"/openShiftId").set(null)
@@ -2160,12 +2232,14 @@ function saveShift(){
     }
   }
 }
-function deleteRecurring(id){
-  if(!confirm("למחוק לגמרי את המשמרת הקבועה מהעובד?")) return;
+async function deleteRecurring(id){
+  const ok=await uiConfirm("למחוק לגמרי את המשמרת הקבועה מהעובד?", {danger:true, okText:"מחק"});
+  if(!ok) return;
   db.ref("recurringShifts/"+id).remove().then(()=>toast("נמחק"));
 }
-function deleteOnetime(id){
-  if(!confirm("למחוק את המשמרת החד-פעמית?")) return;
+async function deleteOnetime(id){
+  const ok=await uiConfirm("למחוק את המשמרת החד-פעמית?", {danger:true, okText:"מחק"});
+  if(!ok) return;
   db.ref("oneTimeShifts/"+id).remove().then(()=>toast("נמחק"));
 }
 
@@ -2218,6 +2292,7 @@ $("authSubmit").addEventListener("click", handleAuthSubmit);
 $("authToggleLink").addEventListener("click", ()=> setAuthMode(authMode==="login"?"signup":"login"));
 $("authPass").addEventListener("keydown", e=>{ if(e.key==="Enter") handleAuthSubmit(); });
 $("pinInput").addEventListener("keydown", e=>{ if(e.key==="Enter") submitPin(); });
+$("uiPromptInput").addEventListener("keydown", e=>{ if(e.key==="Enter") uiPromptOk(); });
 
 // אם אין הגדרות - הצג באנר בתוך האפליקציה (אם בכל זאת ניגשים)
 if(!firebaseReady){ $("configBanner")?.classList.remove("hidden"); }
