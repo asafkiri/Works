@@ -1263,24 +1263,22 @@ function firstEmployeeLogin(u, p){
   suppressRouting=true; // לא לנתב עד שנסיים לקשר
   auth.createUserWithEmailAndPassword(email, p)
     .then(cred=>{
-      const uid=cred.user.uid;
-      // מאתרים את מזהה רשומת העובד דרך אינדקס שמות המשתמש (בלי לקרוא את כל הרשומות)
-      return db.ref("usernames/"+u.toLowerCase()).once("value").then(snap=>{
-        const empId=snap.val();
-        if(!empId){
-          return cred.user.delete().then(()=>{ suppressRouting=false; showErr("שם משתמש או סיסמה שגויים."); });
+      // עכשיו מחוברים כמשתמש החדש - אפשר לקרוא את רשומות העובדים
+      return db.ref("employees").once("value").then(snap=>{
+        const emps=snap.val()||{};
+        let id=null;
+        Object.keys(emps).forEach(k=>{ if((emps[k].username||"").toLowerCase()===u.toLowerCase()) id=k; });
+        if(id && emps[id].tempPassword===p && emps[id].linked!==true){
+          // קישור תקין: שומרים את ה-uid ומסמנים כמקושר
+          return db.ref("employees/"+id).update({ authUid:cred.user.uid, linked:true, tempPassword:null })
+            .then(()=>{ suppressRouting=false; routeAfterLogin(cred.user); });
+        } else {
+          // אין רשומת עובד תואמת או הסיסמה שגויה -> מבטלים את החשבון שנוצר
+          return cred.user.delete().then(()=>{
+            suppressRouting=false;
+            showErr("שם משתמש או סיסמה שגויים.");
+          });
         }
-        // קישור: החוקים מאמתים שהסיסמה שנמסרה (claimPw) זהה לסיסמה הזמנית, ושעדיין לא קושר
-        return db.ref("employees/"+empId).update({ authUid:uid, linked:true, claimPw:p })
-          .then(()=>
-            // ניקוי: מוחקים את הסיסמה הזמנית ואת שדה הבדיקה — הבעלים יכול לכתוב אותם כעת
-            db.ref("employees/"+empId).update({ claimPw:null, tempPassword:null })
-              .then(()=>{ suppressRouting=false; routeAfterLogin(cred.user); })
-          )
-          .catch(()=>
-            // הקישור נדחה -> סיסמה שגויה או שהרשומה כבר קושרה. מבטלים את החשבון שנוצר.
-            cred.user.delete().then(()=>{ suppressRouting=false; showErr("שם משתמש או סיסמה שגויים."); })
-          );
       });
     })
     .catch(err=>{
@@ -1335,63 +1333,56 @@ function routeAfterLogin(user){
       $("empApp").classList.add("hidden");
       $("app").classList.remove("hidden");
       $("configBanner").classList.add("hidden");
-      startDataListeners("manager", user.uid);
+      startDataListeners();
     } else {
       enterEmployeeMode(user);
     }
   }).catch(()=> showErr("שגיאה בטעינה. נסה שוב."));
 }
 
-// כניסה למצב עובד: מאתרים את רשומת העובד שלו בלבד (לפי authUid) ומציגים את הדשבורד
+// כניסה למצב עובד: מאתרים את רשומת העובד המקושרת ומציגים את הדשבורד
 function enterEmployeeMode(user){
-  db.ref("employees").orderByChild("authUid").equalTo(user.uid).once("value").then(snap=>{
-    const found=snap.val()||{};
-    const id=Object.keys(found)[0]||null;
+  startDataListeners();
+  db.ref("employees").once("value").then(snap=>{
+    const emps=snap.val()||{};
+    let id=null;
+    // קודם לפי authUid
+    Object.keys(emps).forEach(k=>{ if(emps[k].authUid===user.uid) id=k; });
+    // גיבוי: לפי שם המשתמש (אם הקישור עוד לא נשמר) - ולקשר
     if(!id){
-      // אין רשומת עובד מקושרת לחשבון הזה - לא חשבון תקין במערכת
+      const local=(user.email||"").split("@")[0].toLowerCase();
+      Object.keys(emps).forEach(k=>{ if((emps[k].username||"").toLowerCase()===local && emps[k].linked!==true) id=k; });
+      if(id) db.ref("employees/"+id).update({ authUid:user.uid, linked:true, tempPassword:null });
+    }
+    if(!id){
+      // אין רשומת עובד מקושרת - לא חשבון תקין במערכת
       $("app").classList.add("hidden"); $("empApp").classList.add("hidden");
       $("authScreen").classList.remove("hidden");
       showErr("החשבון אינו משויך לעובד במערכת. פנה למנהל.");
       auth.signOut();
       return;
     }
-    employees = found; // רק הרשומה של העובד עצמו
     currentRole="employee"; currentEmpId=id; empMonthKey=null; empNav="home";
-    startDataListeners("employee", user.uid);
     $("authScreen").classList.add("hidden");
     $("app").classList.add("hidden");
     $("empApp").classList.remove("hidden");
     renderEmployeeDashboard();
-  }).catch(()=> showErr("שגיאה בטעינה. נסה שוב."));
+  });
 }
 
 let listenersStarted=false;
-let unameIdxDone=false;
-// השלמת אינדקס שמות המשתמש לעובדים קיימים (פעם אחת, בסשן המנהל)
-function ensureUsernameIndex(){
-  if(unameIdxDone) return; unameIdxDone=true;
-  Object.keys(employees).forEach(id=>{
-    const u=(employees[id].username||"").toLowerCase();
-    if(u) db.ref("usernames/"+u).set(id);
-  });
-}
-function startDataListeners(role, uid){
+function startDataListeners(){
   if(listenersStarted) return; listenersStarted=true;
-  if(role==="manager"){
-    // המנהל רואה את כל העובדים (הקונסולה והטרמינל זקוקים לזה)
-    db.ref("employees").on("value", snap=>{ employees = snap.val() || {}; ensureUsernameIndex(); renderActive(); });
-    db.ref("config/consolePin").on("value", snap=>{
-      pinConfig = snap.val() || null;
-      if(currentView==="console") renderPinStatus();
-      if(pinConfig && !consoleUnlocked && currentView==="console"){ applyView("terminal"); }
-    });
-  } else {
-    // העובד מאזין אך ורק לרשומה של עצמו
-    db.ref("employees").orderByChild("authUid").equalTo(uid).on("value", snap=>{ employees = snap.val() || {}; renderActive(); });
-  }
+  db.ref("employees").on("value", snap=>{ employees = snap.val() || {}; renderActive(); });
   db.ref("shifts").on("value",    snap=>{ shifts    = snap.val() || {}; renderActive(); checkAutoClose(); });
   db.ref("recurringShifts").on("value", snap=>{ recurring = snap.val() || {}; if(currentView==="console") renderSchedule(); if(currentRole==="employee") renderEmployeeDashboard(); });
   db.ref("oneTimeShifts").on("value",   snap=>{ oneTime   = snap.val() || {}; if(currentView==="console") renderSchedule(); if(currentRole==="employee") renderEmployeeDashboard(); if(currentRole==="manager") cleanupPastOneTimes(); });
+  db.ref("config/consolePin").on("value", snap=>{
+    pinConfig = snap.val() || null;
+    if(currentView==="console") renderPinStatus();
+    // נעילה בטעינה: אם הוגדר PIN ועדיין לא נפתח בסשן - מפנים לטרמינל
+    if(pinConfig && !consoleUnlocked && currentView==="console"){ applyView("terminal"); }
+  });
 }
 
 /* ============================================================
@@ -2442,12 +2433,10 @@ function addEmployee(){
   // בדיקת כפילות מול עובדים קיימים (אותיות קטנות)
   const taken=Object.values(employees).some(e=> (e.username||"").toLowerCase()===user);
   if(taken){ toast("שם המשתמש כבר תפוס על ידי עובד אחר"); return; }
-  const ref=db.ref("employees").push({
+  db.ref("employees").push({
     name, hourlyRate:rate, active:true, openShiftId:null, createdAt:TS,
     username:user, tempPassword:pass, authUid:null, linked:false, clockPin:pin, birthDate:birth
-  });
-  ref.then(()=>{
-    db.ref("usernames/"+user).set(ref.key);
+  }).then(()=>{
     $("newEmpName").value=""; $("newEmpRate").value="";
     $("newEmpUser").value=""; $("newEmpPass").value=""; $("newEmpPin").value=""; $("newEmpBirth").value="";
     toast("העובד נוסף ✓ — מסור לו שם משתמש, סיסמה וקוד החתמה");
@@ -2487,7 +2476,7 @@ async function addLogin(empId){
   if(pass===null) return;
   if(pass.length<6){ toast("הסיסמה קצרה מדי"); return; }
   db.ref("employees/"+empId).update({ username:user, tempPassword:pass, authUid:null, linked:false })
-    .then(()=>{ db.ref("usernames/"+user).set(empId); toast("ההתחברות נוספה ✓ — מסור לעובד"); });
+    .then(()=>toast("ההתחברות נוספה ✓ — מסור לעובד"));
 }
 
 // איפוס סיסמה. עובד עם accountעדיין לא נוצר -> פשוט; כבר התחבר -> מוסבר שלא נתמך כרגע
