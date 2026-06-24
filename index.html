@@ -308,18 +308,6 @@
   .switch input:checked + .sl{background:var(--primary)}
   .switch input:checked + .sl::before{transform:translateX(-19px)}
 
-  /* ---------- התראת משמרות שנשכחו ---------- */
-  .alarm{border:1.5px solid var(--danger-line);background:var(--danger-bg);border-radius:14px;padding:14px 16px;margin-bottom:16px;box-shadow:var(--shadow);animation:alarmIn .2s ease-out}
-  @keyframes alarmIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
-  .alarm-head{display:flex;align-items:center;gap:9px;font-weight:800;font-size:15px;color:var(--danger);margin-bottom:11px}
-  .alarm-head .bell{font-size:19px;display:inline-block;transform-origin:50% 10%;animation:bellShake 1.4s ease-in-out infinite}
-  @keyframes bellShake{0%,55%,100%{transform:rotate(0)}60%{transform:rotate(14deg)}67%{transform:rotate(-11deg)}74%{transform:rotate(8deg)}81%{transform:rotate(-5deg)}88%{transform:rotate(2deg)}}
-  .alarm-item{display:flex;align-items:center;gap:10px;padding:11px 13px;background:#fff;border:1px solid var(--danger-line);border-radius:11px;margin-bottom:8px;flex-wrap:wrap}
-  .alarm-item:last-child{margin-bottom:0}
-  .alarm-item .ai-main{flex:1;min-width:150px}
-  .alarm-item .ai-t1{font-weight:800;font-size:14.5px}
-  .alarm-item .ai-t2{font-size:12.5px;color:var(--danger);margin-top:3px;font-weight:600;line-height:1.45}
-
   /* ---------- מודאל ---------- */
   .modal-bg{position:fixed;inset:0;background:rgba(20,24,31,.5);display:none;align-items:center;justify-content:center;z-index:50;padding:18px;-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}
   .modal-bg.show{display:flex}
@@ -489,7 +477,6 @@
 
     <!-- תפריט ראשי (בית) -->
     <div id="consoleHome">
-      <div id="forgotAlert"></div>
       <div class="folder-grid">
         <button class="folder" onclick="openFolder('overview')">
           <span class="f-ico">📊</span>
@@ -523,8 +510,6 @@
     <!-- מסך: סקירה -->
     <div id="screen-overview" class="screen hidden">
       <div class="screen-head"><button class="back-btn" onclick="backToHome()">→ חזרה</button><h1 class="screen-title">📊 סקירה</h1></div>
-
-      <div id="forgotAlertOv"></div>
 
       <div class="card">
         <h2>כרגע במשמרת</h2>
@@ -1056,7 +1041,6 @@ const firebaseConfig = {
 
 const LOGIN_DOMAIN   = "store.local"; // שם משתמש "דני" => "דני@store.local" מאחורי הקלעים
 const AUTO_CLOSE_HOURS = 12;          // סגירה אוטומטית למשמרת ששכחו לסגור
-const LONG_OPEN_HOURS  = 10;          // סף "כנראה שכחו לסגור" — מתריע בעוד המשמרת פתוחה (לפני הסגירה האוטומטית)
 
 /* ============================================================
    2. אתחול
@@ -1806,14 +1790,13 @@ function checkAutoClose(){
     }
   });
 }
-setInterval(()=>{ if(firebaseReady){ checkAutoClose(); if(currentRole==="manager") renderForgotAlerts(); } }, 60000);
+setInterval(()=>{ if(firebaseReady) checkAutoClose(); }, 60000);
 
 /* ============================================================
    10. קונסולת מנהל
    ============================================================ */
 function renderConsole(){
   renderOpenShifts();
-  renderForgotAlerts();
   renderEmpList();
   renderSchedule();
   renderShiftList();
@@ -1855,59 +1838,8 @@ function renderOpenShifts(){
   }).join("");
 }
 
-// 10א'. התראה בולטת על משמרות שנשכחו (פתוחות יותר מדי / נסגרו אוטומטית)
-function renderForgotAlerts(){
-  const homeEl=$("forgotAlert"), ovEl=$("forgotAlertOv");
-  if(!homeEl && !ovEl) return;
-  const now=Date.now();
-
-  // משמרות פתוחות שרצות יותר מדי זמן — כנראה שכחו להחתים יציאה
-  const openLong=Object.keys(employees).filter(id=>{
-    const sid=employees[id].openShiftId; const s=sid?shifts[sid]:null;
-    return s && s.clockIn && !s.clockOut && (now - s.clockIn) >= LONG_OPEN_HOURS*3600000;
-  }).map(id=>({sid:employees[id].openShiftId, name:employees[id].name, clockIn:shifts[employees[id].openShiftId].clockIn}))
-    .sort((a,b)=>a.clockIn-b.clockIn);
-
-  // משמרות שנסגרו אוטומטית ועדיין לא טופלו (autoCloseFlag עדיין דלוק)
-  const autoClosed=Object.keys(shifts).filter(sid=>shifts[sid] && shifts[sid].autoCloseFlag===true)
-    .map(sid=>({sid, clockIn:shifts[sid].clockIn, name:(employees[shifts[sid].employeeId]?employees[shifts[sid].employeeId].name:"(עובד שנמחק)")}))
-    .sort((a,b)=>(b.clockIn||0)-(a.clockIn||0));
-
-  if(openLong.length===0 && autoClosed.length===0){
-    if(homeEl) homeEl.innerHTML=""; if(ovEl) ovEl.innerHTML=""; return;
-  }
-
-  let items="";
-  openLong.forEach(x=>{
-    items+=`<div class="alarm-item">
-      <div class="ai-main"><div class="ai-t1">${esc(x.name)}</div>
-      <div class="ai-t2">⏰ במשמרת כבר ${fmtHours(hoursBetween(x.clockIn, now))} — ייתכן ששכח/ה להחתים יציאה</div></div>
-      <button class="btn danger sm" onclick="openEditShift('${x.sid}')">סגור / תקן</button>
-    </div>`;
-  });
-  autoClosed.forEach(x=>{
-    items+=`<div class="alarm-item">
-      <div class="ai-main"><div class="ai-t1">${esc(x.name)}</div>
-      <div class="ai-t2">נסגרה אוטומטית (${fmtDate(x.clockIn)}) — צריך לבדוק את שעת היציאה</div></div>
-      <button class="btn sm" onclick="openEditShift('${x.sid}')">תקן שעות</button>
-      <button class="btn line sm" onclick="confirmAutoClose('${x.sid}')">השעות נכונות</button>
-    </div>`;
-  });
-
-  const total=openLong.length+autoClosed.length;
-  const html=`<div class="alarm">
-    <div class="alarm-head"><span class="bell">🔔</span> ${total===1?'משמרת שדורשת טיפול':total+' משמרות שדורשות טיפול'}</div>
-    ${items}
-  </div>`;
-  if(homeEl) homeEl.innerHTML=html;
-  if(ovEl) ovEl.innerHTML=html;
-}
-// אישור שהשעות של משמרת שנסגרה אוטומטית תקינות — מוריד את ההתראה בלי לשנות שעות
-function confirmAutoClose(shiftId){
-  db.ref("shifts/"+shiftId+"/autoCloseFlag").set(false).then(()=>toast("אושר ✓"));
-}
-
-
+// 10ב. רשימת עובדים + שכר החודש
+const byNameHe=(a,b)=>(a.name||"").localeCompare(b.name||"","he");
 // תיקיית עובד (כפתור) — משמשת במסכי שכר וסידור
 function empFolderHtml(e, subText, fnName){
   return `<button class="folder" onclick="${fnName}('${e.id}')">
@@ -2548,14 +2480,9 @@ function saveEditShift(){
   if(!inV || !outV){ toast("יש למלא כניסה ויציאה"); return; }
   const inMs=fromLocalInput(inV), outMs=fromLocalInput(outV);
   if(outMs<=inMs){ toast("היציאה חייבת להיות אחרי הכניסה"); return; }
-  const s=shifts[editingShiftId];
-  const wasOpenForEmp = s && s.employeeId && employees[s.employeeId] && employees[s.employeeId].openShiftId===editingShiftId;
-  const empOfShift = s ? s.employeeId : null;
   db.ref("shifts/"+editingShiftId).update({
     clockIn:inMs, clockOut:outMs, edited:true, autoCloseFlag:false
   }).then(()=>{
-    // אם תיקנו משמרת שעדיין הייתה "פתוחה" אצל העובד — לנקות כדי שלא ייתקע במצב "במשמרת"
-    if(wasOpenForEmp) db.ref("employees/"+empOfShift+"/openShiftId").set(null);
     closeModal("editModal");
     editingShiftId=null;
     toast("השעות עודכנו ✓");
