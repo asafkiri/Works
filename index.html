@@ -334,6 +334,55 @@
   .note-card{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px;background:#fff;box-shadow:var(--shadow-sm)}
   .note-card .nc-date{font-size:12.5px;color:var(--muted);margin-bottom:6px}
   .note-card .nc-text{font-size:14.5px;line-height:1.55}
+
+  /* ---------- מסך הצלחה אחרי החתמה (טרמינל) ---------- */
+  .success-screen{position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;padding:24px;
+    background:rgba(245,243,238,.9);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+  .success-screen.show{display:flex}
+  .success-card{background:#fff;border:1px solid var(--line);border-radius:var(--r-xl);box-shadow:var(--shadow-lg);
+    padding:34px 28px;max-width:380px;width:100%;text-align:center;animation:modalIn .22s ease-out}
+  .sc-ring{width:104px;height:104px;margin:0 auto 16px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--ok-bg)}
+  .sc-ring.out{background:var(--primary-soft)}
+  .sc-check{width:58px;height:58px}
+  .sc-check circle{stroke:var(--ok);stroke-width:4;fill:none;stroke-dasharray:164;stroke-dashoffset:164;animation:scDash .5s ease-out forwards}
+  .sc-check path{stroke:var(--ok);stroke-width:5;fill:none;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:50;stroke-dashoffset:50;animation:scTick .32s .34s ease-out forwards}
+  .sc-check.out circle,.sc-check.out path{stroke:var(--primary)}
+  @keyframes scDash{to{stroke-dashoffset:0}}
+  @keyframes scTick{to{stroke-dashoffset:0}}
+  .sc-kicker{font-size:13px;font-weight:800;letter-spacing:.04em;color:var(--ok)}
+  .sc-kicker.out{color:var(--primary-d)}
+  .sc-name{font-size:23px;font-weight:800;letter-spacing:-.01em;margin:3px 0 2px}
+  .sc-time{font-size:46px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.02em;margin:2px 0 8px}
+  .sc-msg{font-size:16px;color:var(--ink-soft);line-height:1.5;margin:0}
+  .sc-hint{font-size:12.5px;color:var(--muted);margin-top:18px}
+
+  /* ---------- טיימר חי + כרטיס "במשמרת עכשיו" בדשבורד ---------- */
+  .live-timer{font-variant-numeric:tabular-nums}
+  .live-card{background:var(--live-bg);border-color:var(--live-line);text-align:center}
+  .live-card .lc-head{display:flex;align-items:center;justify-content:center;gap:8px;font-size:14px;font-weight:800;color:var(--live-d)}
+  .live-card .lc-blip{width:9px;height:9px;border-radius:50%;background:var(--live);animation:pulse 1.6s infinite}
+  .live-card .lc-timer{font-size:42px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:.01em;margin:8px 0 2px;color:var(--ink)}
+  .live-card .lc-sub{font-size:13px;color:var(--live-d)}
+
+  /* ---------- סיכום צוות (מסך שכר) ---------- */
+  .team-sum{background:linear-gradient(135deg, var(--primary) 0%, var(--primary-d) 100%);border:none;color:#fff;border-radius:var(--r-lg);padding:18px 18px 16px;margin-bottom:16px;box-shadow:var(--shadow)}
+  .team-sum .ts-label{font-size:13px;font-weight:700;opacity:.9}
+  .team-sum .ts-amount{font-size:38px;font-weight:800;letter-spacing:-.02em;margin:4px 0 12px;font-variant-numeric:tabular-nums}
+  .team-sum .ts-stats{display:flex;gap:10px}
+  .team-sum .ts-stat{flex:1;background:rgba(255,255,255,.13);border-radius:12px;padding:9px 11px}
+  .team-sum .ts-stat .k{font-size:11.5px;opacity:.85}
+  .team-sum .ts-stat .v{font-size:15px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:2px}
+
+  /* ---------- חיווי "כמה במשמרת" על אריח הבית ---------- */
+  .live-count{display:inline-flex;align-items:center;gap:6px;flex:0 0 auto;font-size:12px;font-weight:800;
+    color:var(--live-d);background:var(--live-bg);border:1px solid var(--live-line);border-radius:999px;padding:4px 10px}
+  .live-count .blip{width:8px;height:8px;border-radius:50%;background:var(--live);animation:pulse 1.6s infinite}
+
+  @media (prefers-reduced-motion: reduce){
+    .sc-check circle,.sc-check path{animation:none;stroke-dashoffset:0}
+    .success-card{animation:none}
+    .live-card .lc-blip,.live-count .blip,.emp-tile .badge .blip{animation:none}
+  }
 </style>
 </head>
 <body>
@@ -389,6 +438,7 @@
         <button class="folder" onclick="openFolder('overview')">
           <span class="f-ico">📊</span>
           <span class="f-txt"><span class="f-title">סקירה</span><span class="f-sub">מי במשמרת עכשיו ומשמרות אחרונות</span></span>
+          <span class="live-count hidden" id="homeLiveCount"></span>
           <span class="f-arr">→</span>
         </button>
         <button class="folder" onclick="openFolder('employees')">
@@ -508,6 +558,7 @@
       <!-- רשימת עובדים (תיקיות) -->
       <div id="payList">
         <div class="screen-head"><button class="back-btn" onclick="backToHome()">→ חזרה</button><h1 class="screen-title">💰 שכר ותשלומים</h1></div>
+        <div id="payTeamSummary"></div>
         <div class="card">
           <p class="sub">בחר עובד לצפייה בפירוט המשמרות, סך השעות והסכום לתשלום. ניתן לסמן תשלומים ולייצא דף סיכום לרו״ח.</p>
           <div id="payEmpFolders"></div>
@@ -625,6 +676,7 @@
 
     <!-- בית -->
     <div id="empHome">
+      <div id="empLiveShift" class="hidden"></div>
       <div class="card emp-hero">
         <div class="eh-label" id="empOwedLabel">מגיע לך</div>
         <div class="eh-amount" id="empOwed">₪0</div>
@@ -852,6 +904,11 @@
   </div>
 </div>
 
+<!-- ============================ מסך הצלחה אחרי החתמה (טרמינל) ============================ -->
+<div id="clockSuccess" class="success-screen" onclick="hideClockSuccess()">
+  <div class="success-card" id="clockSuccessCard"></div>
+</div>
+
 <div id="printArea"></div>
 
 <div id="toast" class="toast"></div>
@@ -938,6 +995,10 @@ function fmtTime(ts){ if(!ts) return "—"; const d=new Date(ts); return pad(d.g
 function fmtDate(ts){ if(!ts) return ""; const d=new Date(ts); const days=["א","ב","ג","ד","ה","ו","ש"]; return "יום "+days[d.getDay()]+", "+pad(d.getDate())+"/"+pad(d.getMonth()+1)+"/"+d.getFullYear(); }
 function hoursBetween(a,b){ return (b-a)/3600000; }
 function fmtHours(h){ const H=Math.floor(h); const M=Math.round((h-H)*60); return H+":"+pad(M)+" שע'"; }
+// רטט קצר בנייד (נכשל בשקט בדפדפנים שלא תומכים)
+function vibrate(p){ try{ if(navigator.vibrate) navigator.vibrate(p); }catch(e){} }
+// משך חי לטיימר רץ: "שע':דק':שנ'"
+function fmtDurationLive(ms){ if(ms<0) ms=0; const t=Math.floor(ms/1000); const H=Math.floor(t/3600); const M=Math.floor((t%3600)/60); const S=t%60; return H+":"+pad(M)+":"+pad(S); }
 function inCurrentMonth(ts){ const d=new Date(ts), n=new Date(); return d.getFullYear()===n.getFullYear() && d.getMonth()===n.getMonth(); }
 
 const HEB_MONTHS=["ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"];
@@ -1325,6 +1386,22 @@ function renderEmployeeDashboard(){
   if(!e){ return; } // הנתונים עדיין נטענים
   $("empHello").textContent="שלום, "+e.name+" 👋";
 
+  // --- כרטיס "אתה במשמרת עכשיו" (טיימר חי) ---
+  const lsEl=$("empLiveShift");
+  if(lsEl){
+    const os = e.openShiftId ? shifts[e.openShiftId] : null;
+    if(os && !os.clockOut && os.clockIn){
+      lsEl.innerHTML=`<div class="card live-card">
+        <div class="lc-head"><span class="lc-blip"></span> אתה במשמרת עכשיו</div>
+        <div class="lc-timer live-timer" data-since="${os.clockIn}">${fmtDurationLive(Date.now()-os.clockIn)}</div>
+        <div class="lc-sub">התחלת ב-${fmtTime(os.clockIn)}</div>
+      </div>`;
+      lsEl.classList.remove("hidden");
+    } else {
+      lsEl.innerHTML=""; lsEl.classList.add("hidden");
+    }
+  }
+
   // --- בית: כרטיס "מגיע לך" לחודש הנוכחי ---
   const cur=empMonthTotals(currentMonthKey());
   $("empOwedLabel").textContent="מגיע לך · "+monthLabel(currentMonthKey());
@@ -1426,18 +1503,24 @@ function renderTerminal(){
     return;
   }
   grid.innerHTML = list.map(e=>{
-    const live = !!e.openShiftId;
-    const since = live && shifts[e.openShiftId] ? fmtTime(shifts[e.openShiftId].clockIn) : "";
+    const os = e.openShiftId ? shifts[e.openShiftId] : null;
+    const live = !!(os && !os.clockOut);
+    const cin = live ? os.clockIn : 0;
+    const since = live ? fmtTime(cin) : "";
+    const dur = live ? fmtDurationLive(Date.now()-cin) : "";
     return `
       <div class="emp-tile ${live?'live':''}" onclick="onEmployeeTap('${e.id}')">
         ${live?`<div class="badge"><span class="blip"></span> במשמרת</div>`:''}
         <div>
           <div class="nm">${esc(e.name)}</div>
-          <div class="state">${live?('נכנס/ה בשעה '+since):'לא במשמרת'}</div>
+          <div class="state">${live
+            ? `כבר <span class="live-timer" data-since="${cin}">${dur}</span> · נכנסת ${since}`
+            : 'לא במשמרת'}</div>
         </div>
         <div class="cta">${live?'סיים משמרת ←':'התחל משמרת ←'}</div>
       </div>`;
   }).join("");
+  updateLiveTimers();
 }
 
 function onEmployeeTap(empId){
@@ -1480,12 +1563,14 @@ function updatePadDots(){
 }
 function keypadPress(d){
   if(clockPadBuf.length>=4) return;
+  vibrate(10);
   $("padErr").textContent="";
   clockPadBuf+=d;
   updatePadDots();
   if(clockPadBuf.length===4) setTimeout(verifyClockPin, 120);
 }
 function keypadDelete(){
+  vibrate(10);
   clockPadBuf=clockPadBuf.slice(0,-1);
   $("padErr").textContent="";
   updatePadDots();
@@ -1497,6 +1582,7 @@ function verifyClockPin(){
     closeClockPad();
     clockIn(id);
   } else {
+    vibrate([40,40,40]);
     $("padErr").textContent="קוד שגוי, נסה שוב";
     clockPadBuf="";
     updatePadDots();
@@ -1506,6 +1592,8 @@ function verifyClockPin(){
 }
 
 function clockIn(empId){
+  const name = employees[empId] ? employees[empId].name : "";
+  const inMs = Date.now();
   const ref = db.ref("shifts").push();
   ref.set({
     employeeId: empId,
@@ -1517,7 +1605,7 @@ function clockIn(empId){
     edited: false
   }).then(()=>{
     return db.ref("employees/"+empId+"/openShiftId").set(ref.key);
-  }).then(()=> toast(employees[empId].name + " — תחילת משמרת ✓"))
+  }).then(()=> showClockSuccess({name, kind:'in', timeMs:inMs}))
     .catch(e=> toast("שגיאה בשמירה"));
 }
 
@@ -1526,14 +1614,51 @@ function confirmClockOut(skip){
   const note  = skip ? "" : $("noteText").value.trim();
   closeModal("noteModal");
   if(!empId) return;
-  const shiftId = employees[empId].openShiftId;
+  const emp = employees[empId];
+  const shiftId = emp.openShiftId;
   if(!shiftId){ pendingClockOutEmp=null; return; }
+  const name  = emp.name;
+  const cin   = shifts[shiftId] ? shifts[shiftId].clockIn : null;
+  const outMs = Date.now();
+  const hrs   = cin ? hoursBetween(cin, outMs) : 0;
 
   db.ref("shifts/"+shiftId).update({ clockOut: TS, employeeNote: note })
     .then(()=> db.ref("employees/"+empId+"/openShiftId").set(null))
-    .then(()=> toast(employees[empId].name + " — סיום משמרת ✓"))
+    .then(()=> showClockSuccess({name, kind:'out', timeMs:outMs, hours:hrs}))
     .catch(e=> toast("שגיאה בשמירה"));
   pendingClockOutEmp=null;
+}
+
+/* ---------- מסך הצלחה אחרי החתמה (טרמינל) ---------- */
+let _clockSuccessTimer=null;
+function showClockSuccess(opts){
+  opts=opts||{};
+  const isIn = opts.kind!=='out';
+  const t = fmtTime(opts.timeMs);
+  const kicker = isIn ? 'כניסה נרשמה' : 'יציאה נרשמה';
+  const msg = isIn
+    ? 'שתהיה לך משמרת מצוינת 💪'
+    : ('עבדת '+fmtHours(opts.hours||0)+' היום · תודה ולהתראות 👋');
+  $("clockSuccessCard").innerHTML = `
+    <div class="sc-ring ${isIn?'':'out'}">
+      <svg class="sc-check ${isIn?'':'out'}" viewBox="0 0 60 60" aria-hidden="true">
+        <circle cx="30" cy="30" r="26"/>
+        <path d="M18 31 l8 8 l16 -19"/>
+      </svg>
+    </div>
+    <div class="sc-kicker ${isIn?'':'out'}">${kicker}</div>
+    <div class="sc-name">${esc(opts.name||'')}</div>
+    <div class="sc-time">${t}</div>
+    <p class="sc-msg">${msg}</p>
+    <div class="sc-hint">המסך נסגר מעצמו · אפשר להקיש כדי לסגור</div>`;
+  $("clockSuccess").classList.add("show");
+  vibrate(isIn ? [20,60,30] : [25,45,25]);
+  clearTimeout(_clockSuccessTimer);
+  _clockSuccessTimer=setTimeout(hideClockSuccess, 2800);
+}
+function hideClockSuccess(){
+  clearTimeout(_clockSuccessTimer);
+  $("clockSuccess").classList.remove("show");
 }
 
 /* ============================================================
@@ -1565,6 +1690,22 @@ function renderConsole(){
   renderShiftList();
   renderPayCard();
   renderPinStatus();
+  renderHomeLiveCount();
+}
+
+// חיווי "כמה במשמרת עכשיו" על אריח "סקירה" בתפריט הבית
+function renderHomeLiveCount(){
+  const el=$("homeLiveCount"); if(!el) return;
+  const n=Object.keys(employees).filter(id=>{
+    const sid=employees[id].openShiftId;
+    return sid && shifts[sid] && !shifts[sid].clockOut;
+  }).length;
+  if(n>0){
+    el.innerHTML=`<span class="blip"></span> ${n} במשמרת`;
+    el.classList.remove("hidden");
+  } else {
+    el.classList.add("hidden");
+  }
 }
 
 // 10א. כרגע במשמרת
@@ -1739,7 +1880,37 @@ function monthsForEmp(empId){
   return Object.keys(set).sort().reverse();
 }
 
+// סיכום צוות: סך שעות/ברוטו/שולם/נותר לכל העובדים הפעילים בחודש מסוים
+function teamMonthTotals(monthKey){
+  let hours=0, gross=0, paid=0, count=0;
+  Object.keys(employees).forEach(id=>{
+    const e=employees[id]; if(!e || e.active===false) return;
+    count++;
+    const rate=e.hourlyRate||0;
+    payShiftsFor(id, monthKey).forEach(s=>{
+      const h=hoursBetween(s.clockIn, s.clockOut);
+      hours+=h; const amt=h*rate; gross+=amt; if(s.paid===true) paid+=amt;
+    });
+  });
+  return {hours, gross, paid, remaining:gross-paid, count};
+}
+function renderPayTeamSummary(){
+  const el=$("payTeamSummary"); if(!el) return;
+  const t=teamMonthTotals(currentMonthKey());
+  if(t.count===0){ el.innerHTML=""; return; }
+  el.innerHTML=`<div class="team-sum">
+    <div class="ts-label">מגיע לכל הצוות · ${monthLabel(currentMonthKey())}</div>
+    <div class="ts-amount">₪${t.remaining.toFixed(0)}</div>
+    <div class="ts-stats">
+      <div class="ts-stat"><div class="k">שעות החודש</div><div class="v">${fmtHours(t.hours)}</div></div>
+      <div class="ts-stat"><div class="k">סך הכל ברוטו</div><div class="v">₪${t.gross.toFixed(0)}</div></div>
+      <div class="ts-stat"><div class="k">כבר שולם</div><div class="v">₪${t.paid.toFixed(0)}</div></div>
+    </div>
+  </div>`;
+}
+
 function renderPayCard(){
+  renderPayTeamSummary();
   const foldersBox=$("payEmpFolders"); if(!foldersBox) return;
   const all=Object.keys(employees).map(id=>({id,...employees[id]})).sort(byNameHe);
   const active=all.filter(e=>e.active!==false);
@@ -1979,9 +2150,21 @@ async function resetEmpPass(empId){
   db.ref("employees/"+empId).update({ tempPassword:pass })
     .then(()=>toast("הסיסמה אופסה ✓ — מסור לעובד"));
 }
-function toggleActive(empId){
+async function toggleActive(empId){
   const e=employees[empId]; if(!e) return;
   const newVal = e.active===false; // אם לא פעיל -> הפעל
+  if(!newVal){
+    // השבתה -> דורש אישור (הפעלה מחדש נשארת מיידית)
+    const os = e.openShiftId ? shifts[e.openShiftId] : null;
+    const liveWarn = (os && !os.clockOut)
+      ? "\n\n⚠ לעובד יש משמרת פתוחה כרגע — מומלץ לסיים אותה בטרמינל לפני ההשבתה."
+      : "";
+    const ok = await uiConfirm(
+      "להשבית את "+e.name+"?\nהעובד יעבור לארכיון, לא יופיע בטרמינל ולא יוכל להחתים. כל הנתונים ההיסטוריים והשכר נשמרים, ואפשר להפעיל מחדש בכל רגע."+liveWarn,
+      {danger:true, okText:"השבת עובד", title:"השבתת עובד"}
+    );
+    if(!ok) return;
+  }
   db.ref("employees/"+empId+"/active").set(newVal).then(()=>toast(newVal?"העובד הופעל":"העובד הושבת"));
 }
 
@@ -2282,6 +2465,16 @@ function tickClock(){
   $("kioskClock").textContent = pad(d.getHours())+":"+pad(d.getMinutes());
   const days=["ראשון","שני","שלישי","רביעי","חמישי","שישי","שבת"];
   $("kioskDate").textContent = "יום "+days[d.getDay()]+", "+pad(d.getDate())+"/"+pad(d.getMonth()+1)+"/"+d.getFullYear();
+  updateLiveTimers();
+}
+// עדכון כל הטיימרים הרצים (אריחי טרמינל + כרטיס דשבורד) פעם בשנייה
+function updateLiveTimers(){
+  const now=Date.now();
+  document.querySelectorAll(".live-timer[data-since]").forEach(el=>{
+    const since=parseInt(el.getAttribute("data-since"),10);
+    if(!since) return;
+    el.textContent=fmtDurationLive(now - since);
+  });
 }
 setInterval(tickClock,1000); tickClock();
 
