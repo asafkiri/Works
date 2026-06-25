@@ -377,6 +377,14 @@
   .note-card{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px;background:#fff;box-shadow:var(--shadow-sm)}
   .note-card .nc-date{font-size:12.5px;color:var(--muted);margin-bottom:6px}
   .note-card .nc-text{font-size:14.5px;line-height:1.55}
+  /* הקפה לעובדים */
+  .hk-month{margin-bottom:14px}
+  .hk-month-head{display:flex;justify-content:space-between;align-items:center;font-weight:800;font-size:14.5px;color:var(--primary-d);border-bottom:2px solid var(--line);padding-bottom:6px;margin-bottom:8px}
+  .hk-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 12px;border:1px solid var(--line);border-radius:11px;margin-bottom:7px;background:#fff}
+  .hk-row .hk-main{flex:1;min-width:0}
+  .hk-row .hk-name{font-weight:700;font-size:14.5px}
+  .hk-row .hk-date{font-size:12.5px;color:var(--muted);margin-top:2px}
+  .hk-row .hk-price{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
 
   /* ---------- מסך הצלחה אחרי החתמה (טרמינל) ---------- */
   .success-screen{position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;padding:24px;
@@ -433,7 +441,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v10</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v11</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -458,7 +466,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v10</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v11</span></div>
     <div class="topbar-actions">
       <div class="seg">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -786,6 +794,11 @@
           <span class="f-txt"><span class="f-title">הערות מהמנהל <span id="notesDot" class="note-dot hidden">חדש</span></span><span class="f-sub">משוב על המשמרות שלך</span></span>
           <span class="f-arr">→</span>
         </button>
+        <button class="folder lg" onclick="openEmpNav('hakafa')">
+          <span class="f-ico">🧾</span>
+          <span class="f-txt"><span class="f-title">הקפה לעובדים</span><span class="f-sub">מה שלקחת מהחנות</span></span>
+          <span class="f-arr">→</span>
+        </button>
       </div>
     </div>
 
@@ -827,6 +840,32 @@
       <div class="card">
         <p class="sub">משוב מהמנהל מהמשמרות האחרונות שלך.</p>
         <div id="empNotesBody"></div>
+      </div>
+    </div>
+
+    <!-- הקפה לעובדים -->
+    <div id="empHakafa" class="hidden">
+      <div class="screen-head"><button class="back-btn" onclick="empNavHome()">→ חזרה</button><h1 class="screen-title">🧾 הקפה לעובדים</h1></div>
+      <div class="card">
+        <p class="sub">רשום כאן מה שלקחת מהחנות (חטיף, משהו לבית). הסכומים יורדו מהשכר. מוצגים החודשיים האחרונים.</p>
+        <button class="btn" id="hakafaAddBtn" onclick="toggleHakafaForm(true)">➕ הוסף פריט</button>
+        <div id="hakafaForm" class="hidden" style="margin-top:12px">
+          <label class="fld">שם הפריט</label>
+          <input id="hakafaName" type="text" placeholder="לדוגמה: קפה, חטיף, חלב" autocomplete="off">
+          <label class="fld" style="margin-top:10px">מחיר (₪)</label>
+          <input id="hakafaPrice" type="number" inputmode="decimal" placeholder="0" min="0" step="0.5">
+          <div style="display:flex;gap:8px;margin-top:12px">
+            <button class="btn line" style="flex:1" onclick="toggleHakafaForm(false)">ביטול</button>
+            <button class="btn" style="flex:1" onclick="addHakafa()">הוסף לרשימה</button>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <h2 style="margin:0;font-size:17px">הרשימה שלי</h2>
+          <button class="btn line sm" onclick="hakafaFixInfo()">תיקון</button>
+        </div>
+        <div id="empHakafaBody"></div>
       </div>
     </div>
 
@@ -1364,6 +1403,8 @@ function enterEmployeeMode(user){
       return;
     }
     currentRole="employee"; currentEmpId=id; empMonthKey=null; empNav="home";
+    // הקפה: מאזינים לרשומות של העובד הנוכחי בלבד
+    db.ref("takings/"+id).on("value", snap=>{ myTakings = snap.val()||{}; if(currentRole==="employee") renderEmployeeDashboard(); });
     $("authScreen").classList.add("hidden");
     $("app").classList.add("hidden");
     $("empApp").classList.remove("hidden");
@@ -1593,9 +1634,10 @@ function renderActive(){
    ============================================================ */
 let empNav="home";       // 'home' | 'pay' | 'paymonth' | 'upcoming' | 'notes'
 let empNavMonth=null;    // מפתח החודש בתצוגת פירוט חודש
+let myTakings={};        // הקפה: רשומות העובד הנוכחי (נטען ב-enterEmployeeMode)
 
 function applyEmpDashNav(){
-  const map={home:"empHome",pay:"empPay",paymonth:"empPayMonth",upcoming:"empUpcoming",notes:"empNotes"};
+  const map={home:"empHome",pay:"empPay",paymonth:"empPayMonth",upcoming:"empUpcoming",notes:"empNotes",hakafa:"empHakafa"};
   Object.keys(map).forEach(k=>{ const el=$(map[k]); if(el) el.classList.toggle("hidden", empNav!==k); });
 }
 function empNavHome(){ empNav="home"; renderEmployeeDashboard(); try{window.scrollTo(0,0);}catch(e){} }
@@ -1606,6 +1648,31 @@ function openEmpNav(name){
   try{window.scrollTo(0,0);}catch(e){}
 }
 function openEmpMonth(key){ empNavMonth=key; empNav="paymonth"; renderEmployeeDashboard(); try{window.scrollTo(0,0);}catch(e){} }
+
+/* ---------- הקפה לעובדים (צד העובד) ---------- */
+function toggleHakafaForm(show){
+  const f=$("hakafaForm"), b=$("hakafaAddBtn");
+  if(!f) return;
+  f.classList.toggle("hidden", !show);
+  if(b) b.classList.toggle("hidden", show);
+  if(show){
+    $("hakafaName").value=""; $("hakafaPrice").value="";
+    setTimeout(()=>{ try{ $("hakafaName").focus(); }catch(e){} }, 50);
+  }
+}
+function addHakafa(){
+  const name=($("hakafaName").value||"").trim();
+  const price=parseFloat($("hakafaPrice").value);
+  if(!name){ toast("רשום שם פריט"); return; }
+  if(isNaN(price) || price<0){ toast("רשום מחיר תקין"); return; }
+  if(!currentEmpId) return;
+  db.ref("takings/"+currentEmpId).push().set({ name:name, price:price, createdAt:TS })
+    .then(()=>{ toast("נוסף ✓"); toggleHakafaForm(false); })
+    .catch(()=>{ toast("ההוספה נכשלה — נסה שוב"); });
+}
+function hakafaFixInfo(){
+  uiAlert("לתיקון או מחיקה של רשומה, פנה למנהל.", "תיקון רשומה");
+}
 
 // חישוב סיכומי חודש לעובד
 function empMonthTotals(monthKey){
@@ -1684,6 +1751,33 @@ function renderEmployeeDashboard(){
   const seenAt = e.notesSeenAt || 0;
   const hasNew = Object.values(shifts).some(s=> s.employeeId===currentEmpId && s.managerFeedback && s.managerFeedback.trim()!=="" && (s.feedbackAt||0) > seenAt);
   const dot=$("notesDot"); if(dot) dot.classList.toggle("hidden", !hasNew);
+
+  // --- הקפה לעובדים: רשימה לפי חודש (חודשיים אחרונים) ---
+  const hkBody=$("empHakafaBody");
+  if(hkBody){
+    const items=Object.keys(myTakings||{}).map(id=>({id,...myTakings[id]}))
+      .filter(t=> t && t.createdAt)
+      .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+    const byMonth={};
+    items.forEach(t=>{ const k=monthKeyOf(t.createdAt); (byMonth[k]=byMonth[k]||[]).push(t); });
+    const monthKeys=Object.keys(byMonth).sort().reverse().slice(0,2);
+    if(monthKeys.length===0){
+      hkBody.innerHTML='<div class="empty">עדיין לא רשמת פריטים.</div>';
+    } else {
+      hkBody.innerHTML=monthKeys.map(k=>{
+        const list=byMonth[k];
+        const sum=list.reduce((a,t)=>a+(Number(t.price)||0),0);
+        const rows=list.map(t=>`<div class="hk-row">
+          <div class="hk-main"><div class="hk-name">${esc(t.name)}</div><div class="hk-date">${fmtDate(t.createdAt)}</div></div>
+          <div class="hk-price">₪${(Number(t.price)||0).toFixed(0)}</div>
+        </div>`).join("");
+        return `<div class="hk-month">
+          <div class="hk-month-head"><span>${monthLabel(k)}</span><span>סה"כ ₪${sum.toFixed(0)}</span></div>
+          ${rows}
+        </div>`;
+      }).join("");
+    }
+  }
 
   // --- פירוט חודש נבחר ---
   if(empNav==="paymonth"){
