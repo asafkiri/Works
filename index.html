@@ -385,6 +385,7 @@
   .hk-row .hk-name{font-weight:700;font-size:14.5px}
   .hk-row .hk-date{font-size:12.5px;color:var(--muted);margin-top:2px}
   .hk-row .hk-price{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .hk-row .hk-acts{display:flex;gap:6px;flex:0 0 auto}
 
   /* ---------- מסך הצלחה אחרי החתמה (טרמינל) ---------- */
   .success-screen{position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;padding:24px;
@@ -441,7 +442,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v12</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v13</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -466,7 +467,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v12</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v13</span></div>
     <div class="topbar-actions">
       <div class="seg">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -510,6 +511,11 @@
         <button class="folder" onclick="openFolder('settings')">
           <span class="f-ico">⚙️</span>
           <span class="f-txt"><span class="f-title">הגדרות</span><span class="f-sub">קוד כניסה לקונסולה</span></span>
+          <span class="f-arr">→</span>
+        </button>
+        <button class="folder" onclick="openFolder('hakafa')">
+          <span class="f-ico">🧾</span>
+          <span class="f-txt"><span class="f-title">הקפה לעובדים <span id="hakafaBadge" class="note-dot hidden">חדש</span></span><span class="f-sub" id="hakafaFolderSub">מה שעובדים לקחו מהחנות</span></span>
           <span class="f-arr">→</span>
         </button>
       </div>
@@ -745,6 +751,27 @@
       <div id="settings-tax" class="hidden">
         <div class="screen-head"><button class="back-btn" onclick="backToSettings()">→ חזרה</button><h1 class="screen-title">🧮 הגדרות מס</h1></div>
         <div id="taxSettingsBody"></div>
+      </div>
+    </div>
+
+    <!-- מסך: הקפה לעובדים -->
+    <div id="screen-hakafa" class="screen hidden">
+      <div class="screen-head"><button class="back-btn" onclick="backToHome()">→ חזרה</button><h1 class="screen-title">🧾 הקפה לעובדים</h1></div>
+
+      <!-- רשימת עובדים -->
+      <div id="hkConsoleList">
+        <div class="card">
+          <p class="sub">מה שכל עובד רשם שלקח מהחנות. הסכומים יורדים מהשכר בדוח הפנימי. בחר עובד לצפייה ולתיקון.</p>
+          <div id="hkEmpFolders"></div>
+        </div>
+      </div>
+
+      <!-- פירוט עובד -->
+      <div id="hkConsoleDetail" class="hidden">
+        <div class="screen-head"><button class="back-btn" onclick="hkBackToList()">→ חזרה לרשימה</button><h1 class="screen-title" id="hkDetailTitle">🧾</h1></div>
+        <div class="card">
+          <div id="hkDetailBody"></div>
+        </div>
       </div>
     </div>
 
@@ -1431,6 +1458,7 @@ function startDataListeners(){
   // הקפה לעובדים: המנהל טוען את כל הרשומות (העובד טוען רק את שלו ב-enterEmployeeMode)
   if(currentRole==="manager"){
     db.ref("takings").on("value", snap=>{ allTakings = snap.val()||{}; renderActive(); });
+    db.ref("config/takingsSeenAt").on("value", snap=>{ takingsSeenAt = snap.val()||0; renderActive(); });
   }
 }
 
@@ -1457,13 +1485,14 @@ function applyView(name){
 }
 
 /* ---------- ניווט תיקיות בקונסולה ---------- */
-const CONSOLE_SCREENS=["overview","employees","pay","schedule","settings"];
+const CONSOLE_SCREENS=["overview","employees","pay","schedule","settings","hakafa"];
 function openFolder(name){
   consoleFolder=name;
   if(name==="pay"){ payView="list"; paySubEmpId=null; }
   if(name==="schedule"){ schedView="list"; schedSubEmpId=null; }
   if(name==="employees"){ empView="list"; empSubId=null; }
   if(name==="settings"){ const m=$("settings-main"), t=$("settings-tax"); if(m) m.classList.remove("hidden"); if(t) t.classList.add("hidden"); }
+  if(name==="hakafa"){ hkConsoleView="list"; hkConsoleEmpId=null; if(TS) db.ref("config/takingsSeenAt").set(TS); }
   applyConsoleNav();
   renderConsole();
   try{window.scrollTo(0,0);}catch(e){}
@@ -1687,6 +1716,102 @@ function takingsListFor(empId, monthKey){
 }
 function takingsSumFor(empId, monthKey){
   return takingsListFor(empId, monthKey).reduce((a,t)=>a+(Number(t.price)||0),0);
+}
+
+/* ---------- הקפה לעובדים (צד המנהל / קונסולה) ---------- */
+let hkConsoleView="list";   // 'list' | 'detail'
+let hkConsoleEmpId=null;
+let takingsSeenAt=0;        // מתי המנהל צפה לאחרונה (לחיווי "חדש")
+
+function openHkEmp(empId){ hkConsoleEmpId=empId; hkConsoleView="detail"; renderHakafaConsole(); try{window.scrollTo(0,0);}catch(e){} }
+function hkBackToList(){ hkConsoleView="list"; hkConsoleEmpId=null; renderHakafaConsole(); try{window.scrollTo(0,0);}catch(e){} }
+
+async function delHakafa(empId, takingId){
+  const ok=await uiConfirm("למחוק את הרשומה הזו? הפעולה אינה ניתנת לביטול.", {okText:"מחק", danger:true, title:"מחיקת רשומה"});
+  if(!ok) return;
+  db.ref("takings/"+empId+"/"+takingId).remove().then(()=>toast("נמחק ✓")).catch(()=>toast("המחיקה נכשלה"));
+}
+async function editHakafa(empId, takingId){
+  const t=(allTakings[empId]||{})[takingId]; if(!t) return;
+  const name=await uiPrompt({title:"עריכת רשומה", label:"שם הפריט", value:t.name||""});
+  if(name===null) return;
+  if(!name.trim()){ toast("שם לא תקין"); return; }
+  const priceStr=await uiPrompt({title:"עריכת רשומה", label:"מחיר (₪)", value:String(t.price!=null?t.price:0)});
+  if(priceStr===null) return;
+  const price=parseFloat(priceStr);
+  if(isNaN(price)||price<0){ toast("מחיר לא תקין"); return; }
+  db.ref("takings/"+empId+"/"+takingId).update({name:name.trim(), price:price}).then(()=>toast("עודכן ✓")).catch(()=>toast("העדכון נכשל"));
+}
+
+// מספר רשומות חדשות (שנוספו אחרי הצפייה האחרונה של המנהל)
+function takingsNewCount(){
+  let n=0;
+  Object.keys(allTakings||{}).forEach(empId=>{
+    const m=allTakings[empId]||{};
+    Object.keys(m).forEach(id=>{ const t=m[id]; if(t && (t.createdAt||0) > (takingsSeenAt||0)) n++; });
+  });
+  return n;
+}
+function empHasNewTakings(empId){
+  const m=allTakings[empId]||{};
+  return Object.keys(m).some(id=>{ const t=m[id]; return t && (t.createdAt||0) > (takingsSeenAt||0); });
+}
+
+// חיווי "חדש" על אריח ההקפה בבית הקונסולה
+function renderHakafaBadge(){
+  const badge=$("hakafaBadge"), sub=$("hakafaFolderSub");
+  const n=takingsNewCount();
+  if(badge) badge.classList.toggle("hidden", n===0);
+  if(sub) sub.textContent = n>0 ? (n+" פריטים חדשים — כדאי להיכנס למעקב") : "מה שעובדים לקחו מהחנות";
+}
+
+// רינדור מסך ההקפה בקונסולה (רשימת עובדים / פירוט עובד)
+function renderHakafaConsole(){
+  const listEl=$("hkConsoleList"), detEl=$("hkConsoleDetail");
+  if(!listEl || !detEl) return;
+  listEl.classList.toggle("hidden", hkConsoleView!=="list");
+  detEl.classList.toggle("hidden", hkConsoleView!=="detail");
+  const cutoff = Date.now() - 366*24*60*60*1000;
+
+  if(hkConsoleView==="list"){
+    const rows = Object.keys(allTakings||{}).map(empId=>{
+      const m=allTakings[empId]||{};
+      const items=Object.keys(m).map(id=>m[id]).filter(t=> t && t.createdAt && t.createdAt>=cutoff);
+      const sum=items.reduce((a,t)=>a+(Number(t.price)||0),0);
+      const e=employees[empId];
+      return { empId, name: e?e.name:"(עובד שנמחק)", count:items.length, sum, hasNew: empHasNewTakings(empId) };
+    }).filter(r=> r.count>0)
+      .sort((a,b)=> (b.hasNew-a.hasNew) || (b.sum-a.sum));
+    $("hkEmpFolders").innerHTML = rows.length ? rows.map(r=>`
+      <button class="folder" onclick="openHkEmp('${r.empId}')">
+        <span class="f-ico">🧾</span>
+        <span class="f-txt"><span class="f-title">${esc(r.name)} ${r.hasNew?'<span class="note-dot">חדש</span>':''}</span><span class="f-sub">${r.count} פריטים · סה"כ ₪${r.sum.toFixed(0)}</span></span>
+        <span class="f-arr">→</span>
+      </button>`).join("") : '<div class="empty">עדיין אין רשומות הקפה.</div>';
+  } else {
+    const e=employees[hkConsoleEmpId];
+    $("hkDetailTitle").textContent="🧾 "+(e?e.name:"עובד");
+    const m=allTakings[hkConsoleEmpId]||{};
+    const items=Object.keys(m).map(id=>({id,...m[id]}))
+      .filter(t=> t && t.createdAt && t.createdAt>=cutoff)
+      .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+    const byMonth={};
+    items.forEach(t=>{ const k=monthKeyOf(t.createdAt); (byMonth[k]=byMonth[k]||[]).push(t); });
+    const keys=Object.keys(byMonth).sort().reverse();
+    $("hkDetailBody").innerHTML = keys.length ? keys.map(k=>{
+      const list=byMonth[k];
+      const sum=list.reduce((a,t)=>a+(Number(t.price)||0),0);
+      const rows=list.map(t=>`<div class="hk-row">
+        <div class="hk-main"><div class="hk-name">${esc(t.name)}</div><div class="hk-date">${fmtDate(t.createdAt)}</div></div>
+        <div class="hk-price">₪${(Number(t.price)||0).toFixed(0)}</div>
+        <div class="hk-acts"><button class="btn line sm" onclick="editHakafa('${hkConsoleEmpId}','${t.id}')">✏️</button><button class="btn line sm" onclick="delHakafa('${hkConsoleEmpId}','${t.id}')">🗑️</button></div>
+      </div>`).join("");
+      return `<div class="hk-month">
+        <div class="hk-month-head"><span>${monthLabel(k)}</span><span>סה"כ ₪${sum.toFixed(0)}</span></div>
+        ${rows}
+      </div>`;
+    }).join("") : '<div class="empty">אין רשומות לעובד זה.</div>';
+  }
 }
 
 // חישוב סיכומי חודש לעובד
@@ -2046,6 +2171,8 @@ function renderConsole(){
   renderPayCard();
   renderPinStatus();
   renderHomeLiveCount();
+  renderHakafaConsole();
+  renderHakafaBadge();
 }
 
 // חיווי "כמה במשמרת עכשיו" על אריח "סקירה" בתפריט הבית
