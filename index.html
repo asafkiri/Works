@@ -433,7 +433,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v3</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v5</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -458,7 +458,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v3</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v5</span></div>
     <div class="topbar-actions">
       <div class="seg">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -2411,16 +2411,41 @@ async function addLogin(empId){
     .then(()=>toast("ההתחברות נוספה ✓ — מסור לעובד"));
 }
 
-// איפוס סיסמה. עובד עם accountעדיין לא נוצר -> פשוט; כבר התחבר -> מוסבר שלא נתמך כרגע
+// איפוס סיסמה. עובד שטרם נוצר לו חשבון -> פשוט מעדכנים סיסמה זמנית.
+// עובד שכבר התחבר -> "נתק וחבר מחדש": Firebase לא מאפשר לשנות סיסמה של חשבון
+// אחר מהדפדפן, לכן מנתקים את הקישור ומציבים סיסמה זמנית חדשה. כל ההיסטוריה
+// נשמרת כי המשמרות מקושרות למזהה הרשומה (employeeId) ולא לחשבון ההתחברות.
 async function resetEmpPass(empId){
   const e=employees[empId]; if(!e) return;
   if(!e.username){ toast("לעובד אין התחברות עדיין"); return; }
+
   if(e.linked===true){
-    await uiAlert("העובד כבר התחבר וחשבונו נוצר. איפוס סיסמה לחשבון קיים יתווסף בהמשך (דורש רכיב נוסף). כרגע אפשר לאפס רק לפני הכניסה הראשונה.");
+    const ok = await uiConfirm(
+      "לאפס את הסיסמה של "+e.name+"?\n\n"+
+      "כל המשמרות, השכר וההיסטוריה יישמרו במלואם — הם מקושרים לרשומת העובד, לא לסיסמה.\n\n"+
+      "אחרי האיפוס יהיה צעד ידני קצר אחד בקונסולת Firebase (אסביר בדיוק במסך הבא). העובד יתחבר מחדש עם הסיסמה החדשה וימשיך לראות הכל.",
+      {okText:"המשך לאיפוס", title:"איפוס סיסמה"}
+    );
+    if(!ok) return;
+    let pass=await uiPrompt({title:"סיסמה זמנית חדשה", label:"סיסמה זמנית חדשה עבור "+e.name+" (לפחות 6 תווים):", value:""});
+    if(pass===null) return;
+    pass=pass.trim();
+    if(pass.length<6){ toast("הסיסמה קצרה מדי"); return; }
+    db.ref("employees/"+empId).update({ authUid:null, linked:false, tempPassword:pass })
+      .then(()=> uiAlert(
+        "✓ הקישור אופס. נשארו שני צעדים קצרים:\n\n"+
+        "1) בקונסולת Firebase ← Authentication, מחק את המשתמש:\n"+e.username+"@"+LOGIN_DOMAIN+"\n(שלוש נקודות ליד השורה ← Delete account)\n\n"+
+        "2) מסור ל"+e.name+":\n• שם משתמש: "+e.username+"\n• סיסמה זמנית: "+pass+"\n\n"+
+        "בכניסה הבאה "+e.name+" תתחבר מחדש אוטומטית — וכל ההיסטוריה תישאר.",
+        "כמעט סיימת"
+      ));
     return;
   }
-  const pass=await uiPrompt({title:"איפוס סיסמה", label:"סיסמה זמנית חדשה עבור "+e.name+" (לפחות 6 תווים):", value:""});
+
+  // חשבון טרם נוצר (לא מקושר): מספיק לעדכן את הסיסמה הזמנית
+  let pass=await uiPrompt({title:"איפוס סיסמה", label:"סיסמה זמנית חדשה עבור "+e.name+" (לפחות 6 תווים):", value:""});
   if(pass===null) return;
+  pass=pass.trim();
   if(pass.length<6){ toast("הסיסמה קצרה מדי"); return; }
   db.ref("employees/"+empId).update({ tempPassword:pass })
     .then(()=>toast("הסיסמה אופסה ✓ — מסור לעובד"));
