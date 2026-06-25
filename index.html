@@ -137,6 +137,11 @@
   .folder .f-title{font-size:16px;font-weight:800;color:var(--ink)}
   .folder .f-sub{font-size:12.5px;color:var(--muted)}
   .folder .f-arr{font-size:17px;color:var(--muted);flex:0 0 auto;opacity:.55}
+  /* תיקיית הקפה במצב "יש חדש" - בולט */
+  .folder.alert{border:2px solid var(--danger);background:#fff4ec;box-shadow:0 0 0 3px rgba(194,65,12,.10)}
+  .folder.alert .f-ico{background:var(--danger);color:#fff}
+  .folder.alert .f-title{color:var(--danger)}
+  .folder.alert .f-sub{color:var(--danger);font-weight:800}
   .screen-head{display:flex;align-items:center;gap:12px;margin-bottom:18px}
   .back-btn{
     border:1px solid var(--line);background:#fff;color:var(--ink);
@@ -420,8 +425,8 @@
   .team-sum{background:linear-gradient(135deg, var(--primary) 0%, var(--primary-d) 100%);border:none;color:#fff;border-radius:var(--r-lg);padding:18px 18px 16px;margin-bottom:16px;box-shadow:var(--shadow)}
   .team-sum .ts-label{font-size:13px;font-weight:700;opacity:.9}
   .team-sum .ts-amount{font-size:38px;font-weight:800;letter-spacing:-.02em;margin:4px 0 12px;font-variant-numeric:tabular-nums}
-  .team-sum .ts-stats{display:flex;gap:10px}
-  .team-sum .ts-stat{flex:1;background:rgba(255,255,255,.13);border-radius:12px;padding:9px 11px}
+  .team-sum .ts-stats{display:flex;gap:10px;flex-wrap:wrap}
+  .team-sum .ts-stat{flex:1 1 72px;min-width:72px;background:rgba(255,255,255,.13);border-radius:12px;padding:9px 11px}
   .team-sum .ts-stat .k{font-size:11.5px;opacity:.85}
   .team-sum .ts-stat .v{font-size:15px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:2px}
 
@@ -442,7 +447,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v13</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v14</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -467,7 +472,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v13</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v14</span></div>
     <div class="topbar-actions">
       <div class="seg">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -513,7 +518,7 @@
           <span class="f-txt"><span class="f-title">הגדרות</span><span class="f-sub">קוד כניסה לקונסולה</span></span>
           <span class="f-arr">→</span>
         </button>
-        <button class="folder" onclick="openFolder('hakafa')">
+        <button class="folder" id="hakafaFolderBtn" onclick="openFolder('hakafa')">
           <span class="f-ico">🧾</span>
           <span class="f-txt"><span class="f-title">הקפה לעובדים <span id="hakafaBadge" class="note-dot hidden">חדש</span></span><span class="f-sub" id="hakafaFolderSub">מה שעובדים לקחו מהחנות</span></span>
           <span class="f-arr">→</span>
@@ -1757,12 +1762,22 @@ function empHasNewTakings(empId){
   return Object.keys(m).some(id=>{ const t=m[id]; return t && (t.createdAt||0) > (takingsSeenAt||0); });
 }
 
-// חיווי "חדש" על אריח ההקפה בבית הקונסולה
+// חיווי "חדש" על אריח ההקפה בבית הקונסולה — בולט ומפורט
 function renderHakafaBadge(){
-  const badge=$("hakafaBadge"), sub=$("hakafaFolderSub");
+  const btn=$("hakafaFolderBtn"), badge=$("hakafaBadge"), sub=$("hakafaFolderSub");
   const n=takingsNewCount();
-  if(badge) badge.classList.toggle("hidden", n===0);
-  if(sub) sub.textContent = n>0 ? (n+" פריטים חדשים — כדאי להיכנס למעקב") : "מה שעובדים לקחו מהחנות";
+  let emps=0;
+  Object.keys(allTakings||{}).forEach(empId=>{ if(empHasNewTakings(empId)) emps++; });
+  if(badge){
+    badge.textContent = n>0 ? (n+" חדש") : "חדש";
+    badge.classList.toggle("hidden", n===0);
+  }
+  if(btn) btn.classList.toggle("alert", n>0);
+  if(sub){
+    sub.textContent = n>0
+      ? `${n} ${n===1?'פריט חדש':'פריטים חדשים'}${emps>1?` מ-${emps} עובדים`:''} — כדאי להיכנס למעקב`
+      : "מה שעובדים לקחו מהחנות";
+  }
 }
 
 // רינדור מסך ההקפה בקונסולה (רשימת עובדים / פירוט עובד)
@@ -2569,17 +2584,27 @@ function teamMonthTotals(monthKey){
   });
   return {hours, gross, paid, remaining:gross-paid, count};
 }
+// סך ההקפות של כל הצוות (עובדים פעילים) לחודש מסוים
+function teamTakingsSum(monthKey){
+  let s=0;
+  Object.keys(employees).forEach(id=>{ const e=employees[id]; if(!e || e.active===false) return; s += takingsSumFor(id, monthKey); });
+  return s;
+}
 function renderPayTeamSummary(){
   const el=$("payTeamSummary"); if(!el) return;
-  const t=teamMonthTotals(currentMonthKey());
+  const mk=currentMonthKey();
+  const t=teamMonthTotals(mk);
   if(t.count===0){ el.innerHTML=""; return; }
+  const tk=teamTakingsSum(mk);
+  const net=t.remaining - tk;
   el.innerHTML=`<div class="team-sum">
-    <div class="ts-label">מגיע לכל הצוות · ${monthLabel(currentMonthKey())}</div>
+    <div class="ts-label">מגיע לכל הצוות · ${monthLabel(mk)}${tk>0?` <span style="opacity:.92">(אחרי הורדות הקפה: ₪${net.toFixed(0)})</span>`:''}</div>
     <div class="ts-amount">₪${t.remaining.toFixed(0)}</div>
     <div class="ts-stats">
       <div class="ts-stat"><div class="k">שעות החודש</div><div class="v">${fmtHours(t.hours)}</div></div>
       <div class="ts-stat"><div class="k">סך הכל ברוטו</div><div class="v">₪${t.gross.toFixed(0)}</div></div>
       <div class="ts-stat"><div class="k">כבר שולם</div><div class="v">₪${t.paid.toFixed(0)}</div></div>
+      <div class="ts-stat"><div class="k">הקפות החודש</div><div class="v">₪${tk.toFixed(0)}</div></div>
     </div>
   </div>`;
 }
