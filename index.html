@@ -337,12 +337,12 @@
 
   /* ---------- אזור הדפסה / ייצוא PDF ---------- */
   #printArea{display:none}
-  .pr-wrap{padding:26px;color:#000;direction:rtl;font-family:inherit}
+  .pr-wrap{padding:26px;color:#000;background:#fff;direction:rtl;font-family:inherit}
   .pr-h1{font-size:22px;font-weight:800;margin:0 0 2px}
   .pr-meta{font-size:13px;color:#333;margin:0 0 18px;line-height:1.6}
-  .pr-table{width:100%;border-collapse:collapse;font-size:13px}
+  .pr-table{width:100%;border-collapse:collapse;font-size:13px;background:#fff}
   .pr-table th,.pr-table td{border:1px solid #888;padding:7px 9px;text-align:right}
-  .pr-table th{background:#eee}
+  .pr-table th{background:#fff;border-bottom:2px solid #000;font-weight:800}
   .pr-table td.num{text-align:left;font-variant-numeric:tabular-nums}
   .pr-tot{margin-top:18px;font-size:14px;line-height:1.9}
   .pr-tot b{display:inline-block;min-width:130px}
@@ -433,7 +433,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v8</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v9</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -458,7 +458,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v8</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v9</span></div>
     <div class="topbar-actions">
       <div class="seg">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -2432,8 +2432,10 @@ function renderPayDetail(){
       <div class="ps-row big"><span>נותר לתשלום</span><span class="rem">₪${remaining.toFixed(0)}</span></div>
     </div>
     ${netSummaryHtml(totalPay, e, monthRefDate(paySelMonthKey))}
-    <div style="margin-top:14px">
-      <button class="btn" onclick="exportPayroll()">📄 ייצא דף לרואה החשבון (PDF)</button>
+    <div style="margin-top:14px;display:flex;flex-direction:column;gap:8px">
+      <button class="btn" onclick="exportPayrollAccountant()">📄 דוח לרו"ח (נקי — בלי סטטוס תשלום)</button>
+      <button class="btn line" onclick="exportPayrollInternal()">🗂️ דוח פנימי (כולל שולם / לא שולם)</button>
+      <div style="font-size:12px;color:var(--muted);text-align:center;line-height:1.5">הדוח לרו"ח נקי מסטטוס התשלום. הדוח הפנימי הוא למעקב שלך בלבד.</div>
     </div>`;
 }
 
@@ -2456,51 +2458,81 @@ async function setMonthPaid(target){
   db.ref().update(updates).then(()=> toast(target?"כל החודש סומן כשולם ✓":"הסימון בוטל לכל החודש"));
 }
 
-function exportPayroll(){
-  const e=employees[paySubEmpId]; if(!e) return;
+// אוסף את נתוני הדוח לעובד/חודש הנבחרים (משותף לשני סוגי הדוחות)
+function payReportData(){
+  const e=employees[paySubEmpId]; if(!e) return null;
   const rate=e.hourlyRate||0;
   const list=payShiftsFor(paySubEmpId, paySelMonthKey);
-  if(list.length===0){ toast("אין משמרות לייצוא"); return; }
-
+  if(list.length===0){ toast("אין משמרות לייצוא"); return null; }
+  const days=["א","ב","ג","ד","ה","ו","ש"];
   let totalH=0, totalPay=0, paidPay=0;
   const rows=list.map(s=>{
     const h=hoursBetween(s.clockIn, s.clockOut);
     const amt=h*rate; totalH+=h; totalPay+=amt;
     if(s.paid===true) paidPay+=amt;
     const d=new Date(s.clockIn);
-    const days=["א","ב","ג","ד","ה","ו","ש"];
-    return `<tr>
-      <td>${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()}</td>
-      <td>יום ${days[d.getDay()]}</td>
-      <td>${fmtTime(s.clockIn)}</td>
-      <td>${fmtTime(s.clockOut)}</td>
-      <td class="num">${fmtHours(h)}</td>
-      <td class="num">₪${amt.toFixed(0)}</td>
-      <td>${s.paid===true?'שולם':'—'}</td>
-    </tr>`;
-  }).join("");
-  const remaining=totalPay-paidPay;
+    return { d, day:days[d.getDay()], inT:fmtTime(s.clockIn), outT:fmtTime(s.clockOut), h, amt, paid:s.paid===true };
+  });
   const now=new Date();
   const genDate=pad(now.getDate())+"/"+pad(now.getMonth()+1)+"/"+now.getFullYear();
+  return { e, rate, rows, totalH, totalPay, paidPay, genDate };
+}
 
+// דוח לרואה החשבון — נקי: שעות וברוטו בלבד, בלי סטטוס תשלום
+function exportPayrollAccountant(){
+  const D=payReportData(); if(!D) return;
+  const rows=D.rows.map(r=>`<tr>
+    <td>${pad(r.d.getDate())}/${pad(r.d.getMonth()+1)}/${r.d.getFullYear()}</td>
+    <td>יום ${r.day}</td>
+    <td>${r.inT}</td>
+    <td>${r.outT}</td>
+    <td class="num">${fmtHours(r.h)}</td>
+    <td class="num">₪${r.amt.toFixed(0)}</td>
+  </tr>`).join("");
   $("printArea").innerHTML=`<div class="pr-wrap">
-    <div class="pr-h1">סיכום שכר — ${esc(e.name)}</div>
-    <div class="pr-meta">חודש: ${monthLabel(paySelMonthKey)}<br>תעריף לשעה: ₪${rate}<br>הופק בתאריך: ${genDate}</div>
+    <div class="pr-h1">דוח שעות לרואה החשבון — ${esc(D.e.name)}</div>
+    <div class="pr-meta">חודש: ${monthLabel(paySelMonthKey)}<br>תעריף לשעה: ₪${D.rate}<br>הופק בתאריך: ${D.genDate}</div>
     <table class="pr-table">
-      <thead><tr>
-        <th>תאריך</th><th>יום</th><th>כניסה</th><th>יציאה</th><th>שעות</th><th>סכום</th><th>סטטוס</th>
-      </tr></thead>
+      <thead><tr><th>תאריך</th><th>יום</th><th>כניסה</th><th>יציאה</th><th>שעות</th><th>סכום ברוטו</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
     <div class="pr-tot">
-      <div><b>סך שעות החודש:</b> ${fmtHours(totalH)}</div>
-      <div><b>סך הכל:</b> ₪${totalPay.toFixed(0)}</div>
-      <div><b>שולם:</b> ₪${paidPay.toFixed(0)}</div>
+      <div><b>סך שעות החודש:</b> ${fmtHours(D.totalH)}</div>
+      <div><b>סך ברוטו:</b> ₪${D.totalPay.toFixed(0)}</div>
+    </div>
+    <div class="pr-foot">הופק ממערכת שעון נוכחות · הנתונים מבוססים על החתמות בפועל · אומדן ברוטו — התלוש הרשמי הוא המקור הקובע</div>
+  </div>`;
+  setTimeout(()=>window.print(), 100);
+}
+
+// דוח פנימי — כולל סטטוס תשלום (שולם/נותר), למעקב המנהל בלבד
+function exportPayrollInternal(){
+  const D=payReportData(); if(!D) return;
+  const rows=D.rows.map(r=>`<tr>
+    <td>${pad(r.d.getDate())}/${pad(r.d.getMonth()+1)}/${r.d.getFullYear()}</td>
+    <td>יום ${r.day}</td>
+    <td>${r.inT}</td>
+    <td>${r.outT}</td>
+    <td class="num">${fmtHours(r.h)}</td>
+    <td class="num">₪${r.amt.toFixed(0)}</td>
+    <td>${r.paid?'שולם':'—'}</td>
+  </tr>`).join("");
+  const remaining=D.totalPay-D.paidPay;
+  $("printArea").innerHTML=`<div class="pr-wrap">
+    <div class="pr-h1">דוח פנימי (מעקב תשלומים) — ${esc(D.e.name)}</div>
+    <div class="pr-meta">חודש: ${monthLabel(paySelMonthKey)}<br>תעריף לשעה: ₪${D.rate}<br>הופק בתאריך: ${D.genDate}<br><b>לשימוש פנימי — לא מיועד לרואה החשבון</b></div>
+    <table class="pr-table">
+      <thead><tr><th>תאריך</th><th>יום</th><th>כניסה</th><th>יציאה</th><th>שעות</th><th>סכום</th><th>סטטוס</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="pr-tot">
+      <div><b>סך שעות החודש:</b> ${fmtHours(D.totalH)}</div>
+      <div><b>סך הכל:</b> ₪${D.totalPay.toFixed(0)}</div>
+      <div><b>שולם:</b> ₪${D.paidPay.toFixed(0)}</div>
       <div><b>נותר לתשלום:</b> ₪${remaining.toFixed(0)}</div>
     </div>
-    <div class="pr-foot">הופק ממערכת שעון נוכחות · הנתונים מבוססים על החתמות בפועל</div>
+    <div class="pr-foot">דוח פנימי לשימושך · הנתונים מבוססים על החתמות בפועל</div>
   </div>`;
-
   setTimeout(()=>window.print(), 100);
 }
 
