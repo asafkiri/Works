@@ -441,7 +441,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v11</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v12</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -466,7 +466,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v11</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v12</span></div>
     <div class="topbar-actions">
       <div class="seg">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -796,7 +796,7 @@
         </button>
         <button class="folder lg" onclick="openEmpNav('hakafa')">
           <span class="f-ico">🧾</span>
-          <span class="f-txt"><span class="f-title">הקפה לעובדים</span><span class="f-sub">מה שלקחת מהחנות</span></span>
+          <span class="f-txt"><span class="f-title">הקפה</span><span class="f-sub">מה שלקחת מהחנות</span></span>
           <span class="f-arr">→</span>
         </button>
       </div>
@@ -845,7 +845,7 @@
 
     <!-- הקפה לעובדים -->
     <div id="empHakafa" class="hidden">
-      <div class="screen-head"><button class="back-btn" onclick="empNavHome()">→ חזרה</button><h1 class="screen-title">🧾 הקפה לעובדים</h1></div>
+      <div class="screen-head"><button class="back-btn" onclick="empNavHome()">→ חזרה</button><h1 class="screen-title">🧾 הקפה</h1></div>
       <div class="card">
         <p class="sub">רשום כאן מה שלקחת מהחנות (חטיף, משהו לבית). הסכומים יורדו מהשכר. מוצגים החודשיים האחרונים.</p>
         <button class="btn" id="hakafaAddBtn" onclick="toggleHakafaForm(true)">➕ הוסף פריט</button>
@@ -1428,6 +1428,10 @@ function startDataListeners(){
   // שלב 1: נתוני מס מ-Firebase (אם קיימים). אם אין — taxCfg נשאר null והחישוב
   // ממשיך עם ברירת המחדל של 2026. רק קריאה; אין כאן כתיבה או מסך.
   db.ref("config/taxConfig").on("value", snap=>{ taxCfg = snap.val() || null; renderActive(); });
+  // הקפה לעובדים: המנהל טוען את כל הרשומות (העובד טוען רק את שלו ב-enterEmployeeMode)
+  if(currentRole==="manager"){
+    db.ref("takings").on("value", snap=>{ allTakings = snap.val()||{}; renderActive(); });
+  }
 }
 
 /* ============================================================
@@ -1635,6 +1639,7 @@ function renderActive(){
 let empNav="home";       // 'home' | 'pay' | 'paymonth' | 'upcoming' | 'notes'
 let empNavMonth=null;    // מפתח החודש בתצוגת פירוט חודש
 let myTakings={};        // הקפה: רשומות העובד הנוכחי (נטען ב-enterEmployeeMode)
+let allTakings={};       // הקפה: כל הרשומות (נטען רק אצל המנהל)
 
 function applyEmpDashNav(){
   const map={home:"empHome",pay:"empPay",paymonth:"empPayMonth",upcoming:"empUpcoming",notes:"empNotes",hakafa:"empHakafa"};
@@ -1673,6 +1678,16 @@ function addHakafa(){
 function hakafaFixInfo(){
   uiAlert("לתיקון או מחיקה של רשומה, פנה למנהל.", "תיקון רשומה");
 }
+// רשומות הקפה של עובד לחודש מסוים (מקור הנתונים לפי התפקיד)
+function takingsListFor(empId, monthKey){
+  let src = (currentRole==="employee" && empId===currentEmpId) ? (myTakings||{}) : ((allTakings && allTakings[empId])||{});
+  return Object.keys(src).map(id=>({id,...src[id]}))
+    .filter(t=> t && t.createdAt && monthKeyOf(t.createdAt)===monthKey)
+    .sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+}
+function takingsSumFor(empId, monthKey){
+  return takingsListFor(empId, monthKey).reduce((a,t)=>a+(Number(t.price)||0),0);
+}
 
 // חישוב סיכומי חודש לעובד
 function empMonthTotals(monthKey){
@@ -1707,9 +1722,12 @@ function renderEmployeeDashboard(){
 
   // --- בית: כרטיס "מגיע לך" לחודש הנוכחי ---
   const cur=empMonthTotals(currentMonthKey());
-  $("empOwedLabel").textContent="מגיע לך · "+monthLabel(currentMonthKey());
-  $("empOwed").textContent="₪"+cur.remaining.toFixed(0);
-  $("empOwedSub").textContent=`${fmtHours(cur.totalH)} · סך הכל ₪${cur.totalPay.toFixed(0)} · שולם ₪${cur.paidPay.toFixed(0)}`;
+  const curTk=takingsSumFor(currentEmpId, currentMonthKey());
+  $("empOwedLabel").textContent=(curTk>0?"נטו אחרי הורדות · ":"מגיע לך · ")+monthLabel(currentMonthKey());
+  $("empOwed").textContent="₪"+(cur.remaining-curTk).toFixed(0);
+  $("empOwedSub").textContent = curTk>0
+    ? `${fmtHours(cur.totalH)} · נותר ₪${cur.remaining.toFixed(0)} − הורדות ₪${curTk.toFixed(0)}`
+    : `${fmtHours(cur.totalH)} · סך הכל ₪${cur.totalPay.toFixed(0)} · שולם ₪${cur.paidPay.toFixed(0)}`;
 
   // --- תיקיות חודשים (12 אחרונים) ---
   const months=monthsForEmp(currentEmpId).slice(0,12);
@@ -1783,10 +1801,13 @@ function renderEmployeeDashboard(){
   if(empNav==="paymonth"){
     if(!empNavMonth) empNavMonth=currentMonthKey();
     const t=empMonthTotals(empNavMonth);
+    const monTk=takingsSumFor(currentEmpId, empNavMonth);
     $("empPayMonthTitle").textContent="💰 "+monthLabel(empNavMonth);
-    $("empMonthOwedLabel").textContent="מגיע לך · "+monthLabel(empNavMonth);
-    $("empMonthOwed").textContent="₪"+t.remaining.toFixed(0);
-    $("empMonthOwedSub").textContent=`${fmtHours(t.totalH)} · סך הכל ₪${t.totalPay.toFixed(0)} · שולם ₪${t.paidPay.toFixed(0)}`;
+    $("empMonthOwedLabel").textContent=(monTk>0?"נטו אחרי הורדות · ":"מגיע לך · ")+monthLabel(empNavMonth);
+    $("empMonthOwed").textContent="₪"+(t.remaining-monTk).toFixed(0);
+    $("empMonthOwedSub").textContent = monTk>0
+      ? `${fmtHours(t.totalH)} · נותר ₪${t.remaining.toFixed(0)} − הורדות ₪${monTk.toFixed(0)}`
+      : `${fmtHours(t.totalH)} · סך הכל ₪${t.totalPay.toFixed(0)} · שולם ₪${t.paidPay.toFixed(0)}`;
     $("empShifts").innerHTML = t.list.length ? t.list.map(s=>{
       const h=hoursBetween(s.clockIn,s.clockOut); const amt=h*t.rate; const isPaid=s.paid===true;
       return `<div class="pay-line ${isPaid?'paid':''}">
@@ -1803,6 +1824,8 @@ function renderEmployeeDashboard(){
         <div class="ps-row big"><span>סך הכל</span><span>₪${t.totalPay.toFixed(0)}</span></div>
         <div class="ps-row"><span>שולם</span><span>₪${t.paidPay.toFixed(0)}</span></div>
         <div class="ps-row big"><span>נותר לתשלום</span><span class="rem">₪${t.remaining.toFixed(0)}</span></div>
+        ${monTk>0?`<div class="ps-row"><span>הורדות (הקפה)</span><span>−₪${monTk.toFixed(0)}</span></div>
+        <div class="ps-row big"><span>נטו אחרי הורדות</span><span class="rem">₪${(t.remaining-monTk).toFixed(0)}</span></div>`:''}
       </div>
       ${netSummaryHtml(t.totalPay, employees[currentEmpId], monthRefDate(empNavMonth))}` : '';
   }
@@ -2513,6 +2536,7 @@ function renderPayDetail(){
   }).join("");
 
   const remaining=totalPay-paidPay;
+  const payTk=takingsSumFor(paySubEmpId, paySelMonthKey);
   box.innerHTML=`
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
       <div class="section-title" style="margin:0">${monthLabel(paySelMonthKey)} · ${esc(e.name)} · ₪${rate}/שעה</div>
@@ -2524,6 +2548,8 @@ function renderPayDetail(){
       <div class="ps-row big"><span>סך הכל</span><span>₪${totalPay.toFixed(0)}</span></div>
       <div class="ps-row"><span>שולם</span><span>₪${paidPay.toFixed(0)}</span></div>
       <div class="ps-row big"><span>נותר לתשלום</span><span class="rem">₪${remaining.toFixed(0)}</span></div>
+      ${payTk>0?`<div class="ps-row"><span>הורדות (הקפה)</span><span>−₪${payTk.toFixed(0)}</span></div>
+      <div class="ps-row big"><span>נטו אחרי הורדות</span><span class="rem">₪${(remaining-payTk).toFixed(0)}</span></div>`:''}
     </div>
     ${netSummaryHtml(totalPay, e, monthRefDate(paySelMonthKey))}
     <div style="margin-top:14px;display:flex;flex-direction:column;gap:10px">
@@ -2575,7 +2601,9 @@ function payReportData(){
   });
   const now=new Date();
   const genDate=pad(now.getDate())+"/"+pad(now.getMonth()+1)+"/"+now.getFullYear();
-  return { e, rate, rows, totalH, totalPay, paidPay, genDate };
+  const tkList=takingsListFor(paySubEmpId, paySelMonthKey);
+  const tkSum=tkList.reduce((a,t)=>a+(Number(t.price)||0),0);
+  return { e, rate, rows, totalH, totalPay, paidPay, genDate, tkList, tkSum };
 }
 
 // דוח לרואה החשבון — נקי: שעות וברוטו בלבד, בלי סטטוס תשלום
@@ -2614,6 +2642,11 @@ function internalReportHtml(D){
     <td>${r.paid?'שולם':'—'}</td>
   </tr>`).join("");
   const remaining=D.totalPay-D.paidPay;
+  const tkTable = D.tkSum>0 ? `<div style="margin-top:16px;font-weight:800;font-size:14px">הורדות — הקפה לעובדים</div>
+    <table class="pr-table" style="margin-top:6px">
+      <thead><tr><th>תאריך</th><th>פריט</th><th>סכום</th></tr></thead>
+      <tbody>${D.tkList.map(t=>`<tr><td>${fmtDate(t.createdAt)}</td><td>${esc(t.name)}</td><td class="num">₪${(Number(t.price)||0).toFixed(0)}</td></tr>`).join("")}</tbody>
+    </table>` : '';
   return `<div class="pr-wrap">
     <div class="pr-h1">דוח פנימי (מעקב תשלומים) — ${esc(D.e.name)}</div>
     <div class="pr-meta">חודש: ${monthLabel(paySelMonthKey)}<br>תעריף לשעה: ₪${D.rate}<br>הופק בתאריך: ${D.genDate}<br><b>לשימוש פנימי — לא מיועד לרואה החשבון</b></div>
@@ -2621,11 +2654,13 @@ function internalReportHtml(D){
       <thead><tr><th>תאריך</th><th>יום</th><th>כניסה</th><th>יציאה</th><th>שעות</th><th>סכום</th><th>סטטוס</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
+    ${tkTable}
     <div class="pr-tot">
       <div><b>סך שעות החודש:</b> ${fmtHours(D.totalH)}</div>
       <div><b>סך הכל:</b> ₪${D.totalPay.toFixed(0)}</div>
       <div><b>שולם:</b> ₪${D.paidPay.toFixed(0)}</div>
       <div><b>נותר לתשלום:</b> ₪${remaining.toFixed(0)}</div>
+      ${D.tkSum>0?`<div><b>הורדות (הקפה):</b> −₪${D.tkSum.toFixed(0)}</div><div><b>נטו אחרי הורדות:</b> ₪${(remaining-D.tkSum).toFixed(0)}</div>`:''}
     </div>
     <div class="pr-foot">דוח פנימי לשימושך · הנתונים מבוססים על החתמות בפועל</div>
   </div>`;
