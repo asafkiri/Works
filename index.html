@@ -433,7 +433,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v5</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v6</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -458,7 +458,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v5</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v6</span></div>
     <div class="topbar-actions">
       <div class="seg">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -1367,6 +1367,9 @@ function startDataListeners(){
     // נעילה בטעינה: אם הוגדר PIN ועדיין לא נפתח בסשן - מפנים לטרמינל
     if(pinConfig && !consoleUnlocked && currentView==="console"){ applyView("terminal"); }
   });
+  // שלב 1: נתוני מס מ-Firebase (אם קיימים). אם אין — taxCfg נשאר null והחישוב
+  // ממשיך עם ברירת המחדל של 2026. רק קריאה; אין כאן כתיבה או מסך.
+  db.ref("config/taxConfig").on("value", snap=>{ taxCfg = snap.val() || null; renderActive(); });
 }
 
 /* ============================================================
@@ -1975,6 +1978,37 @@ const TAX_BRACKETS = [
   {upTo:Infinity, rate:0.50}
 ];
 
+/* ----- "צינור" נתוני מס: שלב 1 -----
+   אם הוגדרו נתוני מס ב-Firebase (config/taxConfig) משתמשים בהם; אחרת נופלים
+   לברירת המחדל של 2026 שמוגדרת למעלה. כל עוד אין נתונים ב-Firebase, החישוב
+   זהה לחלוטין לקיים. אין כאן שום מסך — רק קריאה עם נפילה בטוחה לברירת מחדל. */
+let taxCfg = null;
+function txParams(){
+  const c = taxCfg || {};
+  const numOr = (v,d)=> (v!=null && isFinite(Number(v)) ? Number(v) : d);
+  let brackets = TAX_BRACKETS;
+  if(Array.isArray(c.brackets) && c.brackets.length){
+    const ok = c.brackets.every(b=> b && b.rate!=null && isFinite(Number(b.rate)) &&
+                 (b.upTo==null || b.upTo==="Infinity" || isFinite(Number(b.upTo))));
+    if(ok){
+      brackets = c.brackets.map(b=>({
+        upTo: (b.upTo==null || b.upTo==="Infinity") ? Infinity : Number(b.upTo),
+        rate: Number(b.rate)
+      }));
+    }
+  }
+  return {
+    creditPointValue: numOr(c.creditPointValue, CREDIT_POINT_VALUE),
+    niReducedCeil:    numOr(c.niReducedCeil,    NI_REDUCED_CEIL),
+    niMaxCeil:        numOr(c.niMaxCeil,        NI_MAX_CEIL),
+    niEmpRed:         numOr(c.niEmpRed,         NI_EMP_RED),
+    niEmpFull:        numOr(c.niEmpFull,        NI_EMP_FULL),
+    healthRed:        numOr(c.healthRed,        HEALTH_RED),
+    healthFull:       numOr(c.healthFull,       HEALTH_FULL),
+    brackets
+  };
+}
+
 function ageAtDate(birthIso, asOf){
   if(!birthIso) return null;
   const b=parseIso(birthIso); if(isNaN(b.getTime())) return null;
@@ -1985,7 +2019,7 @@ function ageAtDate(birthIso, asOf){
 }
 function incomeTaxMonthly(gross){
   let tax=0, prev=0;
-  for(const br of TAX_BRACKETS){
+  for(const br of txParams().brackets){
     if(gross<=prev) break;
     tax += (Math.min(gross,br.upTo)-prev)*br.rate;
     prev=br.upTo;
@@ -2002,14 +2036,15 @@ function estimateNet(gross, emp, asOf){
   const isMinor = (age!=null && age<18);
   let incomeTax=0, ni=0, health=0, pension=0;
   if(!isMinor){
+    const T = txParams();
     const points = (emp.creditPoints!=null ? Number(emp.creditPoints) : 2.25);
-    incomeTax = Math.max(0, incomeTaxMonthly(gross) - points*CREDIT_POINT_VALUE);
+    incomeTax = Math.max(0, incomeTaxMonthly(gross) - points*T.creditPointValue);
     if(!emp.niExempt){
-      const capped=Math.min(gross, NI_MAX_CEIL);
-      const red=Math.min(capped, NI_REDUCED_CEIL);
-      const full=Math.max(0, capped-NI_REDUCED_CEIL);
-      ni = red*NI_EMP_RED + full*NI_EMP_FULL;
-      health = red*HEALTH_RED + full*HEALTH_FULL;
+      const capped=Math.min(gross, T.niMaxCeil);
+      const red=Math.min(capped, T.niReducedCeil);
+      const full=Math.max(0, capped-T.niReducedCeil);
+      ni = red*T.niEmpRed + full*T.niEmpFull;
+      health = red*T.healthRed + full*T.healthFull;
     }
   }
   if(emp.pensionOn){
