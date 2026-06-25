@@ -294,6 +294,8 @@
   .pay-sum .ps-row{display:flex;justify-content:space-between;font-size:14px;padding:4px 0}
   .pay-sum .ps-row.big{font-size:16px;font-weight:800}
   .pay-sum .ps-row .rem{color:var(--primary);font-weight:800}
+  .pay-sum .ps-row.debt{font-size:18px;font-weight:800;color:#dc2626;background:#fef2f2;border:1.5px solid #dc2626;border-radius:10px;padding:8px 10px;margin-top:6px}
+  .pay-sum .ps-row.debt span{color:#dc2626}
   .badge-paid{font-size:11px;font-weight:800;color:var(--ok);background:var(--ok-bg);border-radius:999px;padding:3px 9px}
 
   /* ---------- הערכת נטו ---------- */
@@ -447,7 +449,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v14</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v15</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -472,7 +474,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v14</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v15</span></div>
     <div class="topbar-actions">
       <div class="seg">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -1463,7 +1465,7 @@ function startDataListeners(){
   // הקפה לעובדים: המנהל טוען את כל הרשומות (העובד טוען רק את שלו ב-enterEmployeeMode)
   if(currentRole==="manager"){
     db.ref("takings").on("value", snap=>{ allTakings = snap.val()||{}; renderActive(); });
-    db.ref("config/takingsSeenAt").on("value", snap=>{ takingsSeenAt = snap.val()||0; renderActive(); });
+    db.ref("config/takingsSeenAt").on("value", snap=>{ const v=snap.val(); takingsSeen=(v && typeof v==='object')?v:{}; renderActive(); });
   }
 }
 
@@ -1497,7 +1499,7 @@ function openFolder(name){
   if(name==="schedule"){ schedView="list"; schedSubEmpId=null; }
   if(name==="employees"){ empView="list"; empSubId=null; }
   if(name==="settings"){ const m=$("settings-main"), t=$("settings-tax"); if(m) m.classList.remove("hidden"); if(t) t.classList.add("hidden"); }
-  if(name==="hakafa"){ hkConsoleView="list"; hkConsoleEmpId=null; if(TS) db.ref("config/takingsSeenAt").set(TS); }
+  if(name==="hakafa"){ hkConsoleView="list"; hkConsoleEmpId=null; }
   applyConsoleNav();
   renderConsole();
   try{window.scrollTo(0,0);}catch(e){}
@@ -1726,9 +1728,9 @@ function takingsSumFor(empId, monthKey){
 /* ---------- הקפה לעובדים (צד המנהל / קונסולה) ---------- */
 let hkConsoleView="list";   // 'list' | 'detail'
 let hkConsoleEmpId=null;
-let takingsSeenAt=0;        // מתי המנהל צפה לאחרונה (לחיווי "חדש")
+let takingsSeen={};        // הקפה: מתי המנהל צפה לאחרונה בכל עובד {empId: ts} (לחיווי "חדש")
 
-function openHkEmp(empId){ hkConsoleEmpId=empId; hkConsoleView="detail"; renderHakafaConsole(); try{window.scrollTo(0,0);}catch(e){} }
+function openHkEmp(empId){ hkConsoleEmpId=empId; hkConsoleView="detail"; if(TS) db.ref("config/takingsSeenAt/"+empId).set(TS); renderHakafaConsole(); try{window.scrollTo(0,0);}catch(e){} }
 function hkBackToList(){ hkConsoleView="list"; hkConsoleEmpId=null; renderHakafaConsole(); try{window.scrollTo(0,0);}catch(e){} }
 
 async function delHakafa(empId, takingId){
@@ -1748,19 +1750,22 @@ async function editHakafa(empId, takingId){
   db.ref("takings/"+empId+"/"+takingId).update({name:name.trim(), price:price}).then(()=>toast("עודכן ✓")).catch(()=>toast("העדכון נכשל"));
 }
 
-// מספר רשומות חדשות (שנוספו אחרי הצפייה האחרונה של המנהל)
+// מספר רשומות חדשות (שנוספו אחרי הצפייה האחרונה של המנהל בכל עובד)
 function takingsNewCount(){
   let n=0;
   Object.keys(allTakings||{}).forEach(empId=>{
+    const seen=takingsSeen[empId]||0;
     const m=allTakings[empId]||{};
-    Object.keys(m).forEach(id=>{ const t=m[id]; if(t && (t.createdAt||0) > (takingsSeenAt||0)) n++; });
+    Object.keys(m).forEach(id=>{ const t=m[id]; if(t && (t.createdAt||0) > seen) n++; });
   });
   return n;
 }
-function empHasNewTakings(empId){
+function empNewTakingsCount(empId){
+  const seen=takingsSeen[empId]||0;
   const m=allTakings[empId]||{};
-  return Object.keys(m).some(id=>{ const t=m[id]; return t && (t.createdAt||0) > (takingsSeenAt||0); });
+  return Object.keys(m).filter(id=>{ const t=m[id]; return t && (t.createdAt||0) > seen; }).length;
 }
+function empHasNewTakings(empId){ return empNewTakingsCount(empId) > 0; }
 
 // חיווי "חדש" על אריח ההקפה בבית הקונסולה — בולט ומפורט
 function renderHakafaBadge(){
@@ -1794,13 +1799,13 @@ function renderHakafaConsole(){
       const items=Object.keys(m).map(id=>m[id]).filter(t=> t && t.createdAt && t.createdAt>=cutoff);
       const sum=items.reduce((a,t)=>a+(Number(t.price)||0),0);
       const e=employees[empId];
-      return { empId, name: e?e.name:"(עובד שנמחק)", count:items.length, sum, hasNew: empHasNewTakings(empId) };
+      return { empId, name: e?e.name:"(עובד שנמחק)", count:items.length, sum, newCount: empNewTakingsCount(empId) };
     }).filter(r=> r.count>0)
-      .sort((a,b)=> (b.hasNew-a.hasNew) || (b.sum-a.sum));
+      .sort((a,b)=> ((b.newCount>0?1:0)-(a.newCount>0?1:0)) || (b.sum-a.sum));
     $("hkEmpFolders").innerHTML = rows.length ? rows.map(r=>`
-      <button class="folder" onclick="openHkEmp('${r.empId}')">
+      <button class="folder${r.newCount>0?' alert':''}" onclick="openHkEmp('${r.empId}')">
         <span class="f-ico">🧾</span>
-        <span class="f-txt"><span class="f-title">${esc(r.name)} ${r.hasNew?'<span class="note-dot">חדש</span>':''}</span><span class="f-sub">${r.count} פריטים · סה"כ ₪${r.sum.toFixed(0)}</span></span>
+        <span class="f-txt"><span class="f-title">${esc(r.name)} ${r.newCount>0?`<span class="note-dot">${r.newCount} חדש</span>`:''}</span><span class="f-sub">${r.count} פריטים · סה"כ ₪${r.sum.toFixed(0)}${r.newCount>0?' · יש חדש לבדיקה':''}</span></span>
         <span class="f-arr">→</span>
       </button>`).join("") : '<div class="empty">עדיין אין רשומות הקפה.</div>';
   } else {
@@ -2701,7 +2706,9 @@ function renderPayDetail(){
       <div class="ps-row"><span>שולם</span><span>₪${paidPay.toFixed(0)}</span></div>
       <div class="ps-row big"><span>נותר לתשלום</span><span class="rem">₪${remaining.toFixed(0)}</span></div>
       ${payTk>0?`<div class="ps-row"><span>הורדות (הקפה)</span><span>−₪${payTk.toFixed(0)}</span></div>
-      <div class="ps-row big"><span>נטו אחרי הורדות</span><span class="rem">₪${(remaining-payTk).toFixed(0)}</span></div>`:''}
+      ${(remaining-payTk)<0
+        ? `<div class="ps-row debt"><span>חוב — העובד לקח יותר ממה שהרוויח</span><span>-₪${Math.abs(remaining-payTk).toFixed(0)}</span></div>`
+        : `<div class="ps-row big"><span>נטו אחרי הורדות</span><span class="rem">₪${(remaining-payTk).toFixed(0)}</span></div>`}`:''}
     </div>
     ${netSummaryHtml(totalPay, e, monthRefDate(paySelMonthKey))}
     <div style="margin-top:14px;display:flex;flex-direction:column;gap:10px">
@@ -2812,7 +2819,10 @@ function internalReportHtml(D){
       <div><b>סך הכל:</b> ₪${D.totalPay.toFixed(0)}</div>
       <div><b>שולם:</b> ₪${D.paidPay.toFixed(0)}</div>
       <div><b>נותר לתשלום:</b> ₪${remaining.toFixed(0)}</div>
-      ${D.tkSum>0?`<div><b>הורדות (הקפה):</b> −₪${D.tkSum.toFixed(0)}</div><div><b>נטו אחרי הורדות:</b> ₪${(remaining-D.tkSum).toFixed(0)}</div>`:''}
+      ${D.tkSum>0?`<div><b>הורדות (הקפה):</b> −₪${D.tkSum.toFixed(0)}</div>
+      ${(remaining-D.tkSum)<0
+        ? `<div style="margin-top:10px;padding:9px 12px;border:2px solid #c00;border-radius:8px;background:#fff0f0;color:#c00;font-weight:800;font-size:15px">חוב של העובד: -₪${Math.abs(remaining-D.tkSum).toFixed(0)} — לקח יותר ממה שהרוויח</div>`
+        : `<div><b>נטו אחרי הורדות:</b> ₪${(remaining-D.tkSum).toFixed(0)}</div>`}`:''}
     </div>
     <div class="pr-foot">דוח פנימי לשימושך · הנתונים מבוססים על החתמות בפועל</div>
   </div>`;
