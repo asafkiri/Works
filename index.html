@@ -433,7 +433,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v9</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v10</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -458,7 +458,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v9</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v10</span></div>
     <div class="topbar-actions">
       <div class="seg">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -2432,10 +2432,16 @@ function renderPayDetail(){
       <div class="ps-row big"><span>נותר לתשלום</span><span class="rem">₪${remaining.toFixed(0)}</span></div>
     </div>
     ${netSummaryHtml(totalPay, e, monthRefDate(paySelMonthKey))}
-    <div style="margin-top:14px;display:flex;flex-direction:column;gap:8px">
-      <button class="btn" onclick="exportPayrollAccountant()">📄 דוח לרו"ח (נקי — בלי סטטוס תשלום)</button>
-      <button class="btn line" onclick="exportPayrollInternal()">🗂️ דוח פנימי (כולל שולם / לא שולם)</button>
-      <div style="font-size:12px;color:var(--muted);text-align:center;line-height:1.5">הדוח לרו"ח נקי מסטטוס התשלום. הדוח הפנימי הוא למעקב שלך בלבד.</div>
+    <div style="margin-top:14px;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;gap:8px">
+        <button class="btn" style="flex:1" onclick="imagePayrollAccountant()">📷 דוח לרו"ח (תמונה)</button>
+        <button class="btn line" onclick="exportPayrollAccountant()">PDF</button>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn line" style="flex:1" onclick="imagePayrollInternal()">🗂️ דוח פנימי (תמונה)</button>
+        <button class="btn line" onclick="exportPayrollInternal()">PDF</button>
+      </div>
+      <div style="font-size:12px;color:var(--muted);text-align:center;line-height:1.5">ברירת המחדל היא תמונה (נוח לשליחה בוואטסאפ). אפשר גם PDF להדפסה. הדוח לרו"ח נקי מסטטוס תשלום; הדוח הפנימי למעקב שלך.</div>
     </div>`;
 }
 
@@ -2479,8 +2485,8 @@ function payReportData(){
 }
 
 // דוח לרואה החשבון — נקי: שעות וברוטו בלבד, בלי סטטוס תשלום
-function exportPayrollAccountant(){
-  const D=payReportData(); if(!D) return;
+// ---------- בניית ה-HTML של הדוחות (משותף ל-PDF ולתמונה) ----------
+function accountantReportHtml(D){
   const rows=D.rows.map(r=>`<tr>
     <td>${pad(r.d.getDate())}/${pad(r.d.getMonth()+1)}/${r.d.getFullYear()}</td>
     <td>יום ${r.day}</td>
@@ -2489,7 +2495,7 @@ function exportPayrollAccountant(){
     <td class="num">${fmtHours(r.h)}</td>
     <td class="num">₪${r.amt.toFixed(0)}</td>
   </tr>`).join("");
-  $("printArea").innerHTML=`<div class="pr-wrap">
+  return `<div class="pr-wrap">
     <div class="pr-h1">דוח שעות לרואה החשבון — ${esc(D.e.name)}</div>
     <div class="pr-meta">חודש: ${monthLabel(paySelMonthKey)}<br>תעריף לשעה: ₪${D.rate}<br>הופק בתאריך: ${D.genDate}</div>
     <table class="pr-table">
@@ -2502,12 +2508,8 @@ function exportPayrollAccountant(){
     </div>
     <div class="pr-foot">הופק ממערכת שעון נוכחות · הנתונים מבוססים על החתמות בפועל · אומדן ברוטו — התלוש הרשמי הוא המקור הקובע</div>
   </div>`;
-  setTimeout(()=>window.print(), 100);
 }
-
-// דוח פנימי — כולל סטטוס תשלום (שולם/נותר), למעקב המנהל בלבד
-function exportPayrollInternal(){
-  const D=payReportData(); if(!D) return;
+function internalReportHtml(D){
   const rows=D.rows.map(r=>`<tr>
     <td>${pad(r.d.getDate())}/${pad(r.d.getMonth()+1)}/${r.d.getFullYear()}</td>
     <td>יום ${r.day}</td>
@@ -2518,7 +2520,7 @@ function exportPayrollInternal(){
     <td>${r.paid?'שולם':'—'}</td>
   </tr>`).join("");
   const remaining=D.totalPay-D.paidPay;
-  $("printArea").innerHTML=`<div class="pr-wrap">
+  return `<div class="pr-wrap">
     <div class="pr-h1">דוח פנימי (מעקב תשלומים) — ${esc(D.e.name)}</div>
     <div class="pr-meta">חודש: ${monthLabel(paySelMonthKey)}<br>תעריף לשעה: ₪${D.rate}<br>הופק בתאריך: ${D.genDate}<br><b>לשימוש פנימי — לא מיועד לרואה החשבון</b></div>
     <table class="pr-table">
@@ -2533,7 +2535,59 @@ function exportPayrollInternal(){
     </div>
     <div class="pr-foot">דוח פנימי לשימושך · הנתונים מבוססים על החתמות בפועל</div>
   </div>`;
-  setTimeout(()=>window.print(), 100);
+}
+
+// ---------- PDF (הדפסה) ----------
+function exportPayrollAccountant(){ const D=payReportData(); if(!D) return; $("printArea").innerHTML=accountantReportHtml(D); setTimeout(()=>window.print(), 100); }
+function exportPayrollInternal(){ const D=payReportData(); if(!D) return; $("printArea").innerHTML=internalReportHtml(D); setTimeout(()=>window.print(), 100); }
+
+// ---------- תמונה (ברירת מחדל) ----------
+function imagePayrollAccountant(){ const D=payReportData(); if(!D) return; reportToImage(accountantReportHtml(D), "דוח לרואה החשבון - "+D.e.name); }
+function imagePayrollInternal(){ const D=payReportData(); if(!D) return; reportToImage(internalReportHtml(D), "דוח פנימי - "+D.e.name); }
+
+// טוען את ספריית יצירת התמונה (html2canvas) פעם אחת, רק כשצריך
+let _h2cPromise=null;
+function loadHtml2Canvas(){
+  if(window.html2canvas) return Promise.resolve(window.html2canvas);
+  if(_h2cPromise) return _h2cPromise;
+  _h2cPromise=new Promise((res,rej)=>{
+    const sc=document.createElement("script");
+    sc.src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+    sc.onload=()=>res(window.html2canvas);
+    sc.onerror=()=>{ _h2cPromise=null; rej(new Error("load failed")); };
+    document.head.appendChild(sc);
+  });
+  return _h2cPromise;
+}
+
+// מרנדר HTML של דוח לתמונה ופותח את חלון השיתוף של המכשיר (או מוריד כגיבוי)
+async function reportToImage(html, filename){
+  toast("מכין תמונה…");
+  let h2c;
+  try{ h2c=await loadHtml2Canvas(); }
+  catch(e){ toast("טעינת רכיב התמונה נכשלה — בדוק חיבור לאינטרנט"); return; }
+  const holder=document.createElement("div");
+  holder.style.cssText="position:absolute;left:-10000px;top:0;width:794px;background:#fff";
+  holder.innerHTML=html;
+  document.body.appendChild(holder);
+  let canvas;
+  try{ canvas=await h2c(holder.firstElementChild, {scale:2, backgroundColor:"#ffffff", useCORS:true}); }
+  catch(e){ try{document.body.removeChild(holder);}catch(_){} toast("יצירת התמונה נכשלה"); return; }
+  try{document.body.removeChild(holder);}catch(_){}
+  canvas.toBlob(async (blob)=>{
+    if(!blob){ toast("יצירת התמונה נכשלה"); return; }
+    const file=new File([blob], filename+".png", {type:"image/png"});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      try{ await navigator.share({files:[file], title:filename}); }
+      catch(e){ /* המשתמש ביטל — לא עושים כלום */ }
+    } else {
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement("a");
+      a.href=url; a.download=filename+".png";
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(()=>URL.revokeObjectURL(url), 4000);
+    }
+  }, "image/png");
 }
 
 /* ============================================================
