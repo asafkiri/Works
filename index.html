@@ -433,7 +433,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v7</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v8</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -458,7 +458,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v7</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v8</span></div>
     <div class="topbar-actions">
       <div class="seg">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -1450,38 +1450,92 @@ function backToSettings(){
 function renderTaxSettings(){
   const body=$("taxSettingsBody"); if(!body) return;
   const T=txParams();
-  const src = taxCfg ? "מהערכים השמורים" : "ברירת מחדל (2026)";
+  const N=TAX_BRACKETS.length;
+  const saved = !!taxCfg;
   const pct = v => +(v*100).toFixed(4);
   const bracketsRows = T.brackets.map((b,i)=>{
-    const upto = (b.upTo===Infinity) ? "כל מה שמעבר" : `עד ₪${Number(b.upTo).toLocaleString()}`;
-    return `<div class="net-field">
-      <label class="fld">מדרגה ${i+1} — ${upto}</label>
-      <input type="number" value="${pct(b.rate)}" disabled>
-    </div>`;
+    const isLast = (i===N-1) || (b.upTo===Infinity);
+    const uptoInput = isLast
+      ? `<input type="text" value="כל מה שמעבר" disabled>`
+      : `<input type="number" id="txBrUpto${i}" inputmode="numeric" step="1" min="0" value="${b.upTo===Infinity?'':b.upTo}">`;
+    return `<div class="net-field"><label class="fld">מדרגה ${i+1} — עד סכום חודשי (₪)</label>${uptoInput}</div>
+      <div class="net-field"><label class="fld">אחוז מס למדרגה ${i+1} (%)</label><input type="number" id="txBrRate${i}" inputmode="decimal" step="0.01" min="0" max="100" value="${pct(b.rate)}"></div>`;
   }).join("");
   body.innerHTML = `
-    <div class="card" style="background:#fff7ec;border-color:#f0d9b5">
-      <div class="net-note" style="margin:0">🔒 מסך תצוגה בלבד (שלב ביניים). עדיין אי אפשר לשמור — כפתור השמירה יתווסף בשלב הבא אחרי שתאשר שהמסך תקין. כרגע החישוב פועל לפי ${src}.</div>
+    <div class="card" style="background:#eef6f4;border-color:#cfe6e0">
+      <div class="net-note" style="margin:0">המספרים מתעדכנים פעם בשנה. עדכן לפי מה שהרו"ח נותן ולחץ שמור. ${saved?'כרגע פועלים הערכים השמורים.':'כרגע פועלת ברירת המחדל המובנית (2026).'} זהו כלי הערכה — התלוש הרשמי הוא המקור הקובע.</div>
     </div>
     <div class="card">
       <h2>נקודת זיכוי ותקרות</h2>
-      <div class="net-field"><label class="fld">שווי נקודת זיכוי לחודש (₪)</label><input type="number" value="${T.creditPointValue}" disabled></div>
-      <div class="net-field"><label class="fld">תקרת מדרגה מופחתת — ביטוח לאומי (₪)</label><input type="number" value="${T.niReducedCeil}" disabled></div>
-      <div class="net-field"><label class="fld">תקרת הכנסה לביטוח לאומי (₪)</label><input type="number" value="${T.niMaxCeil}" disabled></div>
+      <div class="net-field"><label class="fld">שווי נקודת זיכוי לחודש (₪)</label><input type="number" id="txCredit" inputmode="decimal" step="0.01" min="0" value="${T.creditPointValue}"></div>
+      <div class="net-field"><label class="fld">תקרת מדרגה מופחתת — ביטוח לאומי (₪)</label><input type="number" id="txNiRedCeil" inputmode="numeric" step="1" min="0" value="${T.niReducedCeil}"></div>
+      <div class="net-field"><label class="fld">תקרת הכנסה לביטוח לאומי (₪)</label><input type="number" id="txNiMaxCeil" inputmode="numeric" step="1" min="0" value="${T.niMaxCeil}"></div>
     </div>
     <div class="card">
       <h2>אחוזי ביטוח לאומי ובריאות (חלק העובד)</h2>
-      <div class="net-field"><label class="fld">ביטוח לאומי — מדרגה מופחתת (%)</label><input type="number" value="${pct(T.niEmpRed)}" disabled></div>
-      <div class="net-field"><label class="fld">ביטוח לאומי — מדרגה מלאה (%)</label><input type="number" value="${pct(T.niEmpFull)}" disabled></div>
-      <div class="net-field"><label class="fld">מס בריאות — מדרגה מופחתת (%)</label><input type="number" value="${pct(T.healthRed)}" disabled></div>
-      <div class="net-field"><label class="fld">מס בריאות — מדרגה מלאה (%)</label><input type="number" value="${pct(T.healthFull)}" disabled></div>
+      <div class="net-field"><label class="fld">ביטוח לאומי — מדרגה מופחתת (%)</label><input type="number" id="txNiEmpRed" inputmode="decimal" step="0.01" min="0" max="100" value="${pct(T.niEmpRed)}"></div>
+      <div class="net-field"><label class="fld">ביטוח לאומי — מדרגה מלאה (%)</label><input type="number" id="txNiEmpFull" inputmode="decimal" step="0.01" min="0" max="100" value="${pct(T.niEmpFull)}"></div>
+      <div class="net-field"><label class="fld">מס בריאות — מדרגה מופחתת (%)</label><input type="number" id="txHealthRed" inputmode="decimal" step="0.01" min="0" max="100" value="${pct(T.healthRed)}"></div>
+      <div class="net-field"><label class="fld">מס בריאות — מדרגה מלאה (%)</label><input type="number" id="txHealthFull" inputmode="decimal" step="0.01" min="0" max="100" value="${pct(T.healthFull)}"></div>
     </div>
     <div class="card">
       <h2>מדרגות מס הכנסה</h2>
-      <p class="sub">לכל מדרגה: עד איזה סכום חודשי היא חלה, ואיזה אחוז מס. כך תמלא לפי מה שהרו"ח ייתן.</p>
+      <p class="sub">לכל מדרגה: עד איזה סכום חודשי היא חלה, ואיזה אחוז מס. המדרגה האחרונה חלה על כל מה שמעבר.</p>
       ${bracketsRows}
     </div>
+    <div class="card">
+      <div class="modal-actions" style="margin-top:0">
+        <button class="btn line" onclick="resetTaxSettings()">אפס לברירת מחדל</button>
+        <button class="btn" onclick="saveTaxSettings()">שמור הגדרות מס</button>
+      </div>
+    </div>
   `;
+}
+function saveTaxSettings(){
+  const val = id => { const el=$(id); return el ? String(el.value).trim() : ""; };
+  const toNum = s => (s==="" || s==null || !isFinite(Number(s))) ? null : Number(s);
+  const creditPointValue = toNum(val("txCredit"));
+  const niReducedCeil    = toNum(val("txNiRedCeil"));
+  const niMaxCeil        = toNum(val("txNiMaxCeil"));
+  const niEmpRed   = toNum(val("txNiEmpRed"));
+  const niEmpFull  = toNum(val("txNiEmpFull"));
+  const healthRed  = toNum(val("txHealthRed"));
+  const healthFull = toNum(val("txHealthFull"));
+  const pctFields = {niEmpRed, niEmpFull, healthRed, healthFull};
+  const moneyFields = {creditPointValue, niReducedCeil, niMaxCeil};
+  for(const k in moneyFields){ if(moneyFields[k]==null || moneyFields[k]<0){ toast("יש למלא את כל הסכומים במספרים תקינים"); return; } }
+  for(const k in pctFields){ if(pctFields[k]==null || pctFields[k]<0 || pctFields[k]>100){ toast("אחוז לא תקין (חייב להיות בין 0 ל-100)"); return; } }
+  if(niReducedCeil > niMaxCeil){ toast("תקרת המדרגה המופחתת לא יכולה להיות גבוהה מתקרת ההכנסה"); return; }
+  // מדרגות מס
+  const N=TAX_BRACKETS.length;
+  const brackets=[]; let prevUpto=0;
+  for(let i=0;i<N;i++){
+    const rate=toNum(val("txBrRate"+i));
+    if(rate==null || rate<0 || rate>100){ toast("אחוז מס לא תקין במדרגה "+(i+1)); return; }
+    let upTo;
+    if(i===N-1){ upTo="Infinity"; }
+    else {
+      upTo=toNum(val("txBrUpto"+i));
+      if(upTo==null || upTo<=prevUpto){ toast("הסכום במדרגה "+(i+1)+" חייב להיות גדול מהקודמת"); return; }
+      prevUpto=upTo;
+    }
+    brackets.push({ upTo, rate: rate/100 });
+  }
+  const cfg = {
+    creditPointValue, niReducedCeil, niMaxCeil,
+    niEmpRed: niEmpRed/100, niEmpFull: niEmpFull/100,
+    healthRed: healthRed/100, healthFull: healthFull/100,
+    brackets, updatedAt: Date.now()
+  };
+  uiConfirm("לשמור את הגדרות המס? מעכשיו החישוב באפליקציה ישתמש בערכים האלה במקום ברירת המחדל.", {okText:"שמור", title:"שמירת הגדרות מס"}).then(ok=>{
+    if(!ok) return;
+    db.ref("config/taxConfig").set(cfg).then(()=>toast("הגדרות המס נשמרו ✓")).catch(()=>toast("השמירה נכשלה, נסה שוב"));
+  });
+}
+async function resetTaxSettings(){
+  const ok = await uiConfirm("לאפס להגדרות ברירת המחדל (2026)? הערכים שהזנת יימחקו והחישוב יחזור למספרים המובנים.", {danger:true, okText:"אפס לברירת מחדל", title:"איפוס הגדרות מס"});
+  if(!ok) return;
+  db.ref("config/taxConfig").remove().then(()=>toast("אופס לברירת המחדל ✓")).catch(()=>toast("הפעולה נכשלה, נסה שוב"));
 }
 
 /* ---------- נעילת קונסולה ב-PIN ---------- */
