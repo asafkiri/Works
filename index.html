@@ -277,6 +277,9 @@
   .shift-card .times{font-size:14px;margin-top:6px;color:var(--ink-soft)}
   .shift-card .note{font-size:13.5px;margin-top:8px;background:var(--paper);border-radius:10px;padding:9px 11px}
   .shift-card .note b{color:var(--muted);font-weight:700}
+  /* משמרת שנסגרה אוטומטית - בעיה שצריך לתקן */
+  .shift-card.problem{border:2px solid #dc2626;background:#fef2f2;box-shadow:0 0 0 3px rgba(220,38,38,.10)}
+  .shift-card .shift-problem{margin-top:8px;background:#dc2626;color:#fff;font-weight:800;font-size:13.5px;border-radius:10px;padding:9px 12px;line-height:1.45}
   .fb-row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
   .fb-row input{flex:1;min-width:160px}
   .fb-row textarea{flex:1 1 100%;min-height:72px;resize:vertical;line-height:1.45}
@@ -453,7 +456,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v17</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v18</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -478,7 +481,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v17</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v18</span></div>
     <div class="topbar-actions">
       <div class="seg">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -921,6 +924,7 @@
       <button class="btn line" onclick="confirmClockOut(true)">דלג ושמור</button>
       <button class="btn" onclick="confirmClockOut(false)">שמור הערה</button>
     </div>
+    <button class="btn line" style="width:100%;margin-top:8px" onclick="cancelClockOut()">ביטול — אל תסיים משמרת</button>
   </div>
 </div>
 
@@ -2115,6 +2119,12 @@ function clockIn(empId){
     .catch(e=> toast("שגיאה בשמירה"));
 }
 
+// ביטול סיום משמרת — סוגר את המודאל ומשאיר את המשמרת פתוחה (ללא שמירה)
+function cancelClockOut(){
+  closeModal("noteModal");
+  pendingClockOutEmp = null;
+}
+
 function confirmClockOut(skip){
   const empId = pendingClockOutEmp;
   const note  = skip ? "" : $("noteText").value.trim();
@@ -2544,15 +2554,15 @@ function renderShiftList(){
     const dur = open ? "" : fmtHours(hoursBetween(s.clockIn, s.clockOut));
     const pills =
       (open?'<span class="pill live">פתוחה</span>':'')+
-      (s.autoCloseFlag?'<span class="pill flag">⚠ נסגרה אוטומטית · בדוק שעות</span>':'')+
       (s.edited?'<span class="pill edit">נערך</span>':'');
     const empNote = s.employeeNote ? `<div class="note"><b>הערת עובד:</b> ${esc(s.employeeNote)}</div>` : '';
-    return `<div class="shift-card">
+    return `<div class="shift-card${s.autoCloseFlag?' problem':''}">
       <div class="head">
         <span class="nm-strong">${esc(name)}</span>
         <span class="meta">· ${fmtDate(s.clockIn)}</span>
         ${pills}
       </div>
+      ${s.autoCloseFlag?'<div class="shift-problem">⚠️ יש בעיה במשמרת הזאת — נסגרה אוטומטית אחרי 12 שעות (העובד שכח לסגור). בדוק ותקן את השעות.</div>':''}
       <div class="times">כניסה ${fmtTime(s.clockIn)} ← יציאה ${open?'—':fmtTime(s.clockOut)} &nbsp;·&nbsp; ${open?'<span style="color:#a6700a">במהלך משמרת</span>':('סה״כ '+dur)}</div>
       ${empNote}
       <div class="fb-row">
