@@ -279,6 +279,7 @@
   .shift-card .note b{color:var(--muted);font-weight:700}
   .fb-row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
   .fb-row input{flex:1;min-width:160px}
+  .fb-row textarea{flex:1 1 100%;min-height:72px;resize:vertical;line-height:1.45}
 
   .pay-num{font-weight:800;font-size:16px}
   .pay-sub{font-size:12px;color:var(--muted)}
@@ -452,7 +453,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v16</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v17</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -477,7 +478,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v16</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v17</span></div>
     <div class="topbar-actions">
       <div class="seg">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -826,9 +827,9 @@
           <span class="f-txt"><span class="f-title">המשמרות הקרובות שלי</span><span class="f-sub" id="empUpcomingSub">מתי אתה עובד בהמשך</span></span>
           <span class="f-arr">→</span>
         </button>
-        <button class="folder lg" onclick="openEmpNav('notes')">
+        <button class="folder lg" id="notesFolderBtn" onclick="openEmpNav('notes')">
           <span class="f-ico">💬</span>
-          <span class="f-txt"><span class="f-title">הערות מהמנהל <span id="notesDot" class="note-dot hidden">חדש</span></span><span class="f-sub">משוב על המשמרות שלך</span></span>
+          <span class="f-txt"><span class="f-title">הערות מהמנהל <span id="notesDot" class="note-dot hidden">חדש</span></span><span class="f-sub" id="notesFolderSub">משוב על המשמרות שלך</span></span>
           <span class="f-arr">→</span>
         </button>
         <button class="folder lg" onclick="openEmpNav('hakafa')">
@@ -1915,8 +1916,11 @@ function renderEmployeeDashboard(){
 
   // חיווי "הערה חדשה" - אם יש משוב שעודכן אחרי שהעובד צפה לאחרונה
   const seenAt = e.notesSeenAt || 0;
-  const hasNew = Object.values(shifts).some(s=> s.employeeId===currentEmpId && s.managerFeedback && s.managerFeedback.trim()!=="" && (s.feedbackAt||0) > seenAt);
-  const dot=$("notesDot"); if(dot) dot.classList.toggle("hidden", !hasNew);
+  const newNotes = Object.values(shifts).filter(s=> s.employeeId===currentEmpId && s.managerFeedback && s.managerFeedback.trim()!=="" && (s.feedbackAt||0) > seenAt).length;
+  const dot=$("notesDot");
+  if(dot){ dot.textContent = newNotes>1 ? (newNotes+" חדש") : "חדש"; dot.classList.toggle("hidden", newNotes===0); }
+  const nBtn=$("notesFolderBtn"); if(nBtn) nBtn.classList.toggle("alert", newNotes>0);
+  const nSub=$("notesFolderSub"); if(nSub) nSub.textContent = newNotes>0 ? "יש הערה חדשה על המשמרת שלך — כנס לראות" : "משוב על המשמרות שלך";
 
   // --- הקפה לעובדים: רשימה לפי חודש (חודשיים אחרונים) ---
   const hkBody=$("empHakafaBody");
@@ -2552,7 +2556,7 @@ function renderShiftList(){
       <div class="times">כניסה ${fmtTime(s.clockIn)} ← יציאה ${open?'—':fmtTime(s.clockOut)} &nbsp;·&nbsp; ${open?'<span style="color:#a6700a">במהלך משמרת</span>':('סה״כ '+dur)}</div>
       ${empNote}
       <div class="fb-row">
-        <input type="text" id="fb_${s.id}" placeholder="משוב מנהל לעובד..." value="${esc(s.managerFeedback||'')}">
+        <textarea id="fb_${s.id}" rows="2" placeholder="משוב מנהל לעובד...">${esc(s.managerFeedback||'')}</textarea>
         <button class="btn line sm" onclick="saveFeedback('${s.id}')">שמור משוב</button>
         <button class="btn line sm" onclick="openEditShift('${s.id}')">ערוך שעות</button>
         <button class="btn danger sm" onclick="deleteShift('${s.id}')">מחק</button>
