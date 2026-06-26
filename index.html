@@ -456,7 +456,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v18</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v19</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -481,12 +481,13 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v18</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v19</span></div>
     <div class="topbar-actions">
-      <div class="seg">
+      <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
         <button id="tabTerminal" onclick="showView('terminal')">טרמינל</button>
       </div>
+      <button id="deviceSwitchBtn" class="ghost hidden" onclick="openDeviceModal()" title="החלף מצב מכשיר">🔁 מצב</button>
       <button class="ghost" onclick="doLogout()">יציאה</button>
     </div>
   </div>
@@ -913,6 +914,18 @@
   </div>
 </div>
 
+<!-- ============================ מודאל: בחירת מצב מכשיר ============================ -->
+<div id="deviceModal" class="modal-bg">
+  <div class="modal">
+    <h3>מה המכשיר הזה?</h3>
+    <p class="who">בחר פעם אחת — המכשיר יזכור את הבחירה. תמיד אפשר להחליף בכפתור 🔁 מצב למעלה.</p>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px">
+      <button class="btn" onclick="chooseDevice('manager')">📱 מכשיר מנהל — ישר לקונסולה</button>
+      <button class="btn line" onclick="chooseDevice('shop')">🏪 מכשיר חנות — רק טרמינל החתמות</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============================ מודאל: הערת סיום משמרת ============================ -->
 <div id="noteModal" class="modal-bg">
   <div class="modal">
@@ -1176,6 +1189,7 @@ let cancelTargetId = null;        // id של משמרת קבועה במודאל 
 // --- נעילת קונסולה (PIN) ---
 let pinConfig = null;        // קוד ה-PIN השמור (או null אם לא הוגדר)
 let consoleUnlocked = false; // האם הקונסולה נפתחה בסשן הנוכחי
+let pendingDeviceManager = false; // האם ממתינים ל-PIN כדי להפוך מכשיר ל"מנהל"
 let consoleFolder = null;    // התיקייה הפתוחה בקונסולה (null = תפריט הבית)
 
 // תת-ניווט בתוך שכר/סידור/עובדים: 'list' | 'archive' | 'detail'
@@ -1416,6 +1430,7 @@ function routeAfterLogin(user){
       $("app").classList.remove("hidden");
       $("configBanner").classList.add("hidden");
       startDataListeners();
+      applyDeviceMode();
     } else {
       enterEmployeeMode(user);
     }
@@ -1497,6 +1512,45 @@ function applyView(name){
   $("tabTerminal").classList.toggle("on", name==="terminal");
   if(name==="console"){ consoleFolder=null; applyConsoleNav(); }
   renderActive();
+}
+
+/* ---------- מצב מכשיר: מנהל / חנות (נשמר במכשיר, לא נוגע בהרשאות) ---------- */
+function getDeviceMode(){ try{ return localStorage.getItem("deviceMode"); }catch(e){ return null; } }
+function setDeviceModeLS(m){ try{ localStorage.setItem("deviceMode", m); }catch(e){} }
+function openDeviceModal(){ openModal("deviceModal"); }
+
+// מנתב את המכשיר למסך הנכון לפי המצב השמור
+function applyDeviceMode(){
+  const m = getDeviceMode();
+  const tabs = $("viewTabs");
+  const sw = $("deviceSwitchBtn");
+  if(m==="manager"){
+    if(tabs) tabs.classList.add("hidden");
+    if(sw) sw.classList.remove("hidden");
+    consoleUnlocked = true;          // מכשיר מנהל ייעודי - ישר לקונסולה
+    applyView("console");
+  } else if(m==="shop"){
+    if(tabs) tabs.classList.add("hidden");
+    if(sw) sw.classList.remove("hidden");
+    applyView("terminal");
+  } else {
+    if(tabs) tabs.classList.remove("hidden"); // עד שבוחרים - טאבים רגילים
+    if(sw) sw.classList.add("hidden");
+    openModal("deviceModal");
+  }
+}
+
+// בחירת מצב מהמודאל. מעבר ל"מנהל" מוגן ב-PIN אם הוגדר (כדי שבמכשיר חנות לא ייכנסו לקונסולה)
+function chooseDevice(m){
+  if(m==="manager" && pinConfig && !consoleUnlocked){
+    closeModal("deviceModal");
+    pendingDeviceManager = true;
+    openPinModal();
+    return;
+  }
+  setDeviceModeLS(m);
+  closeModal("deviceModal");
+  applyDeviceMode();
 }
 
 /* ---------- ניווט תיקיות בקונסולה ---------- */
@@ -1640,6 +1694,7 @@ function submitPin(){
   if(entered && pinConfig && entered===String(pinConfig)){
     consoleUnlocked=true;
     closeModal("pinModal");
+    if(pendingDeviceManager){ pendingDeviceManager=false; setDeviceModeLS("manager"); applyDeviceMode(); return; }
     applyView("console");
   } else {
     const e=$("pinErr"); e.textContent="קוד שגוי, נסה שוב."; e.classList.add("show");
