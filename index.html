@@ -150,6 +150,15 @@
   .limit-dot{display:inline-block;font-size:10px;font-weight:800;color:#fff;background:#dc2626;border-radius:999px;padding:2px 8px;margin-inline-start:6px;vertical-align:middle}
   .hk-limit{background:#fee2e2;border:2px solid #dc2626;color:#991b1b;border-radius:10px;padding:10px 12px;font-weight:800;font-size:13px;line-height:1.45;margin:8px 0;display:flex;gap:8px;align-items:flex-start}
   .hk-limit .hl-ico{font-size:16px;flex:0 0 auto}
+  /* טפסים לעובדים */
+  .form-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+  .form-row:last-child{border-bottom:none}
+  .form-main{flex:1;min-width:0}
+  .form-title{font-weight:700;font-size:14px}
+  .form-meta{font-size:12px;color:var(--muted);margin-top:2px}
+  .form-status{font-size:11px;font-weight:800;border-radius:999px;padding:3px 9px;white-space:nowrap}
+  .form-status.ok{color:var(--ok);background:var(--ok-bg)}
+  .form-status.wait{color:var(--danger);background:#fff4ec}
   .screen-head{display:flex;align-items:center;gap:12px;margin-bottom:18px}
   .back-btn{
     border:1px solid var(--line);background:#fff;color:var(--ink);
@@ -464,7 +473,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v24</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v25</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -489,7 +498,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v24</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v25</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -539,6 +548,11 @@
         <button class="folder" id="hakafaFolderBtn" onclick="openFolder('hakafa')">
           <span class="f-ico">🧾</span>
           <span class="f-txt"><span class="f-title">הקפה לעובדים <span id="hakafaBadge" class="note-dot hidden">חדש</span></span><span class="f-sub" id="hakafaFolderSub">מה שעובדים לקחו מהחנות</span></span>
+          <span class="f-arr">→</span>
+        </button>
+        <button class="folder" id="formsFolderBtn" onclick="openFolder('forms')">
+          <span class="f-ico">📋</span>
+          <span class="f-txt"><span class="f-title">טפסים לעובדים <span id="formsBadge" class="note-dot hidden">חדש</span></span><span class="f-sub" id="formsFolderSub">שליחת טפסים לחתימה (כמו הסכמה להקפה)</span></span>
           <span class="f-arr">→</span>
         </button>
       </div>
@@ -794,6 +808,30 @@
         <div class="screen-head"><button class="back-btn" onclick="hkBackToList()">→ חזרה לרשימה</button><h1 class="screen-title" id="hkDetailTitle">🧾</h1></div>
         <div class="card">
           <div id="hkDetailBody"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- מסך: טפסים לעובדים -->
+    <div id="screen-forms" class="screen hidden">
+      <div class="screen-head"><button class="back-btn" onclick="backToHome()">→ חזרה</button><h1 class="screen-title">📋 טפסים לעובדים</h1></div>
+
+      <!-- רשימת עובדים -->
+      <div id="formsConsoleList">
+        <div class="card">
+          <p class="sub">שליחת טפסים לחתימה דיגיטלית. בחר עובד כדי לשלוח טופס ולראות מה כבר נחתם.</p>
+          <div id="formsEmpFolders"></div>
+        </div>
+      </div>
+
+      <!-- טפסים של עובד -->
+      <div id="formsConsoleDetail" class="hidden">
+        <div class="screen-head"><button class="back-btn" onclick="formsBackToList()">→ חזרה לרשימה</button><h1 class="screen-title" id="formsDetailTitle">📋</h1></div>
+        <div class="card">
+          <button class="btn" style="width:100%" onclick="sendHakafaForm(formsConsoleEmpId)">➕ שלח טופס הסכמה להקפה</button>
+        </div>
+        <div class="card">
+          <div id="formsDetailBody"></div>
         </div>
       </div>
     </div>
@@ -1471,6 +1509,7 @@ function enterEmployeeMode(user){
     // הקפה: מאזינים לרשומות של העובד הנוכחי בלבד
     db.ref("takings/"+id).on("value", snap=>{ myTakings = snap.val()||{}; if(currentRole==="employee") renderEmployeeDashboard(); });
     db.ref("payments/"+id).on("value", snap=>{ myPayments = snap.val()||{}; if(currentRole==="employee") renderEmployeeDashboard(); });
+    db.ref("forms/"+id).on("value", snap=>{ myForms = snap.val()||{}; if(currentRole==="employee") renderEmployeeDashboard(); });
     $("authScreen").classList.add("hidden");
     $("app").classList.add("hidden");
     $("empApp").classList.remove("hidden");
@@ -1498,6 +1537,7 @@ function startDataListeners(){
   if(currentRole==="manager"){
     db.ref("takings").on("value", snap=>{ allTakings = snap.val()||{}; renderActive(); });
     db.ref("payments").on("value", snap=>{ allPayments = snap.val()||{}; renderActive(); });
+    db.ref("forms").on("value", snap=>{ allForms = snap.val()||{}; renderActive(); });
     db.ref("config/takingsSeenAt").on("value", snap=>{ const v=snap.val(); takingsSeen=(v && typeof v==='object')?v:{}; renderActive(); });
   }
 }
@@ -1564,7 +1604,7 @@ function chooseDevice(m){
 }
 
 /* ---------- ניווט תיקיות בקונסולה ---------- */
-const CONSOLE_SCREENS=["overview","employees","pay","schedule","settings","hakafa"];
+const CONSOLE_SCREENS=["overview","employees","pay","schedule","settings","hakafa","forms"];
 function openFolder(name){
   consoleFolder=name;
   if(name==="pay"){ payView="list"; paySubEmpId=null; }
@@ -1572,6 +1612,7 @@ function openFolder(name){
   if(name==="employees"){ empView="list"; empSubId=null; }
   if(name==="settings"){ const m=$("settings-main"), t=$("settings-tax"); if(m) m.classList.remove("hidden"); if(t) t.classList.add("hidden"); }
   if(name==="hakafa"){ hkConsoleView="list"; hkConsoleEmpId=null; }
+  if(name==="forms"){ formsConsoleView="list"; formsConsoleEmpId=null; }
   applyConsoleNav();
   renderConsole();
   try{window.scrollTo(0,0);}catch(e){}
@@ -1844,8 +1885,91 @@ let hkConsoleView="list";   // 'list' | 'detail'
 let hkConsoleEmpId=null;
 let takingsSeen={};        // הקפה: מתי המנהל צפה לאחרונה בכל עובד {empId: ts} (לחיווי "חדש")
 
+/* ---------- טפסים לעובדים (חתימה דיגיטלית) ---------- */
+let formsConsoleView="list";  // 'list' | 'detail'
+let formsConsoleEmpId=null;
+let allForms={};   // טפסים: כל הרשומות (נטען אצל המנהל)
+let myForms={};    // טפסים: של העובד הנוכחי (נטען ב-enterEmployeeMode)
+const CONSENT_HAKAFA_TITLE = "הסכמה לניכוי משכר עבור מוצרים שנלקחו (הקפה)";
+const CONSENT_HAKAFA_BODY = `אני, החתום/ה מטה, מסכים/ה בזאת כי המעסיק ינכה משכרי את שווי המוצרים והקניות שאקח מהחנות לצריכה אישית ("הקפה"), בהתאם לרישום שמתבצע באפליקציה.
+
+ידוע לי והוסבר לי כי:
+• הניכוי ייעשה מתוך שכרי ומייצג חוב אמיתי שלי למעסיק עבור מוצרים שקיבלתי בפועל.
+• הניכוי החודשי לא יעלה על 25% מהשכר ברוטו, בהתאם לחוק הגנת השכר; יתרה מעבר לכך תידחה לחודשים הבאים.
+• בסיום העבודה רשאי המעסיק לקזז יתרת חוב מהשכר האחרון.
+• כל ניכוי יופיע בתלוש השכר שלי.
+
+הסכמה זו ניתנת מרצוני החופשי ותקפה כל עוד אני מועסק/ת, אלא אם אבטל אותה בכתב.`;
+
 function openHkEmp(empId){ hkConsoleEmpId=empId; hkConsoleView="detail"; if(TS) db.ref("config/takingsSeenAt/"+empId).set(TS); renderHakafaConsole(); try{window.scrollTo(0,0);}catch(e){} }
 function hkBackToList(){ hkConsoleView="list"; hkConsoleEmpId=null; renderHakafaConsole(); try{window.scrollTo(0,0);}catch(e){} }
+
+/* ---------- טפסים לעובדים: צד המנהל ---------- */
+function openFormsEmp(empId){ formsConsoleEmpId=empId; formsConsoleView="detail"; renderFormsConsole(); try{window.scrollTo(0,0);}catch(e){} }
+function formsBackToList(){ formsConsoleView="list"; formsConsoleEmpId=null; renderFormsConsole(); try{window.scrollTo(0,0);}catch(e){} }
+
+async function sendHakafaForm(empId){
+  const e=employees[empId]; if(!e) return;
+  const existing = Object.values(allForms[empId]||{}).filter(f=>f && f.type==="hakafa_consent");
+  const signed = existing.filter(f=>f.status==="signed").length;
+  const pend = existing.filter(f=>f.status!=="signed").length;
+  let msg = `לשלוח ל${e.name} טופס "הסכמה להקפה" לחתימה?`;
+  if(signed>0) msg = `ל${e.name} כבר יש טופס הקפה חתום. לשלוח טופס חדש בכל זאת?`;
+  else if(pend>0) msg = `ל${e.name} כבר נשלח טופס שממתין לחתימה. לשלוח שוב?`;
+  const ok=await uiConfirm(msg, {okText:"שלח"});
+  if(!ok) return;
+  db.ref("forms/"+empId).push().set({
+    type:"hakafa_consent",
+    title:CONSENT_HAKAFA_TITLE,
+    body:CONSENT_HAKAFA_BODY,
+    status:"pending",
+    sentAt:TS
+  }).then(()=>toast("הטופס נשלח לעובד ✓")).catch(()=>toast("השליחה נכשלה"));
+}
+
+async function delForm(empId, formId){
+  const ok=await uiConfirm("למחוק את הטופס הזה? אם הוא חתום — החתימה תימחק לצמיתות.", {okText:"מחק", danger:true, title:"מחיקת טופס"});
+  if(!ok) return;
+  db.ref("forms/"+empId+"/"+formId).remove().then(()=>toast("נמחק ✓")).catch(()=>toast("המחיקה נכשלה"));
+}
+
+function renderFormsConsole(){
+  const listEl=$("formsConsoleList"), detEl=$("formsConsoleDetail");
+  if(!listEl || !detEl) return;
+  listEl.classList.toggle("hidden", formsConsoleView!=="list");
+  detEl.classList.toggle("hidden", formsConsoleView!=="detail");
+  if(formsConsoleView==="list"){
+    const rows = Object.keys(employees).map(empId=>{
+      const e=employees[empId]; if(!e || e.active===false) return null;
+      const fs = Object.values(allForms[empId]||{}).filter(f=>f);
+      const signed=fs.filter(f=>f.status==="signed").length;
+      const pend=fs.filter(f=>f.status!=="signed").length;
+      return { empId, name:e.name, total:fs.length, signed, pend };
+    }).filter(Boolean).sort((a,b)=> (b.pend - a.pend) || (a.name||"").localeCompare(b.name||"","he"));
+    $("formsEmpFolders").innerHTML = rows.length ? rows.map(r=>`
+      <button class="folder${r.pend>0?' alert':''}" onclick="openFormsEmp('${r.empId}')">
+        <span class="f-ico">📄</span>
+        <span class="f-txt"><span class="f-title">${esc(r.name)}${r.pend>0?` <span class="note-dot">${r.pend} ממתין</span>`:''}</span><span class="f-sub">${r.total>0?`${r.signed} חתומים · ${r.pend} ממתינים`:'אין טפסים — לחץ לשליחה'}</span></span>
+        <span class="f-arr">→</span>
+      </button>`).join("") : '<div class="empty">אין עובדים פעילים.</div>';
+  } else {
+    const e=employees[formsConsoleEmpId];
+    $("formsDetailTitle").textContent="📋 "+(e?e.name:"עובד");
+    const fs = Object.keys(allForms[formsConsoleEmpId]||{}).map(id=>({id,...allForms[formsConsoleEmpId][id]}))
+      .filter(f=>f).sort((a,b)=>(b.sentAt||0)-(a.sentAt||0));
+    $("formsDetailBody").innerHTML = fs.length ? fs.map(f=>{
+      const signed = f.status==="signed";
+      return `<div class="form-row">
+        <div class="form-main">
+          <div class="form-title">${esc(f.title||"טופס")}</div>
+          <div class="form-meta">נשלח ${f.sentAt?fmtDate(f.sentAt):''}${signed?` · נחתם ${f.signedAt?fmtDate(f.signedAt):''}`:''}</div>
+        </div>
+        <span class="form-status ${signed?'ok':'wait'}">${signed?'נחתם ✓':'ממתין לחתימה'}</span>
+        <button class="btn line sm" onclick="delForm('${formsConsoleEmpId}','${f.id}')">🗑️</button>
+      </div>`;
+    }).join("") : '<div class="empty">עדיין לא נשלחו טפסים לעובד זה.</div>';
+  }
+}
 
 async function delHakafa(empId, takingId){
   const ok=await uiConfirm("למחוק את הרשומה הזו? הפעולה אינה ניתנת לביטול.", {okText:"מחק", danger:true, title:"מחיקת רשומה"});
@@ -2332,6 +2456,7 @@ function renderConsole(){
   renderHomeLiveCount();
   renderHakafaConsole();
   renderHakafaBadge();
+  renderFormsConsole();
 }
 
 // חיווי "כמה במשמרת עכשיו" על אריח "סקירה" בתפריט הבית
