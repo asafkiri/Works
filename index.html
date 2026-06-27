@@ -482,7 +482,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v33</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v34</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -507,7 +507,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v33</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v34</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -930,6 +930,11 @@
           <span class="f-txt"><span class="f-title">טפסים לחתימה <span id="formsEmpDot" class="note-dot hidden">חדש</span></span><span class="f-sub" id="formsEmpSub">טפסים שצריך לקרוא ולחתום</span></span>
           <span class="f-arr">→</span>
         </button>
+        <button class="folder lg" id="payslipsEmpFolderBtn" onclick="openEmpNav('payslips')">
+          <span class="f-ico">📄</span>
+          <span class="f-txt"><span class="f-title">התלושים שלי <span id="payslipsEmpDot" class="note-dot hidden">חדש</span></span><span class="f-sub" id="payslipsEmpSub">תלושי השכר שלך</span></span>
+          <span class="f-arr">→</span>
+        </button>
       </div>
     </div>
 
@@ -1025,6 +1030,15 @@
           </div>
           <div style="font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5">בחתימה את/ה מאשר/ת שקראת והבנת את הטופס. לאחר החתימה לא ניתן לשנות.</div>
         </div>
+      </div>
+    </div>
+
+    <!-- התלושים שלי -->
+    <div id="empPayslips" class="hidden">
+      <div class="screen-head"><button class="back-btn" onclick="empNavHome()">→ חזרה</button><h1 class="screen-title">📄 התלושים שלי</h1></div>
+      <div class="card">
+        <p class="sub">תלושי השכר שלך מהמעסיק. אנא צפה/י בתלוש ואשר/י שקיבלת אותו.</p>
+        <div id="empPayslipsBody"></div>
       </div>
     </div>
 
@@ -1927,7 +1941,7 @@ let empSignFormId=null;  // הטופס שנמצא בחתימה כרגע
 let sigCtx=null, sigDrawing=false, sigHasInk=false, sigLast=null; // לוח החתימה
 
 function applyEmpDashNav(){
-  const map={home:"empHome",pay:"empPay",paymonth:"empPayMonth",upcoming:"empUpcoming",notes:"empNotes",hakafa:"empHakafa",forms:"empForms"};
+  const map={home:"empHome",pay:"empPay",paymonth:"empPayMonth",upcoming:"empUpcoming",notes:"empNotes",hakafa:"empHakafa",forms:"empForms",payslips:"empPayslips"};
   Object.keys(map).forEach(k=>{ const el=$(map[k]); if(el) el.classList.toggle("hidden", empNav!==k); });
 }
 function empNavHome(){ empNav="home"; renderEmployeeDashboard(); try{window.scrollTo(0,0);}catch(e){} }
@@ -1961,6 +1975,37 @@ function renderEmpForms(){
         : `<button class="btn sm" onclick="openEmpForm('${f.id}')">קרא וחתום</button>`}
     </div>`;
   }).join("") : '<div class="empty">אין טפסים כרגע.</div>';
+}
+
+/* ---------- תלושי שכר: צד העובד ---------- */
+function renderEmpPayslips(){
+  const body=$("empPayslipsBody"); if(!body) return;
+  const slips=Object.keys(myPayslips||{}).map(id=>({id,...myPayslips[id]})).filter(s=>s)
+    .sort((a,b)=>(b.monthKey||"").localeCompare(a.monthKey||""));
+  body.innerHTML = slips.length ? slips.map(s=>{
+    const ack=!!s.acknowledgedAt;
+    return `<div class="form-item">
+      <div class="form-row" style="border-bottom:none;padding-bottom:4px">
+        <div class="form-main">
+          <div class="form-title">תלוש ${monthLabel(s.monthKey)} <span style="font-size:11px;color:var(--muted)">${s.fileType==="pdf"?"PDF":"תמונה"}</span></div>
+          <div class="form-meta">${ack?`אישרת קבלה ${fmtDate(s.acknowledgedAt)}`:'טרם אישרת קבלה'}</div>
+        </div>
+        <span class="form-status ${ack?'ok':'wait'}">${ack?'התקבל ✓':'חדש'}</span>
+      </div>
+      <div style="display:flex;gap:6px;padding:0 0 12px;border-bottom:1px solid var(--line);flex-wrap:wrap">
+        <button class="btn sm" onclick='viewPayslip("${currentEmpId}","${s.id}",${JSON.stringify({fileType:s.fileType,monthKey:s.monthKey})})'>👁️ צפה / שמור</button>
+        ${ack?'':`<button class="btn line sm" onclick="acknowledgePayslip('${s.id}')">✓ אישור קבלה</button>`}
+      </div>
+    </div>`;
+  }).join("") : '<div class="empty">אין תלושים עדיין.</div>';
+}
+async function acknowledgePayslip(slipId){
+  if(!currentEmpId) return;
+  const ok=await uiConfirm("לאשר שקיבלת את התלוש הזה?", {okText:"מאשר/ת קבלה"});
+  if(!ok) return;
+  db.ref("payslips/"+currentEmpId+"/"+slipId+"/acknowledgedAt").set(TS)
+    .then(()=>toast("אישרת קבלת התלוש ✓"))
+    .catch(()=>toast("שגיאה בשמירה"));
 }
 function openEmpForm(formId){
   const f=myForms[formId]; if(!f) return;
@@ -2628,6 +2673,16 @@ function renderEmployeeDashboard(){
   if(fBtn) fBtn.classList.toggle("alert", pendForms>0);
   const fSub=$("formsEmpSub"); if(fSub) fSub.textContent = "יש טופס שמחכה לחתימתך — כנס/י לחתום";
   renderEmpForms();
+
+  // --- תלושי שכר: התיקייה מופיעה אם יש לפחות תלוש אחד; "חדש" אם יש תלוש שטרם אושר ---
+  const slipsArr = Object.values(myPayslips||{}).filter(s=>s);
+  const newSlips = slipsArr.filter(s=> !s.acknowledgedAt).length;
+  const psBtn=$("payslipsEmpFolderBtn"); if(psBtn) psBtn.classList.toggle("hidden", slipsArr.length===0);
+  const psDot=$("payslipsEmpDot");
+  if(psDot){ psDot.textContent = newSlips>1 ? (newSlips+" חדש") : "חדש"; psDot.classList.toggle("hidden", newSlips===0); }
+  if(psBtn) psBtn.classList.toggle("alert", newSlips>0);
+  const psSub=$("payslipsEmpSub"); if(psSub) psSub.textContent = newSlips>0 ? "יש תלוש חדש — צפה/י ואשר/י קבלה" : "תלושי השכר שלך";
+  renderEmpPayslips();
 
   applyEmpDashNav();
 }
