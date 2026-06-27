@@ -476,7 +476,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v29</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v30</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -501,7 +501,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v29</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v30</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -3211,10 +3211,6 @@ function renderPayDetail(){
         <button class="btn" style="flex:1" onclick="imagePayrollAccountant()">📷 דוח לרו"ח (תמונה)</button>
         <button class="btn line" onclick="exportPayrollAccountant()">PDF</button>
       </div>
-      <div style="display:flex;gap:8px">
-        <button class="btn line" style="flex:1" onclick="imagePayrollInternal()">🗂️ דוח פנימי (תמונה)</button>
-        <button class="btn line" onclick="exportPayrollInternal()">PDF</button>
-      </div>
       <div style="font-size:12px;color:var(--muted);text-align:center;line-height:1.5">ברירת המחדל היא תמונה (נוח לשליחה בוואטסאפ). אפשר גם PDF להדפסה.</div>
     </div>`;
 }
@@ -3289,58 +3285,12 @@ function accountantReportHtml(D){
     <div class="pr-foot">הופק ממערכת שעון נוכחות · הנתונים מבוססים על החתמות בפועל · השעות לחישוב שכר; הניכוי הוא חוב העובד למעסיק; המקדמות הן תשלומים ששולמו לעובד</div>
   </div>`;
 }
-function internalReportHtml(D){
-  const rows=D.rows.map(r=>`<tr>
-    <td>${pad(r.d.getDate())}/${pad(r.d.getMonth()+1)}/${r.d.getFullYear()}</td>
-    <td>יום ${r.day}</td>
-    <td>${r.inT}</td>
-    <td>${r.outT}</td>
-    <td class="num">${fmtHours(r.h)}</td>
-    <td class="num">₪${r.amt.toFixed(0)}</td>
-  </tr>`).join("");
-  const left=D.totalPay-D.tkSum-D.paidPay;
-  const tkTable = D.tkSum>0 ? `<div style="margin-top:16px;font-weight:800;font-size:14px">הורדות — הקפה לעובדים</div>
-    <table class="pr-table" style="margin-top:6px">
-      <thead><tr><th>תאריך</th><th>פריט</th><th>סכום</th></tr></thead>
-      <tbody>${D.tkList.map(t=>`<tr><td>${fmtDate(t.createdAt)}</td><td>${esc(t.name)}</td><td class="num">₪${(Number(t.price)||0).toFixed(0)}</td></tr>`).join("")}</tbody>
-    </table>` : '';
-  const payTable = (D.payList && D.payList.length) ? `<div style="margin-top:16px;font-weight:800;font-size:14px">תשלומים / מקדמות שניתנו</div>
-    <table class="pr-table" style="margin-top:6px">
-      <thead><tr><th>תאריך</th><th>הערה</th><th>סכום</th></tr></thead>
-      <tbody>${D.payList.map(p=>`<tr><td>${fmtDate(p.createdAt)}</td><td>${p.note?esc(p.note):'—'}</td><td class="num">₪${(Number(p.amount)||0).toFixed(0)}</td></tr>`).join("")}</tbody>
-    </table>` : '';
-  return `<div class="pr-wrap">
-    <div class="pr-h1">דוח פנימי (מעקב תשלומים) — ${esc(D.e.name)}</div>
-    <div class="pr-meta">חודש: ${monthLabel(paySelMonthKey)}<br>תעריף לשעה: ₪${D.rate}<br>הופק בתאריך: ${D.genDate}<br><b>לשימוש פנימי — לא מיועד לרואה החשבון</b></div>
-    <table class="pr-table">
-      <thead><tr><th>תאריך</th><th>יום</th><th>כניסה</th><th>יציאה</th><th>שעות</th><th>סכום</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-    ${tkTable}
-    ${payTable}
-    <div class="pr-tot">
-      <div><b>סך שעות החודש:</b> ${fmtHours(D.totalH)}</div>
-      ${(D.ot&&D.ot.otEnabled)?`<div><b>שעות רגילות:</b> ${fmtHours(D.ot.regH)} · ₪${(D.ot.regH*D.rate).toFixed(0)}</div>
-      ${D.ot.ot125H>0?`<div><b>שעות נוספות 125%:</b> ${fmtHours(D.ot.ot125H)} · ₪${(D.ot.ot125H*D.rate*1.25).toFixed(0)}</div>`:''}
-      ${D.ot.ot150H>0?`<div><b>שעות נוספות 150%:</b> ${fmtHours(D.ot.ot150H)} · ₪${(D.ot.ot150H*D.rate*1.5).toFixed(0)}</div>`:''}`:''}
-      <div><b>סך הכל (ברוטו${(D.ot&&D.ot.otEnabled)?' משוער כולל נוספות':''}):</b> ₪${D.totalPay.toFixed(0)}</div>
-      ${D.tkSum>0?`<div><b>הורדות (הקפה):</b> −₪${D.tkSum.toFixed(0)}</div>`:''}
-      <div><b>תשלומים/מקדמות שניתנו:</b> −₪${D.paidPay.toFixed(0)}</div>
-      ${left<0
-        ? `<div style="margin-top:10px;padding:9px 12px;border:2px solid #c00;border-radius:8px;background:#fff0f0;color:#c00;font-weight:800;font-size:15px">שולם/נוכה יותר ממה שהרוויח: −₪${Math.abs(left).toFixed(0)}</div>`
-        : `<div><b>נותר לתשלום:</b> ₪${left.toFixed(0)}</div>`}
-    </div>
-    <div class="pr-foot">דוח פנימי לשימושך · הנתונים מבוססים על החתמות בפועל</div>
-  </div>`;
-}
 
 // ---------- PDF (הדפסה) ----------
 function exportPayrollAccountant(){ const D=payReportData(); if(!D) return; $("printArea").innerHTML=accountantReportHtml(D); setTimeout(()=>window.print(), 100); }
-function exportPayrollInternal(){ const D=payReportData(); if(!D) return; $("printArea").innerHTML=internalReportHtml(D); setTimeout(()=>window.print(), 100); }
 
 // ---------- תמונה (ברירת מחדל) ----------
 function imagePayrollAccountant(){ const D=payReportData(); if(!D) return; reportToImage(accountantReportHtml(D), "דוח לרואה החשבון - "+D.e.name); }
-function imagePayrollInternal(){ const D=payReportData(); if(!D) return; reportToImage(internalReportHtml(D), "דוח פנימי - "+D.e.name); }
 
 // טוען את ספריית יצירת התמונה (html2canvas) פעם אחת, רק כשצריך
 let _h2cPromise=null;
