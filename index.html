@@ -142,6 +142,14 @@
   .folder.alert .f-ico{background:var(--danger);color:#fff}
   .folder.alert .f-title{color:var(--danger)}
   .folder.alert .f-sub{color:var(--danger);font-weight:800}
+  /* חריגת 25% מהשכר (מקסימום לניכוי לפי החוק) — אדום בוהק */
+  .folder.over-limit{border:2px solid #dc2626;background:#fef2f2;box-shadow:0 0 0 3px rgba(220,38,38,.12)}
+  .folder.over-limit .f-ico{background:#dc2626;color:#fff}
+  .folder.over-limit .f-title{color:#991b1b}
+  .folder.over-limit .f-sub{color:#dc2626;font-weight:800}
+  .limit-dot{display:inline-block;font-size:10px;font-weight:800;color:#fff;background:#dc2626;border-radius:999px;padding:2px 8px;margin-inline-start:6px;vertical-align:middle}
+  .hk-limit{background:#fee2e2;border:2px solid #dc2626;color:#991b1b;border-radius:10px;padding:10px 12px;font-weight:800;font-size:13px;line-height:1.45;margin:8px 0;display:flex;gap:8px;align-items:flex-start}
+  .hk-limit .hl-ico{font-size:16px;flex:0 0 auto}
   .screen-head{display:flex;align-items:center;gap:12px;margin-bottom:18px}
   .back-btn{
     border:1px solid var(--line);background:#fff;color:var(--ink);
@@ -456,7 +464,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v19</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v22</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -481,7 +489,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v19</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v22</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -1787,6 +1795,19 @@ function takingsListFor(empId, monthKey){
 function takingsSumFor(empId, monthKey){
   return takingsListFor(empId, monthKey).reduce((a,t)=>a+(Number(t.price)||0),0);
 }
+// ברוטו של עובד לחודש מסוים (שעות × תעריף)
+function empGrossForMonth(empId, monthKey){
+  const e=employees[empId]; const rate=e?e.hourlyRate||0:0;
+  let g=0; payShiftsFor(empId, monthKey).forEach(s=>{ g+=hoursBetween(s.clockIn,s.clockOut)*rate; });
+  return g;
+}
+// בדיקת חריגה מ-25% מהשכר (המקסימום לניכוי לפי החוק) לחודש מסוים
+function hakafaLimitInfo(empId, monthKey){
+  const sum=takingsSumFor(empId, monthKey);
+  const gross=empGrossForMonth(empId, monthKey);
+  const limit=gross*0.25;
+  return { sum, gross, limit, over: gross>0 && sum>limit };
+}
 
 /* ---------- הקפה לעובדים (צד המנהל / קונסולה) ---------- */
 let hkConsoleView="list";   // 'list' | 'detail'
@@ -1834,17 +1855,21 @@ function empHasNewTakings(empId){ return empNewTakingsCount(empId) > 0; }
 function renderHakafaBadge(){
   const btn=$("hakafaFolderBtn"), badge=$("hakafaBadge"), sub=$("hakafaFolderSub");
   const n=takingsNewCount();
-  let emps=0;
-  Object.keys(allTakings||{}).forEach(empId=>{ if(empHasNewTakings(empId)) emps++; });
+  let emps=0, overEmps=0;
+  Object.keys(allTakings||{}).forEach(empId=>{
+    if(empHasNewTakings(empId)) emps++;
+    if(hakafaLimitInfo(empId, currentMonthKey()).over) overEmps++;
+  });
+  if(btn){ btn.classList.toggle("over-limit", overEmps>0); btn.classList.toggle("alert", overEmps===0 && n>0); }
   if(badge){
-    badge.textContent = n>0 ? (n+" חדש") : "חדש";
-    badge.classList.toggle("hidden", n===0);
+    if(overEmps>0){ badge.textContent="⚠️ עבר 25%"; badge.classList.remove("hidden"); }
+    else if(n>0){ badge.textContent=n+" חדש"; badge.classList.remove("hidden"); }
+    else { badge.classList.add("hidden"); }
   }
-  if(btn) btn.classList.toggle("alert", n>0);
   if(sub){
-    sub.textContent = n>0
-      ? `${n} ${n===1?'פריט חדש':'פריטים חדשים'}${emps>1?` מ-${emps} עובדים`:''} — כדאי להיכנס למעקב`
-      : "מה שעובדים לקחו מהחנות";
+    if(overEmps>0) sub.textContent = `⚠️ ${overEmps} ${overEmps===1?'עובד עבר':'עובדים עברו'} 25% מהשכר החודש — המקסימום לניכוי לפי החוק`;
+    else if(n>0) sub.textContent = `${n} ${n===1?'פריט חדש':'פריטים חדשים'}${emps>1?` מ-${emps} עובדים`:''} — כדאי להיכנס למעקב`;
+    else sub.textContent = "מה שעובדים לקחו מהחנות";
   }
 }
 
@@ -1862,13 +1887,13 @@ function renderHakafaConsole(){
       const items=Object.keys(m).map(id=>m[id]).filter(t=> t && t.createdAt && t.createdAt>=cutoff);
       const sum=items.reduce((a,t)=>a+(Number(t.price)||0),0);
       const e=employees[empId];
-      return { empId, name: e?e.name:"(עובד שנמחק)", count:items.length, sum, newCount: empNewTakingsCount(empId) };
+      return { empId, name: e?e.name:"(עובד שנמחק)", count:items.length, sum, newCount: empNewTakingsCount(empId), curOver: hakafaLimitInfo(empId, currentMonthKey()).over };
     }).filter(r=> r.count>0)
-      .sort((a,b)=> ((b.newCount>0?1:0)-(a.newCount>0?1:0)) || (b.sum-a.sum));
+      .sort((a,b)=> ((b.curOver?1:0)-(a.curOver?1:0)) || ((b.newCount>0?1:0)-(a.newCount>0?1:0)) || (b.sum-a.sum));
     $("hkEmpFolders").innerHTML = rows.length ? rows.map(r=>`
-      <button class="folder${r.newCount>0?' alert':''}" onclick="openHkEmp('${r.empId}')">
+      <button class="folder${r.curOver?' over-limit':(r.newCount>0?' alert':'')}" onclick="openHkEmp('${r.empId}')">
         <span class="f-ico">🧾</span>
-        <span class="f-txt"><span class="f-title">${esc(r.name)} ${r.newCount>0?`<span class="note-dot">${r.newCount} חדש</span>`:''}</span><span class="f-sub">${r.count} פריטים · סה"כ ₪${r.sum.toFixed(0)}${r.newCount>0?' · יש חדש לבדיקה':''}</span></span>
+        <span class="f-txt"><span class="f-title">${esc(r.name)} ${r.curOver?'<span class="limit-dot">⚠️ עבר 25%</span>':''}${r.newCount>0?`<span class="note-dot">${r.newCount} חדש</span>`:''}</span><span class="f-sub">${r.count} פריטים · סה"כ ₪${r.sum.toFixed(0)}${r.curOver?' · עבר 25% מהשכר החודש':(r.newCount>0?' · יש חדש לבדיקה':'')}</span></span>
         <span class="f-arr">→</span>
       </button>`).join("") : '<div class="empty">עדיין אין רשומות הקפה.</div>';
   } else {
@@ -1889,8 +1914,11 @@ function renderHakafaConsole(){
         <div class="hk-price">₪${(Number(t.price)||0).toFixed(0)}</div>
         <div class="hk-acts"><button class="btn line sm" onclick="editHakafa('${hkConsoleEmpId}','${t.id}')">✏️</button><button class="btn line sm" onclick="delHakafa('${hkConsoleEmpId}','${t.id}')">🗑️</button></div>
       </div>`).join("");
+      const lim=hakafaLimitInfo(hkConsoleEmpId, k);
+      const limitBanner = lim.over ? `<div class="hk-limit"><span class="hl-ico">⚠️</span><span>ההקפה החודש (₪${lim.sum.toFixed(0)}) עברה 25% מהשכר (₪${lim.limit.toFixed(0)}) — זה המקסימום שמותר לנכות מהשכר החודש לפי החוק. את היתרה יש לדחות לחודש הבא.</span></div>` : '';
       return `<div class="hk-month">
         <div class="hk-month-head"><span>${monthLabel(k)}</span><span>סה"כ ₪${sum.toFixed(0)}</span></div>
+        ${limitBanner}
         ${rows}
       </div>`;
     }).join("") : '<div class="empty">אין רשומות לעובד זה.</div>';
@@ -2847,20 +2875,22 @@ function accountantReportHtml(D){
     <td>${r.inT}</td>
     <td>${r.outT}</td>
     <td class="num">${fmtHours(r.h)}</td>
-    <td class="num">₪${r.amt.toFixed(0)}</td>
   </tr>`).join("");
+  const debt = D.tkSum>0 ? `
+    <div class="pr-tot" style="margin-top:18px">
+      <div><b>ניכוי משכר — חוב העובד למעסיק (מוצרים שנלקחו):</b> ₪${D.tkSum.toFixed(0)}</div>
+    </div>` : '';
   return `<div class="pr-wrap">
-    <div class="pr-h1">דוח שעות לרואה החשבון — ${esc(D.e.name)}</div>
-    <div class="pr-meta">חודש: ${monthLabel(paySelMonthKey)}<br>תעריף לשעה: ₪${D.rate}<br>הופק בתאריך: ${D.genDate}</div>
+    <div class="pr-h1">דוח לרואה החשבון — ${esc(D.e.name)}</div>
+    <div class="pr-meta">חודש: ${monthLabel(paySelMonthKey)}<br>הופק בתאריך: ${D.genDate}</div>
+    <div style="margin:0 0 16px;padding:11px 16px;border:2px solid #000;border-radius:8px;display:inline-block;font-weight:800;font-size:17px">תעריף לשעה: ₪${D.rate}</div>
     <table class="pr-table">
-      <thead><tr><th>תאריך</th><th>יום</th><th>כניסה</th><th>יציאה</th><th>שעות</th><th>סכום ברוטו</th></tr></thead>
+      <thead><tr><th>תאריך</th><th>יום</th><th>כניסה</th><th>יציאה</th><th>שעות</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
-    <div class="pr-tot">
-      <div><b>סך שעות החודש:</b> ${fmtHours(D.totalH)}</div>
-      <div><b>סך ברוטו:</b> ₪${D.totalPay.toFixed(0)}</div>
-    </div>
-    <div class="pr-foot">הופק ממערכת שעון נוכחות · הנתונים מבוססים על החתמות בפועל · אומדן ברוטו — התלוש הרשמי הוא המקור הקובע</div>
+    <div class="pr-tot"><div><b>סך שעות החודש:</b> ${fmtHours(D.totalH)}</div></div>
+    ${debt}
+    <div class="pr-foot">הופק ממערכת שעון נוכחות · הנתונים מבוססים על החתמות בפועל · השעות לחישוב שכר; הניכוי הוא חוב העובד למעסיק</div>
   </div>`;
 }
 function internalReportHtml(D){
