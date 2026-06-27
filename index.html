@@ -159,6 +159,8 @@
   .form-status{font-size:11px;font-weight:800;border-radius:999px;padding:3px 9px;white-space:nowrap}
   .form-status.ok{color:var(--ok);background:var(--ok-bg)}
   .form-status.wait{color:var(--danger);background:#fff4ec}
+  .form-text{white-space:pre-wrap;line-height:1.7;font-size:14.5px}
+  .sig-canvas{width:100%;height:180px;border:2px dashed var(--line);border-radius:12px;background:#fff;touch-action:none;display:block}
   .screen-head{display:flex;align-items:center;gap:12px;margin-bottom:18px}
   .back-btn{
     border:1px solid var(--line);background:#fff;color:var(--ink);
@@ -473,7 +475,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v25</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v26</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -498,7 +500,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v25</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v26</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -887,6 +889,11 @@
           <span class="f-txt"><span class="f-title">הקפה</span><span class="f-sub">מה שלקחת מהחנות</span></span>
           <span class="f-arr">→</span>
         </button>
+        <button class="folder lg" id="formsEmpFolderBtn" onclick="openEmpNav('forms')">
+          <span class="f-ico">📋</span>
+          <span class="f-txt"><span class="f-title">טפסים לחתימה <span id="formsEmpDot" class="note-dot hidden">חדש</span></span><span class="f-sub" id="formsEmpSub">טפסים שצריך לקרוא ולחתום</span></span>
+          <span class="f-arr">→</span>
+        </button>
       </div>
     </div>
 
@@ -954,6 +961,34 @@
           <button class="btn line sm" onclick="hakafaFixInfo()">תיקון</button>
         </div>
         <div id="empHakafaBody"></div>
+      </div>
+    </div>
+
+    <!-- טפסים לחתימה -->
+    <div id="empForms" class="hidden">
+      <div class="screen-head"><button class="back-btn" onclick="empNavHome()">→ חזרה</button><h1 class="screen-title">📋 טפסים לחתימה</h1></div>
+      <!-- רשימה -->
+      <div id="empFormsList">
+        <div class="card">
+          <p class="sub">טפסים מהמנהל. קרא/י את הטופס במלואו, ואם את/ה מסכים/ה — חתום/חתמי באצבע.</p>
+          <div id="empFormsBody"></div>
+        </div>
+      </div>
+      <!-- חתימה -->
+      <div id="empFormsSign" class="hidden">
+        <div class="screen-head"><button class="back-btn" onclick="empFormBackToList()">→ חזרה</button><h1 class="screen-title" id="empSignTitle">📝 חתימה</h1></div>
+        <div class="card">
+          <div id="empSignBody" class="form-text"></div>
+        </div>
+        <div class="card">
+          <label class="fld">חתימה — חתום/חתמי באצבע בתוך המסגרת</label>
+          <canvas id="sigCanvas" class="sig-canvas"></canvas>
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button class="btn line" style="flex:1" onclick="clearSignature()">נקה</button>
+            <button class="btn" style="flex:2" onclick="submitSignature()">✓ אני מאשר/ת וחותם/ת</button>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5">בחתימה את/ה מאשר/ת שקראת והבנת את הטופס. לאחר החתימה לא ניתן לשנות.</div>
+        </div>
       </div>
     </div>
 
@@ -1792,19 +1827,95 @@ let myTakings={};        // הקפה: רשומות העובד הנוכחי (נט
 let allTakings={};       // הקפה: כל הרשומות (נטען רק אצל המנהל)
 let myPayments={};       // מקדמות/תשלומים: של העובד הנוכחי (נטען ב-enterEmployeeMode)
 let allPayments={};      // מקדמות/תשלומים: כל הרשומות (נטען רק אצל המנהל)
+let empFormView="list";  // תצוגת טפסים אצל העובד: 'list' | 'sign'
+let empSignFormId=null;  // הטופס שנמצא בחתימה כרגע
+let sigCtx=null, sigDrawing=false, sigHasInk=false, sigLast=null; // לוח החתימה
 
 function applyEmpDashNav(){
-  const map={home:"empHome",pay:"empPay",paymonth:"empPayMonth",upcoming:"empUpcoming",notes:"empNotes",hakafa:"empHakafa"};
+  const map={home:"empHome",pay:"empPay",paymonth:"empPayMonth",upcoming:"empUpcoming",notes:"empNotes",hakafa:"empHakafa",forms:"empForms"};
   Object.keys(map).forEach(k=>{ const el=$(map[k]); if(el) el.classList.toggle("hidden", empNav!==k); });
 }
 function empNavHome(){ empNav="home"; renderEmployeeDashboard(); try{window.scrollTo(0,0);}catch(e){} }
 function openEmpNav(name){
   empNav=name;
   if(name==="notes" && currentEmpId){ db.ref("employees/"+currentEmpId+"/notesSeenAt").set(TS); }
+  if(name==="forms"){ empFormView="list"; empSignFormId=null; }
   renderEmployeeDashboard();
   try{window.scrollTo(0,0);}catch(e){}
 }
 function openEmpMonth(key){ empNavMonth=key; empNav="paymonth"; renderEmployeeDashboard(); try{window.scrollTo(0,0);}catch(e){} }
+
+/* ---------- טפסים לחתימה (צד העובד) ---------- */
+function renderEmpForms(){
+  const listEl=$("empFormsList"), signEl=$("empFormsSign");
+  if(!listEl||!signEl) return;
+  listEl.classList.toggle("hidden", empFormView!=="list");
+  signEl.classList.toggle("hidden", empFormView!=="sign");
+  if(empFormView!=="list") return; // מסך החתימה כבר מוצג — לא לדרוס חתימה בתהליך
+  const fs=Object.keys(myForms||{}).map(id=>({id,...myForms[id]})).filter(f=>f)
+    .sort((a,b)=> ((a.status==="signed"?1:0)-(b.status==="signed"?1:0)) || (b.sentAt||0)-(a.sentAt||0));
+  $("empFormsBody").innerHTML = fs.length ? fs.map(f=>{
+    const signed=f.status==="signed";
+    return `<div class="form-row">
+      <div class="form-main">
+        <div class="form-title">${esc(f.title||"טופס")}</div>
+        <div class="form-meta">${signed?`נחתם ${f.signedAt?fmtDate(f.signedAt):''}`:'ממתין לחתימתך'}</div>
+      </div>
+      ${signed
+        ? `<span class="form-status ok">נחתם ✓</span>`
+        : `<button class="btn sm" onclick="openEmpForm('${f.id}')">קרא וחתום</button>`}
+    </div>`;
+  }).join("") : '<div class="empty">אין טפסים כרגע.</div>';
+}
+function openEmpForm(formId){
+  const f=myForms[formId]; if(!f) return;
+  if(f.status==="signed"){ toast("הטופס כבר נחתם"); return; }
+  empSignFormId=formId; empFormView="sign";
+  $("empFormsList").classList.add("hidden");
+  $("empFormsSign").classList.remove("hidden");
+  $("empSignTitle").textContent="📝 "+(f.title||"חתימה");
+  $("empSignBody").textContent=f.body||"";
+  requestAnimationFrame(()=>{ initSignaturePad(); });
+  try{window.scrollTo(0,0);}catch(e){}
+}
+function empFormBackToList(){ empFormView="list"; empSignFormId=null; renderEmployeeDashboard(); try{window.scrollTo(0,0);}catch(e){} }
+
+function initSignaturePad(){
+  const c=$("sigCanvas"); if(!c) return;
+  const rect=c.getBoundingClientRect();
+  const w=rect.width||300, h=rect.height||180;
+  const dpr=window.devicePixelRatio||1;
+  c.width=Math.round(w*dpr); c.height=Math.round(h*dpr);
+  sigCtx=c.getContext("2d");
+  sigCtx.scale(dpr,dpr);
+  sigCtx.fillStyle="#fff"; sigCtx.fillRect(0,0,w,h);
+  sigCtx.lineWidth=2.6; sigCtx.lineCap="round"; sigCtx.lineJoin="round"; sigCtx.strokeStyle="#111";
+  sigHasInk=false; sigDrawing=false;
+  const pos=(e)=>{ const r=c.getBoundingClientRect(); const t=(e.touches&&e.touches[0])?e.touches[0]:e; return {x:t.clientX-r.left, y:t.clientY-r.top}; };
+  const start=(e)=>{ e.preventDefault(); sigDrawing=true; sigLast=pos(e); };
+  const move=(e)=>{ if(!sigDrawing) return; e.preventDefault(); const p=pos(e); sigCtx.beginPath(); sigCtx.moveTo(sigLast.x,sigLast.y); sigCtx.lineTo(p.x,p.y); sigCtx.stroke(); sigLast=p; sigHasInk=true; };
+  const end=()=>{ sigDrawing=false; };
+  c.ontouchstart=start; c.ontouchmove=move; c.ontouchend=end;
+  c.onmousedown=start; c.onmousemove=move; c.onmouseup=end; c.onmouseleave=end;
+}
+function clearSignature(){
+  const c=$("sigCanvas"); if(!c||!sigCtx) return;
+  const r=c.getBoundingClientRect();
+  sigCtx.fillStyle="#fff"; sigCtx.fillRect(0,0,r.width||300,r.height||180);
+  sigHasInk=false;
+}
+async function submitSignature(){
+  if(!sigHasInk){ toast("נא לחתום קודם בתוך המסגרת"); return; }
+  const c=$("sigCanvas"); if(!c) return;
+  let dataUrl=""; try{ dataUrl=c.toDataURL("image/png"); }catch(err){ toast("שגיאה בקריאת החתימה"); return; }
+  const e=employees[currentEmpId];
+  const ok=await uiConfirm("לאשר ולחתום על הטופס? לאחר החתימה לא ניתן לשנות.", {okText:"מאשר וחותם"});
+  if(!ok) return;
+  db.ref("forms/"+currentEmpId+"/"+empSignFormId).update({
+    status:"signed", signedAt:TS, signatureDataUrl:dataUrl, signerName:(e?e.name:"")
+  }).then(()=>{ toast("נחתם בהצלחה ✓"); empFormView="list"; empSignFormId=null; renderEmployeeDashboard(); })
+    .catch(()=>toast("השמירה נכשלה"));
+}
 
 /* ---------- הקפה לעובדים (צד העובד) ---------- */
 function toggleHakafaForm(show){
@@ -2231,6 +2342,14 @@ function renderEmployeeDashboard(){
       ${monPayList.length?`<div class="card" style="margin-top:12px"><div class="section-title" style="margin:0 0 8px">תשלומים שקיבלת החודש</div>${monPayRows}</div>`:''}
       ${netSummaryHtml(t.totalPay, employees[currentEmpId], monthRefDate(empNavMonth))}` : '';
   }
+
+  // --- טפסים לחתימה: חיווי "חדש" + רינדור הרשימה ---
+  const pendForms = Object.values(myForms||{}).filter(f=> f && f.status!=="signed").length;
+  const fDot=$("formsEmpDot");
+  if(fDot){ fDot.textContent = pendForms>1 ? (pendForms+" חדש") : "חדש"; fDot.classList.toggle("hidden", pendForms===0); }
+  const fBtn=$("formsEmpFolderBtn"); if(fBtn) fBtn.classList.toggle("alert", pendForms>0);
+  const fSub=$("formsEmpSub"); if(fSub) fSub.textContent = pendForms>0 ? "יש טופס שמחכה לחתימתך — כנס/י לחתום" : "טפסים שצריך לקרוא ולחתום";
+  renderEmpForms();
 
   applyEmpDashNav();
 }
