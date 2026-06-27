@@ -475,7 +475,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v26</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v27</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -500,7 +500,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v26</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v27</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -1862,7 +1862,7 @@ function renderEmpForms(){
         <div class="form-meta">${signed?`נחתם ${f.signedAt?fmtDate(f.signedAt):''}`:'ממתין לחתימתך'}</div>
       </div>
       ${signed
-        ? `<span class="form-status ok">נחתם ✓</span>`
+        ? `<span class="form-status ok">נחתם ✓</span><button class="btn line sm" onclick="imageSignedForm('${currentEmpId}','${f.id}')">📷 שמור</button>`
         : `<button class="btn sm" onclick="openEmpForm('${f.id}')">קרא וחתום</button>`}
     </div>`;
   }).join("") : '<div class="empty">אין טפסים כרגע.</div>';
@@ -2070,13 +2070,19 @@ function renderFormsConsole(){
       .filter(f=>f).sort((a,b)=>(b.sentAt||0)-(a.sentAt||0));
     $("formsDetailBody").innerHTML = fs.length ? fs.map(f=>{
       const signed = f.status==="signed";
-      return `<div class="form-row">
-        <div class="form-main">
-          <div class="form-title">${esc(f.title||"טופס")}</div>
-          <div class="form-meta">נשלח ${f.sentAt?fmtDate(f.sentAt):''}${signed?` · נחתם ${f.signedAt?fmtDate(f.signedAt):''}`:''}</div>
+      return `<div class="form-item">
+        <div class="form-row" style="border-bottom:none;padding-bottom:4px">
+          <div class="form-main">
+            <div class="form-title">${esc(f.title||"טופס")}</div>
+            <div class="form-meta">נשלח ${f.sentAt?fmtDate(f.sentAt):''}${signed?` · נחתם ${f.signedAt?fmtDate(f.signedAt):''}`:''}</div>
+          </div>
+          <span class="form-status ${signed?'ok':'wait'}">${signed?'נחתם ✓':'ממתין לחתימה'}</span>
         </div>
-        <span class="form-status ${signed?'ok':'wait'}">${signed?'נחתם ✓':'ממתין לחתימה'}</span>
-        <button class="btn line sm" onclick="delForm('${formsConsoleEmpId}','${f.id}')">🗑️</button>
+        <div style="display:flex;gap:6px;padding:0 0 12px;border-bottom:1px solid var(--line);flex-wrap:wrap">
+          ${signed?`<button class="btn sm" onclick="imageSignedForm('${formsConsoleEmpId}','${f.id}')">📷 תמונה</button>
+            <button class="btn line sm" onclick="pdfSignedForm('${formsConsoleEmpId}','${f.id}')">📄 PDF</button>`:''}
+          <button class="btn line sm" onclick="delForm('${formsConsoleEmpId}','${f.id}')">🗑️ מחק</button>
+        </div>
       </div>`;
     }).join("") : '<div class="empty">עדיין לא נשלחו טפסים לעובד זה.</div>';
   }
@@ -3280,6 +3286,37 @@ async function reportToImage(html, filename){
       setTimeout(()=>URL.revokeObjectURL(url), 4000);
     }
   }, "image/png");
+}
+
+/* ---------- ייצוא טופס חתום (תמונה / PDF) ---------- */
+function signedFormHtml(empId, formId){
+  let f = (allForms[empId]||{})[formId];
+  if(!f && currentRole==="employee" && empId===currentEmpId) f=(myForms||{})[formId];
+  if(!f) return '';
+  const e=employees[empId];
+  const name=(e&&e.name)||f.signerName||"";
+  const sig = f.signatureDataUrl ? `<img src="${f.signatureDataUrl}" style="max-width:320px;max-height:130px;display:block;margin-top:6px;border:1px solid #ccc;border-radius:6px;background:#fff"/>` : '<div style="color:#888">— ללא חתימה —</div>';
+  return `<div class="pr-wrap">
+    <div class="pr-h1">${esc(f.title||"טופס")}</div>
+    <div class="pr-meta">שם העובד: ${esc(name)}<br>נשלח: ${f.sentAt?fmtDate(f.sentAt):'—'} · נחתם: ${f.signedAt?fmtDate(f.signedAt):'—'}</div>
+    <div class="form-text" style="margin:16px 0;line-height:1.75;font-size:14px">${esc(f.body||"")}</div>
+    <div style="margin-top:20px;font-weight:800;font-size:14px">חתימת העובד:</div>
+    ${sig}
+    <div style="margin-top:6px;font-size:13px;font-weight:700">${esc(name)}${f.signedAt?` · נחתם בתאריך ${fmtDate(f.signedAt)}`:''}</div>
+    <div class="pr-foot">נחתם דיגיטלית במערכת שעון נוכחות · החתימה, השם והתאריך נשמרו אוטומטית במועד החתימה</div>
+  </div>`;
+}
+function imageSignedForm(empId, formId){
+  const html=signedFormHtml(empId, formId);
+  if(!html){ toast("הטופס לא נמצא"); return; }
+  const e=employees[empId];
+  reportToImage(html, "טופס_חתום_"+((e&&e.name)||"עובד"));
+}
+function pdfSignedForm(empId, formId){
+  const html=signedFormHtml(empId, formId);
+  if(!html){ toast("הטופס לא נמצא"); return; }
+  $("printArea").innerHTML=html;
+  setTimeout(()=>window.print(), 100);
 }
 
 /* ============================================================
