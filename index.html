@@ -482,7 +482,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v32</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v33</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -507,7 +507,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v32</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v33</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -562,6 +562,11 @@
         <button class="folder" id="formsFolderBtn" onclick="openFolder('forms')">
           <span class="f-ico">📋</span>
           <span class="f-txt"><span class="f-title">טפסים לעובדים <span id="formsBadge" class="note-dot hidden">חדש</span></span><span class="f-sub" id="formsFolderSub">שליחת טפסים לחתימה (כמו הסכמה להקפה)</span></span>
+          <span class="f-arr">→</span>
+        </button>
+        <button class="folder" id="payslipsFolderBtn" onclick="openFolder('payslips')">
+          <span class="f-ico">📄</span>
+          <span class="f-txt"><span class="f-title">תלושי שכר</span><span class="f-sub" id="payslipsFolderSub">העלאת תלוש חודשי לכל עובד</span></span>
           <span class="f-arr">→</span>
         </button>
       </div>
@@ -841,6 +846,30 @@
         </div>
         <div class="card">
           <div id="formsDetailBody"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- מסך: תלושי שכר -->
+    <div id="screen-payslips" class="screen hidden">
+      <div class="screen-head"><button class="back-btn" onclick="backToHome()">→ חזרה</button><h1 class="screen-title">📄 תלושי שכר</h1></div>
+
+      <!-- רשימת עובדים -->
+      <div id="payslipsConsoleList">
+        <div class="card">
+          <p class="sub">העלאת תלוש שכר חודשי (PDF או תמונה) לכל עובד. נשמרים 12 החודשים האחרונים. בחר עובד.</p>
+          <div id="payslipsEmpFolders"></div>
+        </div>
+      </div>
+
+      <!-- תלושים של עובד -->
+      <div id="payslipsConsoleDetail" class="hidden">
+        <div class="screen-head"><button class="back-btn" onclick="payslipsBackToList()">→ חזרה לרשימה</button><h1 class="screen-title" id="payslipsDetailTitle">📄</h1></div>
+        <div class="card">
+          <button class="btn" style="width:100%" onclick="openPayslipUpload(payslipsConsoleEmpId)">➕ העלה תלוש</button>
+        </div>
+        <div class="card">
+          <div id="payslipsDetailBody"></div>
         </div>
       </div>
     </div>
@@ -1222,6 +1251,23 @@
   </div>
 </div>
 
+<!-- ============================ מודאל העלאת תלוש שכר ============================ -->
+<div id="payslipModal" class="modal-bg">
+  <div class="modal">
+    <h3>העלאת תלוש שכר</h3>
+    <p class="who" id="payslipModalWho"></p>
+    <label class="fld">חודש התלוש</label>
+    <select id="payslipMonth"></select>
+    <label class="fld" style="margin-top:12px">קובץ התלוש (PDF או תמונה)</label>
+    <input type="file" id="payslipFile" accept="application/pdf,image/*" onchange="payslipFilePicked()">
+    <div id="payslipFileInfo" class="sub" style="margin-top:8px;line-height:1.5">תמונות יוקטנו אוטומטית. PDF — עד 2MB.</div>
+    <div class="modal-actions">
+      <button class="btn line" onclick="closeModal('payslipModal')">ביטול</button>
+      <button class="btn" id="payslipUploadBtn" onclick="doUploadPayslip()">העלה</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============================ מסך הצלחה אחרי החתמה (טרמינל) ============================ -->
 <div id="clockSuccess" class="success-screen" onclick="hideClockSuccess()">
   <div class="success-card" id="clockSuccessCard"></div>
@@ -1591,6 +1637,7 @@ function enterEmployeeMode(user){
     db.ref("takings/"+id).on("value", snap=>{ myTakings = snap.val()||{}; if(currentRole==="employee") renderEmployeeDashboard(); });
     db.ref("payments/"+id).on("value", snap=>{ myPayments = snap.val()||{}; if(currentRole==="employee") renderEmployeeDashboard(); });
     db.ref("forms/"+id).on("value", snap=>{ myForms = snap.val()||{}; if(currentRole==="employee") renderEmployeeDashboard(); });
+    db.ref("payslips/"+id).on("value", snap=>{ myPayslips = snap.val()||{}; if(currentRole==="employee") renderEmployeeDashboard(); });
     $("authScreen").classList.add("hidden");
     $("app").classList.add("hidden");
     $("empApp").classList.remove("hidden");
@@ -1619,6 +1666,7 @@ function startDataListeners(){
     db.ref("takings").on("value", snap=>{ allTakings = snap.val()||{}; renderActive(); });
     db.ref("payments").on("value", snap=>{ allPayments = snap.val()||{}; renderActive(); });
     db.ref("forms").on("value", snap=>{ allForms = snap.val()||{}; renderActive(); });
+    db.ref("payslips").on("value", snap=>{ allPayslips = snap.val()||{}; renderActive(); });
     db.ref("config/takingsSeenAt").on("value", snap=>{ const v=snap.val(); takingsSeen=(v && typeof v==='object')?v:{}; renderActive(); });
   }
 }
@@ -1685,7 +1733,7 @@ function chooseDevice(m){
 }
 
 /* ---------- ניווט תיקיות בקונסולה ---------- */
-const CONSOLE_SCREENS=["overview","employees","pay","schedule","settings","hakafa","forms"];
+const CONSOLE_SCREENS=["overview","employees","pay","schedule","settings","hakafa","forms","payslips"];
 function openFolder(name){
   consoleFolder=name;
   if(name==="pay"){ payView="list"; paySubEmpId=null; }
@@ -1694,6 +1742,7 @@ function openFolder(name){
   if(name==="settings"){ const m=$("settings-main"), t=$("settings-tax"); if(m) m.classList.remove("hidden"); if(t) t.classList.add("hidden"); }
   if(name==="hakafa"){ hkConsoleView="list"; hkConsoleEmpId=null; }
   if(name==="forms"){ formsConsoleView="list"; formsConsoleEmpId=null; }
+  if(name==="payslips"){ payslipsConsoleView="list"; payslipsConsoleEmpId=null; }
   applyConsoleNav();
   renderConsole();
   try{window.scrollTo(0,0);}catch(e){}
@@ -2045,6 +2094,13 @@ let formsConsoleView="list";  // 'list' | 'detail'
 let formsConsoleEmpId=null;
 let allForms={};   // טפסים: כל הרשומות (נטען אצל המנהל)
 let myForms={};    // טפסים: של העובד הנוכחי (נטען ב-enterEmployeeMode)
+
+/* ---------- תלושי שכר ---------- */
+let payslipsConsoleView="list";  // 'list' | 'detail'
+let payslipsConsoleEmpId=null;
+let payslipUploadEmpId=null;      // העובד שמעלים לו תלוש כרגע
+let allPayslips={};  // מטא-דאטה של כל התלושים (מנהל) — בלי הקובץ עצמו
+let myPayslips={};   // מטא-דאטה של תלושי העובד הנוכחי
 const CONSENT_HAKAFA_TITLE = "הסכמה לניכוי משכר עבור מוצרים שנלקחו (הקפה)";
 const CONSENT_HAKAFA_BODY = `אני, החתום/ה מטה, מסכים/ה בזאת כי המעסיק ינכה משכרי את שווי המוצרים והקניות שאקח מהחנות לצריכה אישית ("הקפה"), בהתאם לרישום שמתבצע באפליקציה.
 
@@ -2129,6 +2185,166 @@ function renderFormsConsole(){
         </div>
       </div>`;
     }).join("") : '<div class="empty">עדיין לא נשלחו טפסים לעובד זה.</div>';
+  }
+}
+
+/* ---------- תלושי שכר: צד המנהל ---------- */
+function last12MonthKeys(){
+  const keys=[]; const now=new Date();
+  for(let i=0;i<12;i++){ const d=new Date(now.getFullYear(), now.getMonth()-i, 1); keys.push(monthKeyOf(d.getTime())); }
+  return keys;
+}
+function openPayslipEmp(empId){ payslipsConsoleEmpId=empId; payslipsConsoleView="detail"; renderPayslipsConsole(); try{window.scrollTo(0,0);}catch(e){} }
+function payslipsBackToList(){ payslipsConsoleView="list"; payslipsConsoleEmpId=null; renderPayslipsConsole(); try{window.scrollTo(0,0);}catch(e){} }
+
+function openPayslipUpload(empId){
+  const e=employees[empId]; if(!e) return;
+  payslipUploadEmpId=empId;
+  $("payslipModalWho").textContent=e.name;
+  const sel=$("payslipMonth");
+  const keys=last12MonthKeys();
+  sel.innerHTML=keys.map(k=>`<option value="${k}">${monthLabel(k)}</option>`).join("");
+  sel.value = keys[1] || keys[0]; // ברירת מחדל: החודש הקודם
+  $("payslipFile").value="";
+  $("payslipFileInfo").textContent="תמונות יוקטנו אוטומטית. PDF — עד 2MB.";
+  $("payslipUploadBtn").disabled=false; $("payslipUploadBtn").textContent="העלה";
+  openModal("payslipModal");
+}
+function payslipFilePicked(){
+  const f=$("payslipFile").files && $("payslipFile").files[0];
+  if(!f){ $("payslipFileInfo").textContent="תמונות יוקטנו אוטומטית. PDF — עד 2MB."; return; }
+  const kb=Math.round(f.size/1024);
+  $("payslipFileInfo").textContent = `${esc(f.name)} · ${kb>1024?(kb/1024).toFixed(1)+'MB':kb+'KB'}`;
+}
+// הקטנת תמונה דרך canvas
+function compressImageFile(file, maxDim, quality){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>{
+      const img=new Image();
+      img.onload=()=>{
+        let w=img.width, h=img.height;
+        if(w>maxDim || h>maxDim){ const r=Math.min(maxDim/w, maxDim/h); w=Math.round(w*r); h=Math.round(h*r); }
+        const c=document.createElement("canvas"); c.width=w; c.height=h;
+        const ctx=c.getContext("2d"); ctx.fillStyle="#fff"; ctx.fillRect(0,0,w,h); ctx.drawImage(img,0,0,w,h);
+        resolve(c.toDataURL("image/jpeg", quality));
+      };
+      img.onerror=()=>reject(new Error("img")); img.src=reader.result;
+    };
+    reader.onerror=()=>reject(new Error("read")); reader.readAsDataURL(file);
+  });
+}
+function readFileAsDataUrl(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(reader.result);
+    reader.onerror=()=>reject(new Error("read")); reader.readAsDataURL(file);
+  });
+}
+async function doUploadPayslip(){
+  const empId=payslipUploadEmpId; if(!empId || !employees[empId]) return;
+  const f=$("payslipFile").files && $("payslipFile").files[0];
+  if(!f){ toast("יש לבחור קובץ תלוש"); return; }
+  const monthKey=$("payslipMonth").value;
+  const isImage=(f.type||"").indexOf("image/")===0;
+  const isPdf=(f.type||"")==="application/pdf";
+  if(!isImage && !isPdf){ toast("יש להעלות קובץ PDF או תמונה בלבד"); return; }
+  const btn=$("payslipUploadBtn"); btn.disabled=true; btn.textContent="מעלה…";
+  try{
+    let dataUrl, fileType;
+    if(isImage){ dataUrl=await compressImageFile(f, 1500, 0.8); fileType="image"; }
+    else {
+      dataUrl=await readFileAsDataUrl(f); fileType="pdf";
+      if(dataUrl.length > 2.8*1024*1024){ toast("קובץ ה-PDF גדול מדי (עד ~2MB). בקש מהרו\"ח קובץ קטן יותר"); btn.disabled=false; btn.textContent="העלה"; return; }
+    }
+    const ref=db.ref("payslips/"+empId).push();
+    await db.ref("payslipFiles/"+empId+"/"+ref.key).set({ data:dataUrl });
+    await ref.set({ monthKey, fileType, fileName:(f.name||""), uploadedAt:TS, acknowledgedAt:null });
+    prunePayslips(empId);
+    closeModal("payslipModal");
+    toast("התלוש הועלה ✓");
+  }catch(e){ toast("ההעלאה נכשלה — נסה שוב"); }
+  btn.disabled=false; btn.textContent="העלה";
+}
+// שמירה של 12 תלושים אחרונים בלבד — ישנים יותר נמחקים (מטא + קובץ)
+function prunePayslips(empId){
+  const slips=allPayslips[empId]||{};
+  const arr=Object.keys(slips).map(id=>({id,...slips[id]})).sort((a,b)=>(b.uploadedAt||0)-(a.uploadedAt||0));
+  if(arr.length<=12) return;
+  arr.slice(12).forEach(s=>{ db.ref("payslips/"+empId+"/"+s.id).remove(); db.ref("payslipFiles/"+empId+"/"+s.id).remove(); });
+}
+async function delPayslip(empId, slipId){
+  const ok=await uiConfirm("למחוק את התלוש הזה?", {okText:"מחק", danger:true, title:"מחיקת תלוש"});
+  if(!ok) return;
+  db.ref("payslips/"+empId+"/"+slipId).remove();
+  db.ref("payslipFiles/"+empId+"/"+slipId).remove();
+  toast("נמחק ✓");
+}
+function dataUrlToBlob(dataUrl){
+  const parts=dataUrl.split(","); const mime=((parts[0]||"").match(/:(.*?);/)||[])[1]||"application/octet-stream";
+  const bin=atob(parts[1]||""); const len=bin.length; const arr=new Uint8Array(len);
+  for(let i=0;i<len;i++) arr[i]=bin.charCodeAt(i);
+  return new Blob([arr], {type:mime});
+}
+// פותח/משתף את התלוש — טוען את הקובץ הכבד רק עכשיו (לפי דרישה)
+async function viewPayslip(empId, slipId, meta){
+  toast("פותח תלוש…");
+  let snap; try{ snap=await db.ref("payslipFiles/"+empId+"/"+slipId+"/data").once("value"); }
+  catch(e){ toast("שגיאה בטעינת הקובץ"); return; }
+  const dataUrl=snap.val();
+  if(!dataUrl){ toast("הקובץ לא נמצא"); return; }
+  let blob; try{ blob=dataUrlToBlob(dataUrl); }catch(e){ toast("שגיאה בקריאת הקובץ"); return; }
+  const ext=(meta && meta.fileType==="pdf")?"pdf":"jpg";
+  const fname="תלוש_"+((meta&&meta.monthKey)||"")+"."+ext;
+  const file=new File([blob], fname, {type:blob.type});
+  if(navigator.canShare && navigator.canShare({files:[file]})){
+    try{ await navigator.share({files:[file], title:fname}); return; }
+    catch(e){ if(e && e.name==="AbortError") return; }
+  }
+  try{ const url=URL.createObjectURL(blob); window.open(url,"_blank"); setTimeout(()=>URL.revokeObjectURL(url), 30000); }
+  catch(e){ toast("לא ניתן לפתוח את הקובץ"); }
+}
+
+function renderPayslipsConsole(){
+  const listEl=$("payslipsConsoleList"), detEl=$("payslipsConsoleDetail");
+  if(!listEl || !detEl) return;
+  listEl.classList.toggle("hidden", payslipsConsoleView!=="list");
+  detEl.classList.toggle("hidden", payslipsConsoleView!=="detail");
+  if(payslipsConsoleView==="list"){
+    const rows=Object.keys(employees).map(empId=>{
+      const e=employees[empId]; if(!e || e.active===false) return null;
+      const slips=Object.values(allPayslips[empId]||{}).filter(s=>s);
+      const total=slips.length;
+      const pend=slips.filter(s=>!s.acknowledgedAt).length;
+      return { empId, name:e.name, total, pend };
+    }).filter(Boolean).sort((a,b)=> (a.name||"").localeCompare(b.name||"","he"));
+    $("payslipsEmpFolders").innerHTML = rows.length ? rows.map(r=>`
+      <button class="folder" onclick="openPayslipEmp('${r.empId}')">
+        <span class="f-ico">📄</span>
+        <span class="f-txt"><span class="f-title">${esc(r.name)}</span><span class="f-sub">${r.total>0?`${r.total} תלושים${r.pend>0?` · ${r.pend} טרם אושרו`:''}`:'אין תלושים — לחץ להעלאה'}</span></span>
+        <span class="f-arr">→</span>
+      </button>`).join("") : '<div class="empty">אין עובדים פעילים.</div>';
+  } else {
+    const e=employees[payslipsConsoleEmpId];
+    $("payslipsDetailTitle").textContent="📄 "+(e?e.name:"עובד");
+    const slips=Object.keys(allPayslips[payslipsConsoleEmpId]||{}).map(id=>({id,...allPayslips[payslipsConsoleEmpId][id]}))
+      .filter(s=>s).sort((a,b)=>(b.monthKey||"").localeCompare(a.monthKey||""));
+    $("payslipsDetailBody").innerHTML = slips.length ? slips.map(s=>{
+      const ack=!!s.acknowledgedAt;
+      return `<div class="form-item">
+        <div class="form-row" style="border-bottom:none;padding-bottom:4px">
+          <div class="form-main">
+            <div class="form-title">תלוש ${monthLabel(s.monthKey)} <span style="font-size:11px;color:var(--muted)">${s.fileType==="pdf"?"PDF":"תמונה"}</span></div>
+            <div class="form-meta">הועלה ${s.uploadedAt?fmtDate(s.uploadedAt):''}</div>
+          </div>
+          <span class="form-status ${ack?'ok':'wait'}">${ack?'אושר ✓':'טרם אושר'}</span>
+        </div>
+        <div style="display:flex;gap:6px;padding:0 0 12px;border-bottom:1px solid var(--line);flex-wrap:wrap">
+          <button class="btn sm" onclick='viewPayslip("${payslipsConsoleEmpId}","${s.id}",${JSON.stringify({fileType:s.fileType,monthKey:s.monthKey})})'>👁️ צפה</button>
+          <button class="btn line sm" onclick="delPayslip('${payslipsConsoleEmpId}','${s.id}')">🗑️ מחק</button>
+        </div>
+      </div>`;
+    }).join("") : '<div class="empty">עדיין לא הועלו תלושים לעובד זה.</div>';
   }
 }
 
@@ -2672,6 +2888,7 @@ function renderConsole(){
   renderHakafaConsole();
   renderHakafaBadge();
   renderFormsConsole();
+  renderPayslipsConsole();
 }
 
 // חיווי "כמה במשמרת עכשיו" על אריח "סקירה" בתפריט הבית
