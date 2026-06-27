@@ -464,7 +464,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v23</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v24</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -489,7 +489,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v23</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v24</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -1959,8 +1959,9 @@ function renderHakafaConsole(){
 function empMonthTotals(monthKey){
   const e=employees[currentEmpId]; const rate=e?e.hourlyRate||0:0;
   const list=payShiftsFor(currentEmpId, monthKey);
-  let totalH=0, totalPay=0, paidPay=0;
-  list.forEach(s=>{ const h=hoursBetween(s.clockIn,s.clockOut); totalH+=h; totalPay+=h*rate; if(s.paid===true) paidPay+=h*rate; });
+  let totalH=0, totalPay=0;
+  list.forEach(s=>{ const h=hoursBetween(s.clockIn,s.clockOut); totalH+=h; totalPay+=h*rate; });
+  const paidPay=paymentsSumFor(currentEmpId, monthKey);
   return {list, totalH, totalPay, paidPay, remaining:totalPay-paidPay, rate};
 }
 
@@ -1989,19 +1990,21 @@ function renderEmployeeDashboard(){
   // --- בית: כרטיס "מגיע לך" לחודש הנוכחי ---
   const cur=empMonthTotals(currentMonthKey());
   const curTk=takingsSumFor(currentEmpId, currentMonthKey());
-  $("empOwedLabel").textContent=(curTk>0?"נטו אחרי הורדות · ":"מגיע לך · ")+monthLabel(currentMonthKey());
-  $("empOwed").textContent="₪"+(cur.remaining-curTk).toFixed(0);
-  $("empOwedSub").textContent = curTk>0
-    ? `${fmtHours(cur.totalH)} · נותר ₪${cur.remaining.toFixed(0)} − הורדות ₪${curTk.toFixed(0)}`
-    : `${fmtHours(cur.totalH)} · סך הכל ₪${cur.totalPay.toFixed(0)} · שולם ₪${cur.paidPay.toFixed(0)}`;
+  const curPaid=cur.paidPay;
+  const curLeft=cur.totalPay - curTk - curPaid;
+  $("empOwedLabel").textContent="מגיע לך · "+monthLabel(currentMonthKey());
+  $("empOwed").textContent="₪"+curLeft.toFixed(0);
+  $("empOwedSub").textContent = `${fmtHours(cur.totalH)} · ברוטו ₪${cur.totalPay.toFixed(0)}${curTk>0?` · הקפה −₪${curTk.toFixed(0)}`:''}${curPaid>0?` · שולם −₪${curPaid.toFixed(0)}`:''}`;
 
   // --- תיקיות חודשים (12 אחרונים) ---
   const months=monthsForEmp(currentEmpId).slice(0,12);
   $("empMonthFolders").innerHTML = months.map(k=>{
     const t=empMonthTotals(k);
+    const tk=takingsSumFor(currentEmpId, k);
+    const left=t.totalPay - tk - t.paidPay;
     return `<button class="folder" onclick="openEmpMonth('${k}')">
       <span class="f-ico">🗓️</span>
-      <span class="f-txt"><span class="f-title">${monthLabel(k)}</span><span class="f-sub">${fmtHours(t.totalH)} · מגיע ₪${t.remaining.toFixed(0)}</span></span>
+      <span class="f-txt"><span class="f-title">${monthLabel(k)}</span><span class="f-sub">${fmtHours(t.totalH)} · מגיע ₪${left.toFixed(0)}</span></span>
       <span class="f-arr">→</span>
     </button>`;
   }).join("") || '<div class="empty">אין נתונים עדיין.</div>';
@@ -2071,31 +2074,37 @@ function renderEmployeeDashboard(){
     if(!empNavMonth) empNavMonth=currentMonthKey();
     const t=empMonthTotals(empNavMonth);
     const monTk=takingsSumFor(currentEmpId, empNavMonth);
+    const monPaid=t.paidPay;
+    const monLeft=t.totalPay - monTk - monPaid;
+    const monPayList=paymentsListFor(currentEmpId, empNavMonth);
     $("empPayMonthTitle").textContent="💰 "+monthLabel(empNavMonth);
-    $("empMonthOwedLabel").textContent=(monTk>0?"נטו אחרי הורדות · ":"מגיע לך · ")+monthLabel(empNavMonth);
-    $("empMonthOwed").textContent="₪"+(t.remaining-monTk).toFixed(0);
-    $("empMonthOwedSub").textContent = monTk>0
-      ? `${fmtHours(t.totalH)} · נותר ₪${t.remaining.toFixed(0)} − הורדות ₪${monTk.toFixed(0)}`
-      : `${fmtHours(t.totalH)} · סך הכל ₪${t.totalPay.toFixed(0)} · שולם ₪${t.paidPay.toFixed(0)}`;
+    $("empMonthOwedLabel").textContent="מגיע לך · "+monthLabel(empNavMonth);
+    $("empMonthOwed").textContent="₪"+monLeft.toFixed(0);
+    $("empMonthOwedSub").textContent = `${fmtHours(t.totalH)} · ברוטו ₪${t.totalPay.toFixed(0)}${monTk>0?` · הקפה −₪${monTk.toFixed(0)}`:''}${monPaid>0?` · שולם −₪${monPaid.toFixed(0)}`:''}`;
     $("empShifts").innerHTML = t.list.length ? t.list.map(s=>{
-      const h=hoursBetween(s.clockIn,s.clockOut); const amt=h*t.rate; const isPaid=s.paid===true;
-      return `<div class="pay-line ${isPaid?'paid':''}">
+      const h=hoursBetween(s.clockIn,s.clockOut); const amt=h*t.rate;
+      return `<div class="pay-line">
         <div class="pl-main">
-          <div class="pl-date">${fmtDate(s.clockIn)} ${isPaid?'<span class="badge-paid">שולם ✓</span>':''}</div>
+          <div class="pl-date">${fmtDate(s.clockIn)}</div>
           <div class="pl-times">${fmtTime(s.clockIn)} ← ${fmtTime(s.clockOut)} · ${fmtHours(h)}</div>
         </div>
         <div class="pl-amt">₪${amt.toFixed(0)}</div>
       </div>`;
     }).join("") : `<div class="empty">אין משמרות סגורות ב${monthLabel(empNavMonth)}.</div>`;
+    const monPayRows = monPayList.length ? monPayList.map(p=>`<div class="hk-row">
+      <div class="hk-main"><div class="hk-name">₪${(Number(p.amount)||0).toFixed(0)}${p.note?` · ${esc(p.note)}`:''}</div><div class="hk-date">${fmtDate(p.createdAt)}</div></div>
+    </div>`).join("") : '';
     $("empSummary").innerHTML = t.list.length ? `
       <div class="pay-sum">
         <div class="ps-row"><span>סך שעות החודש</span><span>${fmtHours(t.totalH)}</span></div>
-        <div class="ps-row big"><span>סך הכל</span><span>₪${t.totalPay.toFixed(0)}</span></div>
-        <div class="ps-row"><span>שולם</span><span>₪${t.paidPay.toFixed(0)}</span></div>
-        <div class="ps-row big"><span>נותר לתשלום</span><span class="rem">₪${t.remaining.toFixed(0)}</span></div>
-        ${monTk>0?`<div class="ps-row"><span>הורדות (הקפה)</span><span>−₪${monTk.toFixed(0)}</span></div>
-        <div class="ps-row big"><span>נטו אחרי הורדות</span><span class="rem">₪${(t.remaining-monTk).toFixed(0)}</span></div>`:''}
+        <div class="ps-row big"><span>סך הכל (ברוטו)</span><span>₪${t.totalPay.toFixed(0)}</span></div>
+        ${monTk>0?`<div class="ps-row"><span>הורדות (הקפה)</span><span>−₪${monTk.toFixed(0)}</span></div>`:''}
+        <div class="ps-row"><span>תשלומים שקיבלת</span><span>−₪${monPaid.toFixed(0)}</span></div>
+        ${monLeft<0
+          ? `<div class="ps-row debt"><span>שולם/נוכה יותר ממה שהרווחת</span><span>−₪${Math.abs(monLeft).toFixed(0)}</span></div>`
+          : `<div class="ps-row big"><span>נותר לתשלום</span><span class="rem">₪${monLeft.toFixed(0)}</span></div>`}
       </div>
+      ${monPayList.length?`<div class="card" style="margin-top:12px"><div class="section-title" style="margin:0 0 8px">תשלומים שקיבלת החודש</div>${monPayRows}</div>`:''}
       ${netSummaryHtml(t.totalPay, employees[currentEmpId], monthRefDate(empNavMonth))}` : '';
   }
 
@@ -2714,8 +2723,9 @@ function teamMonthTotals(monthKey){
     const rate=e.hourlyRate||0;
     payShiftsFor(id, monthKey).forEach(s=>{
       const h=hoursBetween(s.clockIn, s.clockOut);
-      hours+=h; const amt=h*rate; gross+=amt; if(s.paid===true) paid+=amt;
+      hours+=h; gross+=h*rate;
     });
+    paid += paymentsSumFor(id, monthKey);
   });
   return {hours, gross, paid, remaining:gross-paid, count};
 }
@@ -2806,55 +2816,50 @@ function renderPayDetail(){
     return;
   }
 
-  let totalH=0, totalPay=0, paidPay=0, allPaid=true;
+  let totalH=0, totalPay=0;
   const rows=list.map(s=>{
     const h=hoursBetween(s.clockIn, s.clockOut);
     const amt=h*rate;
     totalH+=h; totalPay+=amt;
-    const isPaid=s.paid===true;
-    if(isPaid) paidPay+=amt; else allPaid=false;
-    return `<div class="pay-line ${isPaid?'paid':''}">
+    return `<div class="pay-line">
       <div class="pl-main">
-        <div class="pl-date">${fmtDate(s.clockIn)} ${isPaid?'<span class="badge-paid">שולם ✓</span>':''}</div>
+        <div class="pl-date">${fmtDate(s.clockIn)}</div>
         <div class="pl-times">${fmtTime(s.clockIn)} ← ${fmtTime(s.clockOut)} · ${fmtHours(h)}</div>
       </div>
       <div class="pl-amt">₪${amt.toFixed(0)}</div>
-      <button class="btn ${isPaid?'line':''} sm" onclick="togglePaid('${s.id}')">${isPaid?'בטל סימון':'סמן כשולם'}</button>
     </div>`;
   }).join("");
 
-  const remaining=totalPay-paidPay;
   const payTk=takingsSumFor(paySubEmpId, paySelMonthKey);
   const payList = paymentsListFor(paySubEmpId, paySelMonthKey);
   const paidNow = payList.reduce((a,p)=>a+(Number(p.amount)||0),0);
+  const leftToPay = totalPay - payTk - paidNow;
   const paymentsRows = payList.length ? payList.map(p=>`<div class="hk-row">
     <div class="hk-main"><div class="hk-name">₪${(Number(p.amount)||0).toFixed(0)}${p.note?` · ${esc(p.note)}`:''}</div><div class="hk-date">${fmtDate(p.createdAt)}</div></div>
     <div class="hk-acts"><button class="btn line sm" onclick="delPayment('${paySubEmpId}','${p.id}')">🗑️</button></div>
   </div>`).join("") : '<div class="empty" style="padding:10px">עדיין לא נרשמו תשלומים לחודש זה.</div>';
   box.innerHTML=`
-    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
-      <div class="section-title" style="margin:0">${monthLabel(paySelMonthKey)} · ${esc(e.name)} · ₪${rate}/שעה</div>
-      <button class="btn line sm" onclick="setMonthPaid(${allPaid?'false':'true'})">${allPaid?'בטל סימון לכל החודש':'סמן את כל החודש כשולם'}</button>
-    </div>
+    <div class="section-title" style="margin:0 0 10px">${monthLabel(paySelMonthKey)} · ${esc(e.name)} · ₪${rate}/שעה</div>
     ${rows}
     <div class="pay-sum">
       <div class="ps-row"><span>סך שעות החודש</span><span>${fmtHours(totalH)}</span></div>
-      <div class="ps-row big"><span>סך הכל</span><span>₪${totalPay.toFixed(0)}</span></div>
-      <div class="ps-row"><span>שולם</span><span>₪${paidPay.toFixed(0)}</span></div>
-      <div class="ps-row big"><span>נותר לתשלום</span><span class="rem">₪${remaining.toFixed(0)}</span></div>
-      ${payTk>0?`<div class="ps-row"><span>הורדות (הקפה)</span><span>−₪${payTk.toFixed(0)}</span></div>
-      ${(remaining-payTk)<0
-        ? `<div class="ps-row debt"><span>חוב — העובד לקח יותר ממה שהרוויח</span><span>-₪${Math.abs(remaining-payTk).toFixed(0)}</span></div>`
-        : `<div class="ps-row big"><span>נטו אחרי הורדות</span><span class="rem">₪${(remaining-payTk).toFixed(0)}</span></div>`}`:''}
+      <div class="ps-row big"><span>סך הכל (ברוטו)</span><span>₪${totalPay.toFixed(0)}</span></div>
+      ${payTk>0?`<div class="ps-row"><span>הורדות (הקפה)</span><span>−₪${payTk.toFixed(0)}</span></div>`:''}
+      <div class="ps-row"><span>תשלומים/מקדמות שניתנו</span><span>−₪${paidNow.toFixed(0)}</span></div>
+      ${leftToPay<0
+        ? `<div class="ps-row debt"><span>שולם/נוכה יותר ממה שהרוויח</span><span>−₪${Math.abs(leftToPay).toFixed(0)}</span></div>`
+        : `<div class="ps-row big"><span>נותר לתשלום</span><span class="rem">₪${leftToPay.toFixed(0)}</span></div>`}
     </div>
     <div class="card" style="margin-top:12px">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
         <div class="section-title" style="margin:0">תשלומים / מקדמות</div>
-        <button class="btn sm" onclick="addPayment('${paySubEmpId}','${paySelMonthKey}')">➕ הוסף תשלום</button>
+        <div style="display:flex;gap:6px">
+          <button class="btn sm" onclick="addPayment('${paySubEmpId}','${paySelMonthKey}')">➕ הוסף תשלום</button>
+          <button class="btn line sm" onclick="payFullMonth('${paySubEmpId}','${paySelMonthKey}')">💵 שילמתי הכל</button>
+        </div>
       </div>
       ${paymentsRows}
       <div class="ps-row" style="margin-top:6px"><span>סך תשלומים שניתנו החודש</span><span>₪${paidNow.toFixed(0)}</span></div>
-      <div style="font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5">בשלב זה התשלומים נרשמים בלבד ועדיין לא משפיעים על "נותר לתשלום". בשלב הבא הם יחליפו את סימון "שולם" ויחושבו אוטומטית.</div>
     </div>
     ${netSummaryHtml(totalPay, e, monthRefDate(paySelMonthKey))}
     <div style="margin-top:14px;display:flex;flex-direction:column;gap:10px">
@@ -2866,27 +2871,21 @@ function renderPayDetail(){
         <button class="btn line" style="flex:1" onclick="imagePayrollInternal()">🗂️ דוח פנימי (תמונה)</button>
         <button class="btn line" onclick="exportPayrollInternal()">PDF</button>
       </div>
-      <div style="font-size:12px;color:var(--muted);text-align:center;line-height:1.5">ברירת המחדל היא תמונה (נוח לשליחה בוואטסאפ). אפשר גם PDF להדפסה. הדוח לרו"ח נקי מסטטוס תשלום; הדוח הפנימי למעקב שלך.</div>
+      <div style="font-size:12px;color:var(--muted);text-align:center;line-height:1.5">ברירת המחדל היא תמונה (נוח לשליחה בוואטסאפ). אפשר גם PDF להדפסה.</div>
     </div>`;
 }
 
-function togglePaid(shiftId){
-  const s=shifts[shiftId]; if(!s) return;
-  const newVal = s.paid!==true;
-  db.ref("shifts/"+shiftId).update({ paid:newVal, paidAt: newVal?TS:null })
-    .then(()=> toast(newVal?"סומן כשולם ✓":"הסימון בוטל"));
-}
-
-async function setMonthPaid(target){
-  const list=payShiftsFor(paySubEmpId, paySelMonthKey);
-  if(list.length===0) return;
-  const e=employees[paySubEmpId];
-  const verb = target ? "לסמן כשולם" : "לבטל סימון תשלום עבור";
-  const ok=await uiConfirm(verb+" את כל "+list.length+" המשמרות של "+(e?e.name:"")+" ב"+monthLabel(paySelMonthKey)+"?", {okText: target?"סמן הכל":"בטל סימון"});
+async function payFullMonth(empId, monthKey){
+  const e=employees[empId]; const rate=e?e.hourlyRate||0:0;
+  let gross=0; payShiftsFor(empId, monthKey).forEach(s=>{ gross+=hoursBetween(s.clockIn,s.clockOut)*rate; });
+  const tk=takingsSumFor(empId, monthKey);
+  const paid=paymentsSumFor(empId, monthKey);
+  const left = gross - tk - paid;
+  if(left<=0){ toast("אין יתרה לתשלום החודש"); return; }
+  const ok=await uiConfirm(`לרשום תשלום מלא של ₪${left.toFixed(0)} ל${e?e.name:""} עבור ${monthLabel(monthKey)}? כך "נותר לתשלום" יתאפס.`, {okText:"שלם הכל"});
   if(!ok) return;
-  const updates={};
-  list.forEach(s=>{ updates["shifts/"+s.id+"/paid"]=target; updates["shifts/"+s.id+"/paidAt"]=target?TS:null; });
-  db.ref().update(updates).then(()=> toast(target?"כל החודש סומן כשולם ✓":"הסימון בוטל לכל החודש"));
+  db.ref("payments/"+empId).push().set({ amount:left, note:"תשלום מלא לחודש", monthKey:monthKey, createdAt:TS })
+    .then(()=>toast("נרשם תשלום מלא ✓")).catch(()=>toast("השמירה נכשלה"));
 }
 
 // אוסף את נתוני הדוח לעובד/חודש הנבחרים (משותף לשני סוגי הדוחות)
@@ -2896,19 +2895,20 @@ function payReportData(){
   const list=payShiftsFor(paySubEmpId, paySelMonthKey);
   if(list.length===0){ toast("אין משמרות לייצוא"); return null; }
   const days=["א","ב","ג","ד","ה","ו","ש"];
-  let totalH=0, totalPay=0, paidPay=0;
+  let totalH=0, totalPay=0;
   const rows=list.map(s=>{
     const h=hoursBetween(s.clockIn, s.clockOut);
     const amt=h*rate; totalH+=h; totalPay+=amt;
-    if(s.paid===true) paidPay+=amt;
     const d=new Date(s.clockIn);
-    return { d, day:days[d.getDay()], inT:fmtTime(s.clockIn), outT:fmtTime(s.clockOut), h, amt, paid:s.paid===true };
+    return { d, day:days[d.getDay()], inT:fmtTime(s.clockIn), outT:fmtTime(s.clockOut), h, amt };
   });
   const now=new Date();
   const genDate=pad(now.getDate())+"/"+pad(now.getMonth()+1)+"/"+now.getFullYear();
   const tkList=takingsListFor(paySubEmpId, paySelMonthKey);
   const tkSum=tkList.reduce((a,t)=>a+(Number(t.price)||0),0);
-  return { e, rate, rows, totalH, totalPay, paidPay, genDate, tkList, tkSum };
+  const payList=paymentsListFor(paySubEmpId, paySelMonthKey);
+  const paidPay=payList.reduce((a,p)=>a+(Number(p.amount)||0),0);
+  return { e, rate, rows, totalH, totalPay, paidPay, genDate, tkList, tkSum, payList };
 }
 
 // דוח לרואה החשבון — נקי: שעות וברוטו בלבד, בלי סטטוס תשלום
@@ -2925,6 +2925,10 @@ function accountantReportHtml(D){
     <div class="pr-tot" style="margin-top:18px">
       <div><b>ניכוי משכר — חוב העובד למעסיק (מוצרים שנלקחו):</b> ₪${D.tkSum.toFixed(0)}</div>
     </div>` : '';
+  const adv = D.paidPay>0 ? `
+    <div class="pr-tot" style="margin-top:12px">
+      <div><b>מקדמות / תשלומים ששולמו לעובד (לניכוי בתלוש):</b> ₪${D.paidPay.toFixed(0)}</div>
+    </div>` : '';
   return `<div class="pr-wrap">
     <div class="pr-h1">דוח לרואה החשבון — ${esc(D.e.name)}</div>
     <div class="pr-meta">חודש: ${monthLabel(paySelMonthKey)}<br>הופק בתאריך: ${D.genDate}</div>
@@ -2935,7 +2939,8 @@ function accountantReportHtml(D){
     </table>
     <div class="pr-tot"><div><b>סך שעות החודש:</b> ${fmtHours(D.totalH)}</div></div>
     ${debt}
-    <div class="pr-foot">הופק ממערכת שעון נוכחות · הנתונים מבוססים על החתמות בפועל · השעות לחישוב שכר; הניכוי הוא חוב העובד למעסיק</div>
+    ${adv}
+    <div class="pr-foot">הופק ממערכת שעון נוכחות · הנתונים מבוססים על החתמות בפועל · השעות לחישוב שכר; הניכוי הוא חוב העובד למעסיק; המקדמות הן תשלומים ששולמו לעובד</div>
   </div>`;
 }
 function internalReportHtml(D){
@@ -2946,31 +2951,35 @@ function internalReportHtml(D){
     <td>${r.outT}</td>
     <td class="num">${fmtHours(r.h)}</td>
     <td class="num">₪${r.amt.toFixed(0)}</td>
-    <td>${r.paid?'שולם':'—'}</td>
   </tr>`).join("");
-  const remaining=D.totalPay-D.paidPay;
+  const left=D.totalPay-D.tkSum-D.paidPay;
   const tkTable = D.tkSum>0 ? `<div style="margin-top:16px;font-weight:800;font-size:14px">הורדות — הקפה לעובדים</div>
     <table class="pr-table" style="margin-top:6px">
       <thead><tr><th>תאריך</th><th>פריט</th><th>סכום</th></tr></thead>
       <tbody>${D.tkList.map(t=>`<tr><td>${fmtDate(t.createdAt)}</td><td>${esc(t.name)}</td><td class="num">₪${(Number(t.price)||0).toFixed(0)}</td></tr>`).join("")}</tbody>
     </table>` : '';
+  const payTable = (D.payList && D.payList.length) ? `<div style="margin-top:16px;font-weight:800;font-size:14px">תשלומים / מקדמות שניתנו</div>
+    <table class="pr-table" style="margin-top:6px">
+      <thead><tr><th>תאריך</th><th>הערה</th><th>סכום</th></tr></thead>
+      <tbody>${D.payList.map(p=>`<tr><td>${fmtDate(p.createdAt)}</td><td>${p.note?esc(p.note):'—'}</td><td class="num">₪${(Number(p.amount)||0).toFixed(0)}</td></tr>`).join("")}</tbody>
+    </table>` : '';
   return `<div class="pr-wrap">
     <div class="pr-h1">דוח פנימי (מעקב תשלומים) — ${esc(D.e.name)}</div>
     <div class="pr-meta">חודש: ${monthLabel(paySelMonthKey)}<br>תעריף לשעה: ₪${D.rate}<br>הופק בתאריך: ${D.genDate}<br><b>לשימוש פנימי — לא מיועד לרואה החשבון</b></div>
     <table class="pr-table">
-      <thead><tr><th>תאריך</th><th>יום</th><th>כניסה</th><th>יציאה</th><th>שעות</th><th>סכום</th><th>סטטוס</th></tr></thead>
+      <thead><tr><th>תאריך</th><th>יום</th><th>כניסה</th><th>יציאה</th><th>שעות</th><th>סכום</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
     ${tkTable}
+    ${payTable}
     <div class="pr-tot">
       <div><b>סך שעות החודש:</b> ${fmtHours(D.totalH)}</div>
-      <div><b>סך הכל:</b> ₪${D.totalPay.toFixed(0)}</div>
-      <div><b>שולם:</b> ₪${D.paidPay.toFixed(0)}</div>
-      <div><b>נותר לתשלום:</b> ₪${remaining.toFixed(0)}</div>
-      ${D.tkSum>0?`<div><b>הורדות (הקפה):</b> −₪${D.tkSum.toFixed(0)}</div>
-      ${(remaining-D.tkSum)<0
-        ? `<div style="margin-top:10px;padding:9px 12px;border:2px solid #c00;border-radius:8px;background:#fff0f0;color:#c00;font-weight:800;font-size:15px">חוב של העובד: -₪${Math.abs(remaining-D.tkSum).toFixed(0)} — לקח יותר ממה שהרוויח</div>`
-        : `<div><b>נטו אחרי הורדות:</b> ₪${(remaining-D.tkSum).toFixed(0)}</div>`}`:''}
+      <div><b>סך הכל (ברוטו):</b> ₪${D.totalPay.toFixed(0)}</div>
+      ${D.tkSum>0?`<div><b>הורדות (הקפה):</b> −₪${D.tkSum.toFixed(0)}</div>`:''}
+      <div><b>תשלומים/מקדמות שניתנו:</b> −₪${D.paidPay.toFixed(0)}</div>
+      ${left<0
+        ? `<div style="margin-top:10px;padding:9px 12px;border:2px solid #c00;border-radius:8px;background:#fff0f0;color:#c00;font-weight:800;font-size:15px">שולם/נוכה יותר ממה שהרוויח: −₪${Math.abs(left).toFixed(0)}</div>`
+        : `<div><b>נותר לתשלום:</b> ₪${left.toFixed(0)}</div>`}
     </div>
     <div class="pr-foot">דוח פנימי לשימושך · הנתונים מבוססים על החתמות בפועל</div>
   </div>`;
