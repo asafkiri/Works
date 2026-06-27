@@ -120,6 +120,11 @@
 
   /* ---------- תפריט תיקיות + ניווט מסכים ---------- */
   .folder-grid{display:flex;flex-direction:column;gap:11px}
+  .mini-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:13px}
+  .mini-tile{position:relative;background:var(--card,#fff);border:1px solid var(--line);border-radius:16px;padding:18px 10px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;text-align:center;box-shadow:var(--shadow);transition:transform .08s}
+  .mini-tile:active{transform:translateY(1px)}
+  .mini-tile .mt-ico{font-size:29px;line-height:1}
+  .mini-tile .mt-title{font-weight:800;font-size:13.5px;letter-spacing:-.01em}
   .folder{
     display:flex;align-items:center;gap:14px;width:100%;text-align:right;
     background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);
@@ -489,7 +494,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v38</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v39</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -514,7 +519,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v38</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v39</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -534,16 +539,32 @@
 
     <!-- תפריט ראשי (בית) -->
     <div id="consoleHome">
+      <!-- רשת 2×2: תיקיות שנכנסים אליהן מדי פעם -->
+      <div class="mini-grid">
+        <button class="mini-tile" onclick="openFolder('employees')">
+          <span class="mt-ico">👥</span>
+          <span class="mt-title">ניהול עובדים</span>
+        </button>
+        <button class="mini-tile" id="formsFolderBtn" onclick="openFolder('forms')">
+          <span class="mt-ico">📋</span>
+          <span class="mt-title">טפסים לעובדים <span id="formsBadge" class="note-dot hidden">חדש</span></span>
+        </button>
+        <button class="mini-tile" id="payslipsFolderBtn" onclick="openFolder('payslips')">
+          <span class="mt-ico">📄</span>
+          <span class="mt-title">תלושי שכר</span>
+        </button>
+        <button class="mini-tile" onclick="openFolder('settings')">
+          <span class="mt-ico">⚙️</span>
+          <span class="mt-title">הגדרות</span>
+        </button>
+      </div>
+
+      <!-- כרטיסים גדולים: יומיומי -->
       <div class="folder-grid">
         <button class="folder" onclick="openFolder('overview')">
           <span class="f-ico">📊</span>
           <span class="f-txt"><span class="f-title">סקירה</span><span class="f-sub">מי במשמרת עכשיו ומשמרות אחרונות</span></span>
           <span class="live-count hidden" id="homeLiveCount"></span>
-          <span class="f-arr">→</span>
-        </button>
-        <button class="folder" onclick="openFolder('employees')">
-          <span class="f-ico">👥</span>
-          <span class="f-txt"><span class="f-title">ניהול עובדים</span><span class="f-sub">הוספה, השבתה, שמות משתמש וסיסמאות</span></span>
           <span class="f-arr">→</span>
         </button>
         <button class="folder" onclick="openFolder('pay')">
@@ -556,24 +577,9 @@
           <span class="f-txt"><span class="f-title">סידור עבודה</span><span class="f-sub">תכנון משמרות קדימה</span></span>
           <span class="f-arr">→</span>
         </button>
-        <button class="folder" onclick="openFolder('settings')">
-          <span class="f-ico">⚙️</span>
-          <span class="f-txt"><span class="f-title">הגדרות</span><span class="f-sub">קוד כניסה לקונסולה</span></span>
-          <span class="f-arr">→</span>
-        </button>
         <button class="folder" id="hakafaFolderBtn" onclick="openFolder('hakafa')">
           <span class="f-ico">🧾</span>
           <span class="f-txt"><span class="f-title">הקפה לעובדים <span id="hakafaBadge" class="note-dot hidden">חדש</span></span><span class="f-sub" id="hakafaFolderSub">מה שעובדים לקחו מהחנות</span></span>
-          <span class="f-arr">→</span>
-        </button>
-        <button class="folder" id="formsFolderBtn" onclick="openFolder('forms')">
-          <span class="f-ico">📋</span>
-          <span class="f-txt"><span class="f-title">טפסים לעובדים <span id="formsBadge" class="note-dot hidden">חדש</span></span><span class="f-sub" id="formsFolderSub">שליחת טפסים לחתימה (כמו הסכמה להקפה)</span></span>
-          <span class="f-arr">→</span>
-        </button>
-        <button class="folder" id="payslipsFolderBtn" onclick="openFolder('payslips')">
-          <span class="f-ico">📄</span>
-          <span class="f-txt"><span class="f-title">תלושי שכר</span><span class="f-sub" id="payslipsFolderSub">העלאת תלוש חודשי לכל עובד</span></span>
           <span class="f-arr">→</span>
         </button>
       </div>
