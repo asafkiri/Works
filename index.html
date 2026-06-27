@@ -162,6 +162,7 @@
   .form-text{white-space:pre-wrap;line-height:1.7;font-size:14.5px}
   .sig-canvas{width:100%;height:180px;border:2px dashed var(--line);border-radius:12px;background:#fff;touch-action:none;display:block}
   .night-tag{display:inline-block;font-size:10px;font-weight:800;color:#3730a3;background:#e0e7ff;border-radius:999px;padding:2px 7px;margin-inline-start:4px;vertical-align:middle}
+  .short-break-tag{display:inline-block;font-size:10px;font-weight:800;color:#fff;background:#2563eb;border-radius:999px;padding:2px 8px;margin-inline-start:4px;vertical-align:middle}
   .screen-head{display:flex;align-items:center;gap:12px;margin-bottom:18px}
   .back-btn{
     border:1px solid var(--line);background:#fff;color:var(--ink);
@@ -278,6 +279,10 @@
   .emp-tile.live .cta{color:var(--danger)}
   .emp-tile .badge{position:absolute;top:14px;left:14px;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:var(--live-d)}
   .emp-tile .badge .blip{width:8px;height:8px;border-radius:50%;background:var(--live);animation:pulse 1.6s infinite}
+  .emp-tile.onbreak{background:#fff7ed;border-color:#fdba74}
+  .emp-tile.onbreak .badge{color:#c2410c}
+  .break-btn{margin-top:12px;width:100%;padding:10px;border-radius:10px;border:1.5px solid #fdba74;background:#fff;color:#c2410c;font-weight:800;font-size:14px;cursor:pointer}
+  .break-btn.ret{background:#16a34a;border-color:#16a34a;color:#fff}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
 
   /* ---------- רשימות / שורות ---------- */
@@ -290,6 +295,7 @@
   .pill.live{background:var(--live-bg);color:var(--live-d)}
   .pill.flag{background:var(--danger-bg);color:var(--danger)}
   .pill.edit{background:var(--ok-bg);color:var(--ok)}
+  .pill.short-break{background:#2563eb;color:#fff}
   .empty{color:var(--muted);font-size:14px;padding:22px 14px;text-align:center;background:var(--paper);border-radius:12px}
 
   .shift-card{border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:10px;background:#fff;box-shadow:var(--shadow-sm)}
@@ -476,7 +482,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v30</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v32</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -501,7 +507,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v30</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v32</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -1182,6 +1188,10 @@
       <label class="switch"><input type="checkbox" id="netOvertime" onchange="netSyncOt()"><span class="sl"></span></label>
     </div>
     <div class="net-note hidden" id="netOtNote" style="margin:-6px 0 14px">השכר יחושב עם שעות נוספות: מעל 8 ש׳ ביום (7 במשמרת לילה) ומעל 42 ש׳ בשבוע — 125% לשעתיים הראשונות, 150% מעבר. עדיין הערכה; התלוש מהרו"ח קובע.</div>
+    <div class="net-toggle-row">
+      <span class="lbl">הפסקה לא בתשלום <span style="font-weight:500;color:var(--muted);font-size:12px">(כפתור הפסקה בטרמינל; הזמן יורד מהשעות)</span></span>
+      <label class="switch"><input type="checkbox" id="netUnpaidBreak"><span class="sl"></span></label>
+    </div>
     <div id="netSimpleNote" class="net-note hidden" style="margin:-6px 0 14px">השכר יחושב כתעריף לשעה × שעות, ללא ניכויים מהשכר — הסכום הוא מה שהעובד מקבל ליד.</div>
     <div id="netCalcFields">
       <div class="net-field">
@@ -1303,6 +1313,36 @@ function pad(n){ return n < 10 ? "0"+n : ""+n; }
 function fmtTime(ts){ if(!ts) return "—"; const d=new Date(ts); return pad(d.getHours())+":"+pad(d.getMinutes()); }
 function fmtDate(ts){ if(!ts) return ""; const d=new Date(ts); const days=["א","ב","ג","ד","ה","ו","ש"]; return "יום "+days[d.getDay()]+", "+pad(d.getDate())+"/"+pad(d.getMonth()+1)+"/"+d.getFullYear(); }
 function hoursBetween(a,b){ return (b-a)/3600000; }
+/* ---------- הפסקות (לא בתשלום) ---------- */
+const MIN_DEDUCT_MS = 30*60000; // לפי חוק: רק הפסקה רצופה של 30 דק' ומעלה ניתנת לניכוי
+// סך זמן ההפסקות שמנוכות מהשכר — רק הפסקות של 30 דק' ומעלה
+function breakMsOf(s){
+  if(!s || !s.breaks) return 0;
+  let ms=0;
+  Object.values(s.breaks).forEach(b=>{ if(b && b.start && b.end && b.end>b.start){ const d=b.end-b.start; if(d>=MIN_DEDUCT_MS) ms+=d; } });
+  return ms;
+}
+// סך זמן ההפסקות הקצרות (פחות מ-30 דק') — לפי חוק נחשבות זמן עבודה ולא מנוכות
+function shortBreakMsOf(s){
+  if(!s || !s.breaks) return 0;
+  let ms=0;
+  Object.values(s.breaks).forEach(b=>{ if(b && b.start && b.end && b.end>b.start){ const d=b.end-b.start; if(d<MIN_DEDUCT_MS) ms+=d; } });
+  return ms;
+}
+function hasShortBreak(s){ return shortBreakMsOf(s)>0; }
+// ההפסקה הפתוחה כרגע (בלי end) — מחזיר {id,start} או null
+function currentBreakOf(s){
+  if(!s || !s.breaks) return null;
+  let open=null;
+  Object.keys(s.breaks).forEach(k=>{ const b=s.breaks[k]; if(b && b.start && !b.end) open={id:k, start:b.start}; });
+  return open;
+}
+// שעות עבודה נטו במשמרת = (יציאה − כניסה) − הפסקות
+function netHoursOf(s){
+  if(!s || !s.clockIn || !s.clockOut) return 0;
+  const net=(s.clockOut - s.clockIn) - breakMsOf(s);
+  return Math.max(0, net)/3600000;
+}
 function fmtHours(h){ const H=Math.floor(h); const M=Math.round((h-H)*60); return H+":"+pad(M)+" שע'"; }
 // רטט קצר בנייד (נכשל בשקט בדפדפנים שלא תומכים)
 function vibrate(p){ try{ if(navigator.vibrate) navigator.vibrate(p); }catch(e){} }
@@ -1957,11 +1997,9 @@ function takingsListFor(empId, monthKey){
 function takingsSumFor(empId, monthKey){
   return takingsListFor(empId, monthKey).reduce((a,t)=>a+(Number(t.price)||0),0);
 }
-// ברוטו של עובד לחודש מסוים (שעות × תעריף)
+// ברוטו של עובד לחודש מסוים (כולל שעות נוספות וניכוי הפסקות) — לבדיקת תקרת 25% בהקפה
 function empGrossForMonth(empId, monthKey){
-  const e=employees[empId]; const rate=e?e.hourlyRate||0:0;
-  let g=0; payShiftsFor(empId, monthKey).forEach(s=>{ g+=hoursBetween(s.clockIn,s.clockOut)*rate; });
-  return g;
+  return computeEmpPay(empId, monthKey).totalPay;
 }
 // בדיקת חריגה מ-25% מהשכר (המקסימום לניכוי לפי החוק) לחודש מסוים
 function hakafaLimitInfo(empId, monthKey){
@@ -2207,7 +2245,7 @@ function empMonthTotals(monthKey){
   const e=employees[currentEmpId]; const rate=e?e.hourlyRate||0:0;
   const list=payShiftsFor(currentEmpId, monthKey);
   let totalH=0;
-  list.forEach(s=>{ totalH+=hoursBetween(s.clockIn,s.clockOut); });
+  list.forEach(s=>{ totalH+=netHoursOf(s); });
   const cp=computeEmpPay(currentEmpId, monthKey);
   const totalPay=cp.totalPay;
   const paidPay=paymentsSumFor(currentEmpId, monthKey);
@@ -2332,12 +2370,13 @@ function renderEmployeeDashboard(){
     $("empMonthOwedSub").textContent = `${fmtHours(t.totalH)} · ברוטו ₪${t.totalPay.toFixed(0)}${monTk>0?` · הקפה −₪${monTk.toFixed(0)}`:''}${monPaid>0?` · שולם −₪${monPaid.toFixed(0)}`:''}`;
     const monOt=t.ot||{}; const monOtOn=monOt.otEnabled===true;
     $("empShifts").innerHTML = t.list.length ? t.list.map(s=>{
-      const h=hoursBetween(s.clockIn,s.clockOut); const amt=h*t.rate;
+      const h=netHoursOf(s); const amt=h*t.rate;
       const night=monOtOn && isNightShift(s);
+      const brkMin=Math.round(breakMsOf(s)/60000);
       return `<div class="pay-line">
         <div class="pl-main">
-          <div class="pl-date">${fmtDate(s.clockIn)}${night?' <span class="night-tag">🌙 לילה</span>':''}</div>
-          <div class="pl-times">${fmtTime(s.clockIn)} ← ${fmtTime(s.clockOut)} · ${fmtHours(h)}</div>
+          <div class="pl-date">${fmtDate(s.clockIn)}${night?' <span class="night-tag">🌙 לילה</span>':''}${hasShortBreak(s)?' <span class="short-break-tag">☕ הפסקה קצרה — ללא ניכוי</span>':''}</div>
+          <div class="pl-times">${fmtTime(s.clockIn)} ← ${fmtTime(s.clockOut)} · ${fmtHours(h)}${brkMin>0?` · ☕ ${brkMin}ד`:''}</div>
         </div>
         ${monOtOn?'':`<div class="pl-amt">₪${amt.toFixed(0)}</div>`}
       </div>`;
@@ -2403,19 +2442,26 @@ function renderTerminal(){
   grid.innerHTML = list.map(e=>{
     const os = e.openShiftId ? shifts[e.openShiftId] : null;
     const live = !!(os && !os.clockOut);
+    const brk = live ? currentBreakOf(os) : null;
+    const onBreak = !!brk;
     const cin = live ? os.clockIn : 0;
     const since = live ? fmtTime(cin) : "";
     const dur = live ? fmtDurationLive(Date.now()-cin) : "";
+    const canBreak = live && e.unpaidBreak===true;
+    const breakBtn = canBreak ? (onBreak
+      ? `<button class="break-btn ret" onclick="event.stopPropagation();endBreak('${e.id}')">▶️ חזרה מהפסקה</button>`
+      : `<button class="break-btn" onclick="event.stopPropagation();startBreak('${e.id}')">☕ יציאה להפסקה</button>`) : '';
     return `
-      <div class="emp-tile ${live?'live':''}" onclick="onEmployeeTap('${e.id}')">
-        ${live?`<div class="badge"><span class="blip"></span> במשמרת</div>`:''}
+      <div class="emp-tile ${live?'live':''} ${onBreak?'onbreak':''}" onclick="onEmployeeTap('${e.id}')">
+        ${live?`<div class="badge">${onBreak?'☕ בהפסקה':'<span class="blip"></span> במשמרת'}</div>`:''}
         <div>
           <div class="nm">${esc(e.name)}</div>
           <div class="state">${live
-            ? `כבר <span class="live-timer" data-since="${cin}">${dur}</span> · נכנסת ${since}`
+            ? (onBreak ? `בהפסקה מאז ${fmtTime(brk.start)}` : `כבר <span class="live-timer" data-since="${cin}">${dur}</span> · נכנסת ${since}`)
             : 'לא במשמרת'}</div>
         </div>
-        <div class="cta">${live?'סיים משמרת ←':'התחל משמרת ←'}</div>
+        ${breakBtn}
+        <div class="cta">${live?(onBreak?'חזרה מהפסקה ←':'סיים משמרת ←'):'התחל משמרת ←'}</div>
       </div>`;
   }).join("");
   updateLiveTimers();
@@ -2424,6 +2470,8 @@ function renderTerminal(){
 function onEmployeeTap(empId){
   const e=employees[empId]; if(!e) return;
   if(e.openShiftId){
+    const os=shifts[e.openShiftId];
+    if(os && currentBreakOf(os)){ endBreak(empId); return; } // בהפסקה -> לחיצה מחזירה מההפסקה
     // יש משמרת פתוחה -> סיום (ללא קוד, עם הערה אופציונלית)
     pendingClockOutEmp = empId;
     $("noteWho").textContent = e.name + " · סיום משמרת";
@@ -2433,6 +2481,26 @@ function onEmployeeTap(empId){
     // כניסה -> דורש קוד החתמה
     openClockPad(empId);
   }
+}
+
+/* ---------- הפסקות בטרמינל ---------- */
+function startBreak(empId){
+  const e=employees[empId]; if(!e || !e.openShiftId) return;
+  const os=shifts[e.openShiftId];
+  if(os && currentBreakOf(os)) return; // כבר בהפסקה
+  db.ref("shifts/"+e.openShiftId+"/breaks").push().set({ start: TS, end: null })
+    .then(()=> toast("יצאת להפסקה ☕"))
+    .catch(()=> toast("שגיאה בשמירה"));
+}
+function endBreak(empId){
+  const e=employees[empId]; if(!e || !e.openShiftId) return;
+  const os=shifts[e.openShiftId];
+  const open=os?currentBreakOf(os):null;
+  if(!open) return;
+  const mins=Math.round((Date.now()-open.start)/60000);
+  db.ref("shifts/"+e.openShiftId+"/breaks/"+open.id+"/end").set(TS)
+    .then(()=> toast(mins>=30 ? `חזרת מההפסקה ▶️ (נוכו ${mins} דק׳)` : `חזרת מההפסקה ▶️ · הפסקה קצרה (${mins} דק׳) — לא נוכתה`))
+    .catch(()=> toast("שגיאה בשמירה"));
 }
 
 /* ---------- מקלדת קוד החתמה ---------- */
@@ -2522,11 +2590,16 @@ function confirmClockOut(skip){
   const shiftId = emp.openShiftId;
   if(!shiftId){ pendingClockOutEmp=null; return; }
   const name  = emp.name;
-  const cin   = shifts[shiftId] ? shifts[shiftId].clockIn : null;
+  const os    = shifts[shiftId];
+  const cin   = os ? os.clockIn : null;
   const outMs = Date.now();
-  const hrs   = cin ? hoursBetween(cin, outMs) : 0;
+  const openBrk = os ? currentBreakOf(os) : null;
+  let brkMs = os ? breakMsOf(os) : 0;
+  if(openBrk) brkMs += (outMs - openBrk.start);
+  const hrs   = cin ? Math.max(0,(outMs - cin - brkMs))/3600000 : 0;
 
   db.ref("shifts/"+shiftId).update({ clockOut: TS, employeeNote: note })
+    .then(()=> openBrk ? db.ref("shifts/"+shiftId+"/breaks/"+openBrk.id+"/end").set(TS) : null)
     .then(()=> db.ref("employees/"+empId+"/openShiftId").set(null))
     .then(()=> showClockSuccess({name, kind:'out', timeMs:outMs, hours:hrs}))
     .catch(e=> toast("שגיאה בשמירה"));
@@ -2741,13 +2814,8 @@ function openPayFromEmp(id){
 }
 
 function monthTotals(empId, rate){
-  let hours=0;
-  Object.values(shifts).forEach(s=>{
-    if(s.employeeId===empId && s.clockOut && inCurrentMonth(s.clockIn)){
-      hours += hoursBetween(s.clockIn, s.clockOut);
-    }
-  });
-  return {hours, pay: hours*rate};
+  const cp=computeEmpPay(empId, currentMonthKey());
+  return {hours: cp.totalH, pay: cp.totalPay};
 }
 
 /* ============================================================
@@ -2899,6 +2967,7 @@ function openNetModal(empId){
   $("netPensionRate").value = (e.pensionRate!=null ? e.pensionRate : 6);
   $("netNiExempt").checked = e.niExempt===true;
   $("netOvertime").checked = e.overtimeEnabled===true;
+  $("netUnpaidBreak").checked = e.unpaidBreak===true;
   netSyncPensionRate();
   netSyncMode();
   netSyncOt();
@@ -2924,6 +2993,7 @@ function saveNetSettings(){
   let rate=parseFloat($("netPensionRate").value);
   const niExempt=$("netNiExempt").checked;
   const overtime=$("netOvertime").checked;
+  const unpaidBreak=$("netUnpaidBreak").checked;
   if(!netIsNet){
     if(isNaN(points) || points<0){ toast("מספר נקודות זיכוי לא תקין"); return; }
     if(pensionOn && (isNaN(rate)||rate<0||rate>25)){ toast("אחוז פנסיה לא תקין (0–25)"); return; }
@@ -2931,7 +3001,7 @@ function saveNetSettings(){
   if(isNaN(points)) points=2.25;
   if(isNaN(rate)) rate=6;
   db.ref("employees/"+empId).update({
-    netIsNet:netIsNet, birthDate:birth, creditPoints:points, pensionOn:pensionOn, pensionRate:rate, niExempt:niExempt, overtimeEnabled:overtime
+    netIsNet:netIsNet, birthDate:birth, creditPoints:points, pensionOn:pensionOn, pensionRate:rate, niExempt:niExempt, overtimeEnabled:overtime, unpaidBreak:unpaidBreak
   }).then(()=>{ closeModal("netModal"); toast("פרטי השכר נשמרו ✓"); });
 }
 
@@ -2946,10 +3016,12 @@ function renderShiftList(){
   box.innerHTML = list.map(s=>{
     const name = employees[s.employeeId] ? employees[s.employeeId].name : "(עובד שנמחק)";
     const open = !s.clockOut;
-    const dur = open ? "" : fmtHours(hoursBetween(s.clockIn, s.clockOut));
+    const brkMin = Math.round(breakMsOf(s)/60000);
+    const dur = open ? "" : (fmtHours(netHoursOf(s))+(brkMin>0?` · ☕ ${brkMin}ד`:''));
     const pills =
       (open?'<span class="pill live">פתוחה</span>':'')+
-      (s.edited?'<span class="pill edit">נערך</span>':'');
+      (s.edited?'<span class="pill edit">נערך</span>':'')+
+      (hasShortBreak(s)?'<span class="pill short-break">☕ הפסקה קצרה ללא ניכוי</span>':'');
     const empNote = s.employeeNote ? `<div class="note"><b>הערת עובד:</b> ${esc(s.employeeNote)}</div>` : '';
     return `<div class="shift-card${s.autoCloseFlag?' problem':''}">
       <div class="head">
@@ -3012,7 +3084,7 @@ function computeEmpPay(empId, monthKey){
     .sort((a,b)=>(a.clockIn||0)-(b.clockIn||0));
   let totalH=0, regH=0, ot125H=0, ot150H=0, pay=0, nightCount=0;
   if(!otOn){
-    allShifts.forEach(s=>{ if(monthKeyOf(s.clockIn)===monthKey){ const h=hoursBetween(s.clockIn,s.clockOut); totalH+=h; regH+=h; pay+=h*rate; } });
+    allShifts.forEach(s=>{ if(monthKeyOf(s.clockIn)===monthKey){ const h=netHoursOf(s); totalH+=h; regH+=h; pay+=h*rate; } });
     return { totalH, totalPay:pay, regH, ot125H:0, ot150H:0, otPay:0, hasOT:false, otEnabled:false, nightCount:0, rate };
   }
   // קיבוץ לפי שבוע (ראשון–שבת), ריצה כרונולוגית, מכסה שבועית 42 בלי כפל
@@ -3021,7 +3093,7 @@ function computeEmpPay(empId, monthKey){
   Object.keys(weeks).forEach(wk=>{
     let weeklyReg=0;
     weeks[wk].forEach(s=>{
-      const h=hoursBetween(s.clockIn,s.clockOut);
+      const h=netHoursOf(s);
       const night=isNightShift(s);
       const quota=night?7:8;
       const dailyReg=Math.min(h, quota);
@@ -3155,13 +3227,13 @@ function renderPayDetail(){
   const otOn=cp.otEnabled;
   let totalH=0;
   const rows=list.map(s=>{
-    const h=hoursBetween(s.clockIn, s.clockOut);
-    const amt=h*rate; totalH+=h;
+    const h=netHoursOf(s); const amt=h*rate; totalH+=h;
     const night=otOn && isNightShift(s);
+    const brkMin=Math.round(breakMsOf(s)/60000);
     return `<div class="pay-line">
       <div class="pl-main">
-        <div class="pl-date">${fmtDate(s.clockIn)}${night?' <span class="night-tag">🌙 לילה</span>':''}</div>
-        <div class="pl-times">${fmtTime(s.clockIn)} ← ${fmtTime(s.clockOut)} · ${fmtHours(h)}</div>
+        <div class="pl-date">${fmtDate(s.clockIn)}${night?' <span class="night-tag">🌙 לילה</span>':''}${hasShortBreak(s)?' <span class="short-break-tag">☕ הפסקה קצרה — ללא ניכוי</span>':''}</div>
+        <div class="pl-times">${fmtTime(s.clockIn)} ← ${fmtTime(s.clockOut)} · ${fmtHours(h)}${brkMin>0?` · ☕ ${brkMin}ד`:''}</div>
       </div>
       ${otOn?'':`<div class="pl-amt">₪${amt.toFixed(0)}</div>`}
     </div>`;
@@ -3237,10 +3309,10 @@ function payReportData(){
   const days=["א","ב","ג","ד","ה","ו","ש"];
   let totalH=0;
   const rows=list.map(s=>{
-    const h=hoursBetween(s.clockIn, s.clockOut);
+    const h=netHoursOf(s);
     const amt=h*rate; totalH+=h;
     const d=new Date(s.clockIn);
-    return { d, day:days[d.getDay()], inT:fmtTime(s.clockIn), outT:fmtTime(s.clockOut), h, amt, night:isNightShift(s) };
+    return { d, day:days[d.getDay()], inT:fmtTime(s.clockIn), outT:fmtTime(s.clockOut), h, amt, night:isNightShift(s), brkMin:Math.round(breakMsOf(s)/60000) };
   });
   const cp=computeEmpPay(paySubEmpId, paySelMonthKey);
   const totalPay=cp.totalPay;
@@ -3261,7 +3333,7 @@ function accountantReportHtml(D){
     <td>יום ${r.day}</td>
     <td>${r.inT}</td>
     <td>${r.outT}</td>
-    <td class="num">${fmtHours(r.h)}</td>
+    <td class="num">${fmtHours(r.h)}${r.brkMin>0?` <span style="color:#666;font-size:11px">(הפסקה −${r.brkMin}ד)</span>`:''}</td>
   </tr>`).join("");
   const debt = D.tkSum>0 ? `
     <div class="pr-tot" style="margin-top:18px">
