@@ -348,6 +348,12 @@
   /* ---------- מודאל ---------- */
   .modal-bg{position:fixed;inset:0;background:rgba(20,24,31,.5);display:none;align-items:center;justify-content:center;z-index:50;padding:18px;-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}
   .modal-bg.show{display:flex}
+  .pv-card{background:#fff;border-radius:16px;width:100%;max-width:560px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden}
+  .pv-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line)}
+  .pv-title{font-weight:800;font-size:15px}
+  .pv-actions{display:flex;gap:8px;flex-shrink:0}
+  .pv-body{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;background:#f3f4f6;padding:10px}
+  .pv-body img{width:100%;height:auto;display:block;border-radius:6px}
   .modal{background:#fff;border-radius:var(--r-xl);max-width:420px;width:100%;padding:24px;box-shadow:var(--shadow-lg);animation:modalIn .18s ease-out}
   @keyframes modalIn{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
   .modal h3{margin:0 0 4px;font-size:18px;font-weight:800;letter-spacing:-.01em}
@@ -394,6 +400,7 @@
   .emp-hero .eh-label{font-size:14px;font-weight:700;opacity:.9}
   .emp-hero .eh-amount{font-size:46px;font-weight:800;letter-spacing:-.02em;margin:6px 0 4px;font-variant-numeric:tabular-nums}
   .emp-hero .eh-sub{font-size:13px;opacity:.85}
+  .emp-hero .eh-est{display:inline-block;margin-top:12px;font-size:11.5px;font-weight:700;background:rgba(255,255,255,.18);color:#fff;border-radius:999px;padding:5px 12px;line-height:1.45}
   .emp-next{display:flex;align-items:center;gap:10px;font-size:15.5px;font-weight:700}
   .emp-next .en-when{color:var(--primary)}
   /* תיקיות גדולות בדשבורד עובד */
@@ -482,7 +489,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v34</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v38</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -507,7 +514,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v34</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v38</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -903,6 +910,7 @@
         <div class="eh-label" id="empOwedLabel">מגיע לך</div>
         <div class="eh-amount" id="empOwed">₪0</div>
         <div class="eh-sub" id="empOwedSub">—</div>
+        <div class="eh-est">הסכום הוא הערכה בלבד — הסכום הסופי נקבע בתלוש מהרו"ח</div>
       </div>
       <div class="folder-grid">
         <button class="folder lg" onclick="openEmpNav('pay')">
@@ -965,7 +973,7 @@
     <div id="empUpcoming" class="hidden">
       <div class="screen-head"><button class="back-btn" onclick="empNavHome()">→ חזרה</button><h1 class="screen-title">📅 המשמרות הקרובות שלי</h1></div>
       <div class="card">
-        <p class="sub">משמרות קבועות וחד-פעמיות שמתוכננות לך. משמרות חד-פעמיות מסומנות בצבע.</p>
+        <p class="sub">המשמרות שלך ל-7 הימים הקרובים (קבועות וחד-פעמיות). חד-פעמיות מסומנות בצבע.</p>
         <div id="empUpcomingBody"></div>
       </div>
     </div>
@@ -1142,9 +1150,9 @@
 <!-- ============================ מודאל: ביטול מופע בודד ============================ -->
 <div id="cancelModal" class="modal-bg">
   <div class="modal">
-    <h3>ביטול מופע בודד</h3>
+    <h3>עריכה / ביטול מופע בודד</h3>
     <p class="who" id="cancelWho"></p>
-    <p class="meta" style="margin:-8px 0 12px">ביטול משמרת בתאריך מסוים בלי למחוק את המשמרת הקבועה. אפשר לשחזר בכל רגע.</p>
+    <p class="meta" style="margin:-8px 0 12px">שינוי שעות או ביטול של משמרת בתאריך מסוים, בלי לגעת במשמרת הקבועה. "ערוך" הופך את אותו יום למשמרת חד-פעמית.</p>
     <div class="cancel-list" id="cancelList"></div>
     <div class="modal-actions">
       <button class="btn" onclick="closeModal('cancelModal')">סגור</button>
@@ -1282,6 +1290,20 @@
   </div>
 </div>
 
+<!-- ============================ צופה תלוש (תמונה) בתוך האפליקציה ============================ -->
+<div id="payslipViewModal" class="modal-bg">
+  <div class="pv-card">
+    <div class="pv-head">
+      <span id="payslipViewTitle" class="pv-title">תלוש</span>
+      <div class="pv-actions">
+        <button class="btn line sm" id="payslipViewShareBtn">📤 שמור</button>
+        <button class="btn sm" onclick="closeModal('payslipViewModal')">סגור ✕</button>
+      </div>
+    </div>
+    <div class="pv-body" id="payslipViewBody"></div>
+  </div>
+</div>
+
 <!-- ============================ מסך הצלחה אחרי החתמה (טרמינל) ============================ -->
 <div id="clockSuccess" class="success-screen" onclick="hideClockSuccess()">
   <div class="success-card" id="clockSuccessCard"></div>
@@ -1342,6 +1364,8 @@ let shiftModalMode = "add";       // "add" | "editRecurring" | "editOnetime"
 let shiftModalType = "recurring"; // "recurring" | "onetime"
 let editingPlanId = null;         // id של משמרת מתוכננת בעריכה
 let cancelTargetId = null;        // id של משמרת קבועה במודאל ביטול מופע
+let occEditRecurringId = null;    // עריכת מופע בודד: id המשמרת הקבועה
+let occEditDate = null;           // עריכת מופע בודד: התאריך הספציפי
 
 // --- נעילת קונסולה (PIN) ---
 let pinConfig = null;        // קוד ה-PIN השמור (או null אם לא הוגדר)
@@ -2331,23 +2355,38 @@ function dataUrlToBlob(dataUrl){
   for(let i=0;i<len;i++) arr[i]=bin.charCodeAt(i);
   return new Blob([arr], {type:mime});
 }
-// פותח/משתף את התלוש — טוען את הקובץ הכבד רק עכשיו (לפי דרישה)
+// פותח תלוש — תמונה מוצגת בצופה מובנה באפליקציה; PDF נפתח בצופה של המכשיר. הקובץ נטען רק עכשיו.
 async function viewPayslip(empId, slipId, meta){
-  toast("פותח תלוש…");
+  const isImage = !(meta && meta.fileType==="pdf");
+  toast("טוען תלוש…");
   let snap; try{ snap=await db.ref("payslipFiles/"+empId+"/"+slipId+"/data").once("value"); }
   catch(e){ toast("שגיאה בטעינת הקובץ"); return; }
   const dataUrl=snap.val();
   if(!dataUrl){ toast("הקובץ לא נמצא"); return; }
-  let blob; try{ blob=dataUrlToBlob(dataUrl); }catch(e){ toast("שגיאה בקריאת הקובץ"); return; }
-  const ext=(meta && meta.fileType==="pdf")?"pdf":"jpg";
-  const fname="תלוש_"+((meta&&meta.monthKey)||"")+"."+ext;
-  const file=new File([blob], fname, {type:blob.type});
-  if(navigator.canShare && navigator.canShare({files:[file]})){
-    try{ await navigator.share({files:[file], title:fname}); return; }
-    catch(e){ if(e && e.name==="AbortError") return; }
+  const monthKey=(meta&&meta.monthKey)||"";
+  if(isImage){
+    $("payslipViewTitle").textContent = "תלוש "+(monthKey?monthLabel(monthKey):"");
+    $("payslipViewBody").innerHTML = `<img src="${dataUrl}" alt="תלוש">`;
+    $("payslipViewShareBtn").onclick = ()=> sharePayslipData(dataUrl, "image", monthKey);
+    openModal("payslipViewModal");
+    return;
   }
+  sharePayslipData(dataUrl, "pdf", monthKey);
+}
+function tryOpenBlob(blob){
   try{ const url=URL.createObjectURL(blob); window.open(url,"_blank"); setTimeout(()=>URL.revokeObjectURL(url), 30000); }
   catch(e){ toast("לא ניתן לפתוח את הקובץ"); }
+}
+function sharePayslipData(dataUrl, fileType, monthKey){
+  let blob; try{ blob=dataUrlToBlob(dataUrl); }catch(e){ toast("שגיאה בקריאת הקובץ"); return; }
+  const ext = fileType==="pdf" ? "pdf" : "jpg";
+  const fname="תלוש_"+(monthKey||"")+"."+ext;
+  const file=new File([blob], fname, {type:blob.type});
+  if(navigator.canShare && navigator.canShare({files:[file]})){
+    navigator.share({files:[file], title:fname}).catch(e=>{ if(e && e.name!=="AbortError") tryOpenBlob(blob); });
+    return;
+  }
+  tryOpenBlob(blob);
 }
 
 function renderPayslipsConsole(){
@@ -2557,9 +2596,9 @@ function renderEmployeeDashboard(){
     </button>`;
   }).join("") || '<div class="empty">אין נתונים עדיין.</div>';
 
-  // --- משמרות קרובות ---
-  const up=computeUpcomingForEmp(currentEmpId, 6);
-  $("empUpcomingSub").textContent = up.length ? `${up.length} משמרות מתוכננות` : "אין משמרות קרובות";
+  // --- משמרות קרובות: רק 7 הימים הקרובים ---
+  const up=computeUpcomingForEmp(currentEmpId, 2, 7);
+  $("empUpcomingSub").textContent = up.length ? `${up.length} משמרות ב-7 הימים הקרובים` : "אין משמרות ב-7 הימים הקרובים";
   $("empUpcomingBody").innerHTML = up.length ? up.map(u=>{
     const once=u.type==='once';
     return `<div class="up-item ${once?'once':''}">
@@ -2569,7 +2608,7 @@ function renderEmployeeDashboard(){
       </div>
       <span class="up-badge ${once?'once':'rec'}">${once?'חד-פעמית':'קבועה'}</span>
     </div>`;
-  }).join("") : '<div class="empty">אין משמרות קרובות בסידור.</div>';
+  }).join("") : '<div class="empty">אין משמרות ב-7 הימים הקרובים.</div>';
 
   // --- הערות מנהל: מ-3 המשמרות האחרונות שיש בהן משוב ---
   const notes=Object.keys(shifts).map(id=>({id,...shifts[id]}))
@@ -4094,7 +4133,7 @@ function recurringOccurrences(r, weeks, includeCancelled){
 }
 
 // איחוד קבועות + חד-פעמיות לתצוגת "המשמרות הקרובות"
-function computeUpcomingForEmp(empId, weeks){
+function computeUpcomingForEmp(empId, weeks, maxDays){
   const list=[];
   Object.values(recurring).forEach(r=>{
     if(r.employeeId!==empId) return;
@@ -4106,7 +4145,13 @@ function computeUpcomingForEmp(empId, weeks){
     if(o.employeeId===empId && o.date>=todayIso)
       list.push({date:o.date, startTime:o.startTime, endTime:o.endTime, type:'once'});
   });
-  return list.sort((a,b)=> a.date===b.date ? a.startTime.localeCompare(b.startTime) : a.date.localeCompare(b.date));
+  let result=list.sort((a,b)=> a.date===b.date ? a.startTime.localeCompare(b.startTime) : a.date.localeCompare(b.date));
+  if(maxDays){
+    const t=new Date(); t.setHours(0,0,0,0);
+    const limitIso=isoDate(new Date(t.getTime()+maxDays*86400000));
+    result=result.filter(u=> u.date>=todayIso && u.date<=limitIso);
+  }
+  return result;
 }
 
 /* ---------- הוספה / עריכה ---------- */
@@ -4119,6 +4164,7 @@ function setShiftType(type){
 }
 function clearShiftModal(){
   $("dayPicker").querySelectorAll("input").forEach(c=>c.checked=false);
+  $("shiftDate").removeAttribute("readonly");
   $("shiftDate").value=""; $("shiftStart").value="16:00"; $("shiftEnd").value="22:00";
 }
 function openAddShift(){
@@ -4171,6 +4217,14 @@ function saveShift(){
   } else {
     const date=$("shiftDate").value;
     if(!date){ toast("בחר תאריך"); return; }
+    if(shiftModalMode==="editOccurrence" && occEditRecurringId && occEditDate){
+      const r=recurring[occEditRecurringId];
+      const empId2=r?r.employeeId:schedSubEmpId;
+      db.ref("recurringShifts/"+occEditRecurringId+"/cancelledDates/"+occEditDate).set(true);
+      db.ref("oneTimeShifts").push({employeeId:empId2, date:occEditDate, startTime:start, endTime:end, createdAt:TS})
+        .then(()=>{ $("shiftDate").removeAttribute("readonly"); occEditRecurringId=null; occEditDate=null; closeModal("shiftModal"); toast("המופע עודכן ✓ (הפך לחד-פעמי לאותו יום)"); });
+      return;
+    }
     if(shiftModalMode==="editOnetime" && editingPlanId){
       db.ref("oneTimeShifts/"+editingPlanId).update({date, startTime:start, endTime:end})
         .then(()=>{ closeModal("shiftModal"); toast("המשמרת עודכנה ✓"); });
@@ -4206,7 +4260,10 @@ function renderCancelList(){
   if(occ.length===0){ box.innerHTML='<div class="empty">אין מופעים קרובים.</div>'; return; }
   box.innerHTML=occ.map(o=>`<div class="cancel-item ${o.cancelled?'off':''}">
       <span class="d">${fmtIsoShort(o.date)}${o.cancelled?' · בוטל':''}</span>
-      <button class="btn ${o.cancelled?'line':'danger'} sm" onclick="toggleCancelDate('${o.date}')">${o.cancelled?'שחזר':'בטל'}</button>
+      <div style="display:flex;gap:6px">
+        ${o.cancelled?'':`<button class="btn line sm" onclick="editOccurrence('${o.date}')">✏️ ערוך</button>`}
+        <button class="btn ${o.cancelled?'line':'danger'} sm" onclick="toggleCancelDate('${o.date}')">${o.cancelled?'שחזר':'בטל'}</button>
+      </div>
     </div>`).join("");
 }
 function toggleCancelDate(dateIso){
@@ -4215,6 +4272,20 @@ function toggleCancelDate(dateIso){
   const ref=db.ref("recurringShifts/"+cancelTargetId+"/cancelledDates/"+dateIso);
   const op = isCancelled ? ref.remove() : ref.set(true);
   op.then(()=>renderCancelList());
+}
+// עריכת מופע בודד: פותח את מודאל המשמרת עם התאריך נעול והזמן הקבוע. בשמירה — מבטל את המופע הקבוע ויוצר חד-פעמית.
+function editOccurrence(dateIso){
+  const r=recurring[cancelTargetId]; if(!r) return;
+  occEditRecurringId=cancelTargetId; occEditDate=dateIso;
+  shiftModalMode="editOccurrence"; editingPlanId=null;
+  $("shiftModalTitle").textContent="עריכת מופע בודד";
+  $("shiftModalWho").textContent=(employees[r.employeeId]?employees[r.employeeId].name:"")+" · "+fmtIsoShort(dateIso);
+  $("shiftTypeSeg").classList.add("hidden");
+  clearShiftModal(); setShiftType("onetime");
+  $("shiftDate").value=dateIso; $("shiftStart").value=r.startTime; $("shiftEnd").value=r.endTime;
+  $("shiftDate").setAttribute("readonly","readonly");
+  closeModal("cancelModal");
+  openModal("shiftModal");
 }
 
 /* ============================================================
