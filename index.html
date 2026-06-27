@@ -464,7 +464,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v22</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v23</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -489,7 +489,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v22</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v23</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -1470,6 +1470,7 @@ function enterEmployeeMode(user){
     currentRole="employee"; currentEmpId=id; empMonthKey=null; empNav="home";
     // הקפה: מאזינים לרשומות של העובד הנוכחי בלבד
     db.ref("takings/"+id).on("value", snap=>{ myTakings = snap.val()||{}; if(currentRole==="employee") renderEmployeeDashboard(); });
+    db.ref("payments/"+id).on("value", snap=>{ myPayments = snap.val()||{}; if(currentRole==="employee") renderEmployeeDashboard(); });
     $("authScreen").classList.add("hidden");
     $("app").classList.add("hidden");
     $("empApp").classList.remove("hidden");
@@ -1496,6 +1497,7 @@ function startDataListeners(){
   // הקפה לעובדים: המנהל טוען את כל הרשומות (העובד טוען רק את שלו ב-enterEmployeeMode)
   if(currentRole==="manager"){
     db.ref("takings").on("value", snap=>{ allTakings = snap.val()||{}; renderActive(); });
+    db.ref("payments").on("value", snap=>{ allPayments = snap.val()||{}; renderActive(); });
     db.ref("config/takingsSeenAt").on("value", snap=>{ const v=snap.val(); takingsSeen=(v && typeof v==='object')?v:{}; renderActive(); });
   }
 }
@@ -1747,6 +1749,8 @@ let empNav="home";       // 'home' | 'pay' | 'paymonth' | 'upcoming' | 'notes'
 let empNavMonth=null;    // מפתח החודש בתצוגת פירוט חודש
 let myTakings={};        // הקפה: רשומות העובד הנוכחי (נטען ב-enterEmployeeMode)
 let allTakings={};       // הקפה: כל הרשומות (נטען רק אצל המנהל)
+let myPayments={};       // מקדמות/תשלומים: של העובד הנוכחי (נטען ב-enterEmployeeMode)
+let allPayments={};      // מקדמות/תשלומים: כל הרשומות (נטען רק אצל המנהל)
 
 function applyEmpDashNav(){
   const map={home:"empHome",pay:"empPay",paymonth:"empPayMonth",upcoming:"empUpcoming",notes:"empNotes",hakafa:"empHakafa"};
@@ -1807,6 +1811,32 @@ function hakafaLimitInfo(empId, monthKey){
   const gross=empGrossForMonth(empId, monthKey);
   const limit=gross*0.25;
   return { sum, gross, limit, over: gross>0 && sum>limit };
+}
+
+/* ---------- מקדמות / תשלומים שניתנו לעובד ---------- */
+function paymentsListFor(empId, monthKey){
+  let src = (currentRole==="employee" && empId===currentEmpId) ? (myPayments||{}) : ((allPayments && allPayments[empId])||{});
+  return Object.keys(src).map(id=>({id,...src[id]}))
+    .filter(p=> p && (p.monthKey===monthKey || (!p.monthKey && p.createdAt && monthKeyOf(p.createdAt)===monthKey)))
+    .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+}
+function paymentsSumFor(empId, monthKey){
+  return paymentsListFor(empId, monthKey).reduce((a,p)=>a+(Number(p.amount)||0),0);
+}
+async function addPayment(empId, monthKey){
+  const amtStr = await uiPrompt({title:"תשלום / מקדמה", label:"סכום ששולם (₪)", value:"", inputmode:"decimal"});
+  if(amtStr===null) return;
+  const amt=parseFloat(amtStr);
+  if(isNaN(amt)||amt<=0){ toast("סכום לא תקין"); return; }
+  let note = await uiPrompt({title:"תשלום / מקדמה", label:"הערה (לא חובה)", value:""});
+  if(note===null) note="";
+  db.ref("payments/"+empId).push().set({ amount:amt, note:note.trim(), monthKey:monthKey, createdAt:TS })
+    .then(()=>toast("נרשם ✓")).catch(()=>toast("השמירה נכשלה"));
+}
+async function delPayment(empId, paymentId){
+  const ok=await uiConfirm("למחוק את התשלום הזה? הפעולה אינה ניתנת לביטול.", {okText:"מחק", danger:true, title:"מחיקת תשלום"});
+  if(!ok) return;
+  db.ref("payments/"+empId+"/"+paymentId).remove().then(()=>toast("נמחק ✓")).catch(()=>toast("המחיקה נכשלה"));
 }
 
 /* ---------- הקפה לעובדים (צד המנהל / קונסולה) ---------- */
@@ -2795,6 +2825,12 @@ function renderPayDetail(){
 
   const remaining=totalPay-paidPay;
   const payTk=takingsSumFor(paySubEmpId, paySelMonthKey);
+  const payList = paymentsListFor(paySubEmpId, paySelMonthKey);
+  const paidNow = payList.reduce((a,p)=>a+(Number(p.amount)||0),0);
+  const paymentsRows = payList.length ? payList.map(p=>`<div class="hk-row">
+    <div class="hk-main"><div class="hk-name">₪${(Number(p.amount)||0).toFixed(0)}${p.note?` · ${esc(p.note)}`:''}</div><div class="hk-date">${fmtDate(p.createdAt)}</div></div>
+    <div class="hk-acts"><button class="btn line sm" onclick="delPayment('${paySubEmpId}','${p.id}')">🗑️</button></div>
+  </div>`).join("") : '<div class="empty" style="padding:10px">עדיין לא נרשמו תשלומים לחודש זה.</div>';
   box.innerHTML=`
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
       <div class="section-title" style="margin:0">${monthLabel(paySelMonthKey)} · ${esc(e.name)} · ₪${rate}/שעה</div>
@@ -2810,6 +2846,15 @@ function renderPayDetail(){
       ${(remaining-payTk)<0
         ? `<div class="ps-row debt"><span>חוב — העובד לקח יותר ממה שהרוויח</span><span>-₪${Math.abs(remaining-payTk).toFixed(0)}</span></div>`
         : `<div class="ps-row big"><span>נטו אחרי הורדות</span><span class="rem">₪${(remaining-payTk).toFixed(0)}</span></div>`}`:''}
+    </div>
+    <div class="card" style="margin-top:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
+        <div class="section-title" style="margin:0">תשלומים / מקדמות</div>
+        <button class="btn sm" onclick="addPayment('${paySubEmpId}','${paySelMonthKey}')">➕ הוסף תשלום</button>
+      </div>
+      ${paymentsRows}
+      <div class="ps-row" style="margin-top:6px"><span>סך תשלומים שניתנו החודש</span><span>₪${paidNow.toFixed(0)}</span></div>
+      <div style="font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5">בשלב זה התשלומים נרשמים בלבד ועדיין לא משפיעים על "נותר לתשלום". בשלב הבא הם יחליפו את סימון "שולם" ויחושבו אוטומטית.</div>
     </div>
     ${netSummaryHtml(totalPay, e, monthRefDate(paySelMonthKey))}
     <div style="margin-top:14px;display:flex;flex-direction:column;gap:10px">
