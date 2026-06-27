@@ -494,7 +494,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v40</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v42</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -519,7 +519,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v40</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v42</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -685,6 +685,10 @@
       <!-- רשימת עובדים (תיקיות) -->
       <div id="payList">
         <div class="screen-head"><button class="back-btn" onclick="backToHome()">→ חזרה</button><h1 class="screen-title">💰 שכר ותשלומים</h1></div>
+        <div class="card" style="padding:12px 14px;margin-bottom:12px">
+          <label class="fld" style="margin:0 0 6px">חודש</label>
+          <select id="payTeamMonth" onchange="onPayTeamMonthChange()"></select>
+        </div>
         <div id="payTeamSummary"></div>
         <div class="card">
           <p class="sub">בחר עובד לצפייה בפירוט המשמרות, סך השעות והסכום לתשלום. ניתן לסמן תשלומים ולייצא דף סיכום לרו״ח.</p>
@@ -856,7 +860,7 @@
         <div class="screen-head"><button class="back-btn" onclick="formsBackToList()">→ חזרה לרשימה</button><h1 class="screen-title" id="formsDetailTitle">📋</h1></div>
         <div class="card">
           <button class="btn" style="width:100%;margin-bottom:8px" onclick="sendConsentForm(formsConsoleEmpId,'hakafa_consent')">➕ שלח הסכמה להקפה</button>
-          <button class="btn line" style="width:100%" onclick="sendConsentForm(formsConsoleEmpId,'payslip_consent')">➕ שלח הסכמה לתלוש אונליין</button>
+          <button class="btn" style="width:100%" onclick="sendConsentForm(formsConsoleEmpId,'payslip_consent')">➕ שלח הסכמה לתלוש אונליין</button>
         </div>
         <div class="card">
           <div id="formsDetailBody"></div>
@@ -1393,6 +1397,7 @@ let empMonthKey=null;     // החודש הנבחר בדשבורד העובד
 
 // --- בורר שכר ותשלומים ---
 let paySelMonthKey = null; // החודש הנבחר ("YYYY-MM")
+let payTeamMonthKey = null; // החודש הנבחר במסך הצוות (רשימת כל העובדים)
 
 /* ============================================================
    4. עזרים
@@ -3474,9 +3479,16 @@ function teamTakingsSum(monthKey){
   Object.keys(employees).forEach(id=>{ const e=employees[id]; if(!e || e.active===false) return; s += takingsSumFor(id, monthKey); });
   return s;
 }
+function renderPayTeamMonthOptions(){
+  const sel=$("payTeamMonth"); if(!sel) return;
+  const months=last12MonthKeys();
+  if(!payTeamMonthKey || months.indexOf(payTeamMonthKey)===-1) payTeamMonthKey=currentMonthKey();
+  sel.innerHTML=months.map(k=>`<option value="${k}" ${k===payTeamMonthKey?'selected':''}>${monthLabel(k)}</option>`).join("");
+}
+function onPayTeamMonthChange(){ payTeamMonthKey=$("payTeamMonth").value; renderPayCard(); try{window.scrollTo(0,0);}catch(e){} }
 function renderPayTeamSummary(){
   const el=$("payTeamSummary"); if(!el) return;
-  const mk=currentMonthKey();
+  const mk=payTeamMonthKey||currentMonthKey();
   const t=teamMonthTotals(mk);
   if(t.count===0){ el.innerHTML=""; return; }
   const tk=teamTakingsSum(mk);
@@ -3495,15 +3507,17 @@ function renderPayTeamSummary(){
 }
 
 function renderPayCard(){
+  renderPayTeamMonthOptions();
   renderPayTeamSummary();
   const foldersBox=$("payEmpFolders"); if(!foldersBox) return;
   const all=Object.keys(employees).map(id=>({id,...employees[id]})).sort(byNameHe);
   const active=all.filter(e=>e.active!==false);
   const inactive=all.filter(e=>e.active===false);
 
+  const mk=payTeamMonthKey||currentMonthKey();
   const folder = e => {
-    const {hours,pay}=monthTotals(e.id, e.hourlyRate||0);
-    return empFolderHtml(e, `החודש: ${fmtHours(hours)} · ₪${pay.toFixed(0)}`, "openPayEmp");
+    const cp=computeEmpPay(e.id, mk);
+    return empFolderHtml(e, `${monthLabel(mk)}: ${fmtHours(cp.totalH)} · ₪${cp.totalPay.toFixed(0)}`, "openPayEmp");
   };
   foldersBox.innerHTML = active.length ? active.map(folder).join("")
     : '<div class="empty">אין עובדים פעילים. הוסף עובד ב"ניהול עובדים".</div>';
@@ -3535,7 +3549,7 @@ function applyPayNav(){
   $("payArchive").classList.toggle("hidden", payView!=="archive");
   $("payDetail").classList.toggle("hidden", payView!=="detail");
 }
-function openPayEmp(empId){ paySubEmpId=empId; paySelMonthKey=null; payView="detail"; renderPayCard(); try{window.scrollTo(0,0);}catch(e){} }
+function openPayEmp(empId){ paySubEmpId=empId; paySelMonthKey=payTeamMonthKey||null; payView="detail"; renderPayCard(); try{window.scrollTo(0,0);}catch(e){} }
 function openPayArchive(){ payView="archive"; renderPayCard(); try{window.scrollTo(0,0);}catch(e){} }
 function payBackToList(){ payView="list"; paySubEmpId=null; renderPayCard(); try{window.scrollTo(0,0);}catch(e){} }
 
