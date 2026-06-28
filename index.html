@@ -406,6 +406,9 @@
   .emp-hero .eh-amount{font-size:46px;font-weight:800;letter-spacing:-.02em;margin:6px 0 4px;font-variant-numeric:tabular-nums}
   .emp-hero .eh-sub{font-size:13px;opacity:.85}
   .emp-hero .eh-est{display:inline-block;margin-top:12px;font-size:11.5px;font-weight:700;background:rgba(255,255,255,.18);color:#fff;border-radius:999px;padding:5px 12px;line-height:1.45}
+  .ls-head{font-weight:800;font-size:15px;margin-bottom:4px}
+  .ls-meta{font-size:13px;color:var(--muted);line-height:1.5}
+  .ls-mgr{margin-top:8px;background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:8px 10px;font-size:13px;color:#3730a3;line-height:1.5}
   .emp-next{display:flex;align-items:center;gap:10px;font-size:15.5px;font-weight:700}
   .emp-next .en-when{color:var(--primary)}
   /* תיקיות גדולות בדשבורד עובד */
@@ -494,7 +497,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v42</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v43</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -519,7 +522,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v42</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v43</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -923,6 +926,7 @@
         <div class="eh-sub" id="empOwedSub">—</div>
         <div class="eh-est">הסכום הוא הערכה בלבד — הסכום הסופי נקבע בתלוש מהרו"ח</div>
       </div>
+      <div id="empLastShift"></div>
       <div class="folder-grid">
         <button class="folder lg" onclick="openEmpNav('pay')">
           <span class="f-ico">💰</span>
@@ -2043,6 +2047,40 @@ async function acknowledgePayslip(slipId){
     .then(()=>toast("אישרת קבלת התלוש ✓"))
     .catch(()=>toast("שגיאה בשמירה"));
 }
+
+/* ---------- המשמרת האחרונה של העובד + הערה למנהל ---------- */
+function renderEmpLastShift(){
+  const box=$("empLastShift"); if(!box) return;
+  const mine=Object.keys(shifts).map(id=>({id,...shifts[id]})).filter(s=>s.employeeId===currentEmpId)
+    .sort((a,b)=>(b.clockIn||0)-(a.clockIn||0));
+  const s=mine[0];
+  if(!s){ box.innerHTML=""; return; }
+  const open=!s.clockOut;
+  const note=s.employeeNote||"";
+  const mgrFb=s.managerFeedback||"";
+  box.innerHTML=`<div class="card">
+    <div class="ls-head">המשמרת האחרונה שלך</div>
+    <div class="ls-meta">${fmtDate(s.clockIn)} · כניסה ${fmtTime(s.clockIn)} ← ${open?'במשמרת עכשיו':('יציאה '+fmtTime(s.clockOut))}</div>
+    ${mgrFb?`<div class="ls-mgr"><b>💬 משוב מהמנהל:</b> ${esc(mgrFb)}</div>`:''}
+    <label class="fld" style="margin-top:10px">הערה למנהל על המשמרת</label>
+    <textarea id="empShiftNoteInput" rows="3" placeholder="משהו שקרה במשמרת? בעיה בקופה? כתוב כאן והמנהל יראה...">${esc(note)}</textarea>
+    <button class="btn" style="width:100%;margin-top:8px" onclick="saveEmpShiftNote('${s.id}')">${note?'✓ עדכן הערה':'📨 שלח הערה למנהל'}</button>
+    ${note?`<button class="btn line sm" style="width:100%;margin-top:6px" onclick="deleteEmpShiftNote('${s.id}')">מחק הערה</button>`:''}
+  </div>`;
+}
+async function saveEmpShiftNote(shiftId){
+  const el=$("empShiftNoteInput"); if(!el) return;
+  const txt=(el.value||"").trim();
+  if(!txt){ toast("ההערה ריקה"); return; }
+  try{ await db.ref("shifts/"+shiftId).update({ employeeNote:txt, employeeNoteAt:TS }); toast("ההערה נשלחה למנהל ✓"); }
+  catch(e){ toast("שגיאה בשליחה — נסה שוב"); }
+}
+async function deleteEmpShiftNote(shiftId){
+  const ok=await uiConfirm("למחוק את ההערה?", {okText:"מחק", danger:true, title:"מחיקת הערה"});
+  if(!ok) return;
+  try{ await db.ref("shifts/"+shiftId).update({ employeeNote:null, employeeNoteAt:null }); toast("נמחק"); }
+  catch(e){ toast("שגיאה"); }
+}
 function openEmpForm(formId){
   const f=myForms[formId]; if(!f) return;
   if(f.status==="signed"){ toast("הטופס כבר נחתם"); return; }
@@ -2748,6 +2786,7 @@ function renderEmployeeDashboard(){
   if(psBtn) psBtn.classList.toggle("alert", newSlips>0);
   const psSub=$("payslipsEmpSub"); if(psSub) psSub.textContent = newSlips>0 ? "יש תלוש חדש — צפה/י ואשר/י קבלה" : "תלושי השכר שלך";
   renderEmpPayslips();
+  renderEmpLastShift();
 
   applyEmpDashNav();
 }
