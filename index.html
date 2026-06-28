@@ -168,6 +168,8 @@
   .sig-canvas{width:100%;height:180px;border:2px dashed var(--line);border-radius:12px;background:#fff;touch-action:none;display:block}
   .night-tag{display:inline-block;font-size:10px;font-weight:800;color:#3730a3;background:#e0e7ff;border-radius:999px;padding:2px 7px;margin-inline-start:4px;vertical-align:middle}
   .short-break-tag{display:inline-block;font-size:10px;font-weight:800;color:#fff;background:#2563eb;border-radius:999px;padding:2px 8px;margin-inline-start:4px;vertical-align:middle}
+  .alert-badge{display:inline-block;font-size:12px;font-weight:800;color:#fff;background:#ef4444;border-radius:999px;padding:2px 10px;margin-inline-start:6px;vertical-align:middle;box-shadow:0 0 0 0 rgba(239,68,68,.6);animation:alertPulse 1.6s infinite}
+  @keyframes alertPulse{0%{box-shadow:0 0 0 0 rgba(239,68,68,.55)}70%{box-shadow:0 0 0 9px rgba(239,68,68,0)}100%{box-shadow:0 0 0 0 rgba(239,68,68,0)}}
   .screen-head{display:flex;align-items:center;gap:12px;margin-bottom:18px}
   .back-btn{
     border:1px solid var(--line);background:#fff;color:var(--ink);
@@ -497,7 +499,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v43</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v44</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -522,7 +524,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v43</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v44</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -566,7 +568,7 @@
       <div class="folder-grid">
         <button class="folder" onclick="openFolder('overview')">
           <span class="f-ico">📊</span>
-          <span class="f-txt"><span class="f-title">סקירה</span><span class="f-sub">מי במשמרת עכשיו ומשמרות אחרונות</span></span>
+          <span class="f-txt"><span class="f-title">סקירה <span id="overviewNoteBadge" class="alert-badge hidden">💬 0</span></span><span class="f-sub">מי במשמרת עכשיו ומשמרות אחרונות</span></span>
           <span class="live-count hidden" id="homeLiveCount"></span>
           <span class="f-arr">→</span>
         </button>
@@ -926,7 +928,6 @@
         <div class="eh-sub" id="empOwedSub">—</div>
         <div class="eh-est">הסכום הוא הערכה בלבד — הסכום הסופי נקבע בתלוש מהרו"ח</div>
       </div>
-      <div id="empLastShift"></div>
       <div class="folder-grid">
         <button class="folder lg" onclick="openEmpNav('pay')">
           <span class="f-ico">💰</span>
@@ -959,6 +960,7 @@
           <span class="f-arr">→</span>
         </button>
       </div>
+      <div id="empLastShift"></div>
     </div>
 
     <!-- תשלומים: רשימת חודשים -->
@@ -1721,6 +1723,7 @@ function startDataListeners(){
     db.ref("payments").on("value", snap=>{ allPayments = snap.val()||{}; renderActive(); });
     db.ref("forms").on("value", snap=>{ allForms = snap.val()||{}; renderActive(); });
     db.ref("payslips").on("value", snap=>{ allPayslips = snap.val()||{}; renderActive(); });
+    db.ref("config/empNotesSeenAt").on("value", snap=>{ empNotesSeenAt = snap.val()||0; renderActive(); });
     db.ref("config/takingsSeenAt").on("value", snap=>{ const v=snap.val(); takingsSeen=(v && typeof v==='object')?v:{}; renderActive(); });
   }
 }
@@ -1797,6 +1800,7 @@ function openFolder(name){
   if(name==="hakafa"){ hkConsoleView="list"; hkConsoleEmpId=null; }
   if(name==="forms"){ formsConsoleView="list"; formsConsoleEmpId=null; }
   if(name==="payslips"){ payslipsConsoleView="list"; payslipsConsoleEmpId=null; }
+  if(name==="overview" && TS){ db.ref("config/empNotesSeenAt").set(TS); }
   applyConsoleNav();
   renderConsole();
   try{window.scrollTo(0,0);}catch(e){}
@@ -2219,6 +2223,7 @@ let payslipsConsoleView="list";  // 'list' | 'detail'
 let payslipsConsoleEmpId=null;
 let payslipUploadEmpId=null;      // העובד שמעלים לו תלוש כרגע
 let allPayslips={};  // מטא-דאטה של כל התלושים (מנהל) — בלי הקובץ עצמו
+let empNotesSeenAt=0; // חותמת: עד מתי המנהל ראה הערות עובדים
 let myPayslips={};   // מטא-דאטה של תלושי העובד הנוכחי
 const CONSENT_HAKAFA_TITLE = "הסכמה לניכוי משכר עבור מוצרים שנלקחו (הקפה)";
 const CONSENT_HAKAFA_BODY = `אני, החתום/ה מטה, מסכים/ה בזאת כי המעסיק ינכה משכרי את שווי המוצרים והקניות שאקח מהחנות לצריכה אישית ("הקפה"), בהתאם לרישום שמתבצע באפליקציה.
@@ -3044,6 +3049,7 @@ function renderConsole(){
   renderPayCard();
   renderPinStatus();
   renderHomeLiveCount();
+  renderOverviewNoteBadge();
   renderHakafaConsole();
   renderHakafaBadge();
   renderFormsConsole();
@@ -3063,6 +3069,15 @@ function renderHomeLiveCount(){
   } else {
     el.classList.add("hidden");
   }
+}
+// התראה אדומה בולטת על תיקיית הסקירה — מספר ההערות מעובדים שטרם נראו
+function renderOverviewNoteBadge(){
+  const el=$("overviewNoteBadge"); if(!el) return;
+  const seen=empNotesSeenAt||0;
+  let count=0;
+  Object.values(shifts).forEach(s=>{ if(s && s.employeeNote && s.employeeNoteAt && s.employeeNoteAt>seen) count++; });
+  if(count>0){ el.textContent="💬 "+count; el.classList.remove("hidden"); }
+  else el.classList.add("hidden");
 }
 
 // 10א. כרגע במשמרת
