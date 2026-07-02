@@ -170,6 +170,11 @@
   .short-break-tag{display:inline-block;font-size:10px;font-weight:800;color:#fff;background:#2563eb;border-radius:999px;padding:2px 8px;margin-inline-start:4px;vertical-align:middle}
   .alert-badge{display:inline-block;font-size:12px;font-weight:800;color:#fff;background:#ef4444;border-radius:999px;padding:2px 10px;margin-inline-start:6px;vertical-align:middle;box-shadow:0 0 0 0 rgba(239,68,68,.6);animation:alertPulse 1.6s infinite}
   @keyframes alertPulse{0%{box-shadow:0 0 0 0 rgba(239,68,68,.55)}70%{box-shadow:0 0 0 9px rgba(239,68,68,0)}100%{box-shadow:0 0 0 0 rgba(239,68,68,0)}}
+  .problem-alert{display:flex;align-items:center;gap:11px;background:#dc2626;color:#fff;border-radius:14px;padding:15px 16px;margin-bottom:14px;cursor:pointer;box-shadow:0 6px 18px rgba(220,38,38,.45);animation:bannerPulse 1.3s infinite}
+  .problem-alert .pa-ico{font-size:24px;flex-shrink:0;line-height:1}
+  .problem-alert .pa-text{font-weight:800;font-size:14.5px;line-height:1.4}
+  .problem-alert .pa-arr{margin-inline-start:auto;font-weight:800;font-size:18px;flex-shrink:0}
+  @keyframes bannerPulse{0%{box-shadow:0 6px 18px rgba(220,38,38,.35)}50%{box-shadow:0 6px 24px rgba(220,38,38,.85)}100%{box-shadow:0 6px 18px rgba(220,38,38,.35)}}
   .screen-head{display:flex;align-items:center;gap:12px;margin-bottom:18px}
   .back-btn{
     border:1px solid var(--line);background:#fff;color:var(--ink);
@@ -499,7 +504,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v46</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v47</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -524,7 +529,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v46</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v47</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -544,6 +549,11 @@
 
     <!-- תפריט ראשי (בית) -->
     <div id="consoleHome">
+      <div id="problemShiftAlert" class="problem-alert hidden" onclick="openFolder('overview')">
+        <span class="pa-ico">⚠️</span>
+        <span class="pa-text">יש משמרת עם בעיה שדורשת תיקון</span>
+        <span class="pa-arr">←</span>
+      </div>
       <!-- רשת 2×2: תיקיות שנכנסים אליהן מדי פעם -->
       <div class="mini-grid">
         <button class="mini-tile" onclick="openFolder('employees')">
@@ -3046,6 +3056,7 @@ function renderConsole(){
   renderPinStatus();
   renderHomeLiveCount();
   renderOverviewNoteBadge();
+  renderProblemShiftAlert();
   renderHakafaConsole();
   renderHakafaBadge();
   renderFormsConsole();
@@ -3061,6 +3072,18 @@ function renderHomeLiveCount(){
   }).length;
   if(n>0){
     el.innerHTML=`<span class="blip"></span> ${n} במשמרת`;
+    el.classList.remove("hidden");
+  } else {
+    el.classList.add("hidden");
+  }
+}
+// התראה אדומה בולטת בראש המסך — משמרות שנסגרו אוטומטית (בעיה שדורשת תיקון). נשארת עד שמתקנים.
+function renderProblemShiftAlert(){
+  const el=$("problemShiftAlert"); if(!el) return;
+  const n=Object.values(shifts).filter(s=>s && s.autoCloseFlag===true).length;
+  if(n>0){
+    const txt=el.querySelector(".pa-text");
+    if(txt) txt.textContent = n===1 ? "יש משמרת עם בעיה שדורשת תיקון — לחץ/י לבדיקה" : `יש ${n} משמרות עם בעיה שדורשות תיקון — לחץ/י לבדיקה`;
     el.classList.remove("hidden");
   } else {
     el.classList.add("hidden");
