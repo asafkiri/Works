@@ -507,7 +507,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v48</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v49</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -532,7 +532,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v48</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v49</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -2943,11 +2943,30 @@ function verifyClockPin(){
   }
 }
 
+// איתור משמרת פתוחה קיימת של עובד — סריקה בכל המשמרות, כולל "יתומות" ללא קישור
+function findOpenShiftId(empId){
+  let found=null;
+  Object.keys(shifts).forEach(id=>{
+    const s=shifts[id];
+    if(s && s.employeeId===empId && s.clockIn && !s.clockOut) found=id;
+  });
+  return found;
+}
+
 function clockIn(empId){
   const name = employees[empId] ? employees[empId].name : "";
+  // הגנה מכפילות: אם כבר קיימת משמרת פתוחה לעובד (גם יתומה) —
+  // מתקנים את הקישור אליה במקום לפתוח משמרת שנייה במקביל.
+  const existing = findOpenShiftId(empId);
+  if(existing){
+    db.ref("employees/"+empId+"/openShiftId").set(existing)
+      .then(()=> toast(name+" כבר במשמרת פתוחה — הקישור תוקן ✓"));
+    return;
+  }
   const inMs = Date.now();
   const ref = db.ref("shifts").push();
-  ref.set({
+  const updates = {};
+  updates["shifts/"+ref.key] = {
     employeeId: empId,
     clockIn: TS,
     clockOut: null,
@@ -2955,9 +2974,11 @@ function clockIn(empId){
     employeeNote: "",
     managerFeedback: "",
     edited: false
-  }).then(()=>{
-    return db.ref("employees/"+empId+"/openShiftId").set(ref.key);
-  }).then(()=> showClockSuccess({name, kind:'in', timeMs:inMs}))
+  };
+  updates["employees/"+empId+"/openShiftId"] = ref.key;
+  // כתיבה אטומית אחת — אין יותר מצב ביניים של משמרת שנשמרה בלי קישור
+  db.ref().update(updates)
+    .then(()=> showClockSuccess({name, kind:'in', timeMs:inMs}))
     .catch(e=> toast("שגיאה בשמירה"));
 }
 
@@ -2983,9 +3004,12 @@ function confirmClockOut(){
   if(openBrk) brkMs += (outMs - openBrk.start);
   const hrs   = cin ? Math.max(0,(outMs - cin - brkMs))/3600000 : 0;
 
-  db.ref("shifts/"+shiftId).update({ clockOut: TS })
-    .then(()=> openBrk ? db.ref("shifts/"+shiftId+"/breaks/"+openBrk.id+"/end").set(TS) : null)
-    .then(()=> db.ref("employees/"+empId+"/openShiftId").set(null))
+  const updates = {};
+  updates["shifts/"+shiftId+"/clockOut"] = TS;
+  if(openBrk) updates["shifts/"+shiftId+"/breaks/"+openBrk.id+"/end"] = TS;
+  updates["employees/"+empId+"/openShiftId"] = null;
+  // כתיבה אטומית אחת — אין מצב שהמשמרת נסגרת אבל הקישור נשאר (או להפך)
+  db.ref().update(updates)
     .then(()=> showClockSuccess({name, kind:'out', timeMs:outMs, hours:hrs}))
     .catch(e=> toast("שגיאה בשמירה"));
   pendingClockOutEmp=null;
@@ -3029,16 +3053,33 @@ function hideClockSuccess(){
 function checkAutoClose(){
   if(currentRole!=="manager") return; // סגירה אוטומטית מתבצעת רק בסשן המנהל (טרמינל), לא בדשבורד עובד
   const now = Date.now();
-  Object.keys(employees).forEach(empId=>{
-    const sid = employees[empId].openShiftId;
-    if(!sid) return;
+  // סורק את *כל* המשמרות — לא רק את המקושרות ב-openShiftId — כך שגם משמרת
+  // "יתומה" (שנפתחה בלי שהקישור נשמר, למשל בגלל ניתוק רשת) תיסגר ותקבל התראה.
+  Object.keys(shifts).forEach(sid=>{
     const s = shifts[sid];
-    if(!s || !s.clockIn || s.clockOut) return;
-    if(now - s.clockIn >= AUTO_CLOSE_HOURS*3600000){
-      const forcedOut = s.clockIn + AUTO_CLOSE_HOURS*3600000;
-      db.ref("shifts/"+sid).update({ clockOut: forcedOut, autoCloseFlag: true, pendingReview: true });
-      db.ref("employees/"+empId+"/openShiftId").set(null);
+    if(!s || !s.clockIn) return;
+
+    // תיקון רטרואקטיבי (30 ימים אחורה): משמרת שכבר נסגרה אוטומטית אבל בלי
+    // סימון לבדיקה (למשל ממכשיר שרץ גרסה ישנה) — מסמנים לבדיקה כדי שלא
+    // תיספר בשכר בשקט. אחרי אישור/תיקון של המנהל היא לא תיתפס שוב.
+    if(s.clockOut && s.autoCloseFlag===true && s.pendingReview===undefined
+       && now - s.clockIn < 30*24*3600000){
+      db.ref("shifts/"+sid+"/pendingReview").set(true);
+      return;
     }
+
+    if(s.clockOut) return; // סגורה ותקינה — אין מה לעשות
+    if(now - s.clockIn < AUTO_CLOSE_HOURS*3600000) return; // עדיין בטווח
+    const forcedOut = s.clockIn + AUTO_CLOSE_HOURS*3600000;
+    const updates = {};
+    updates["shifts/"+sid+"/clockOut"]      = forcedOut;
+    updates["shifts/"+sid+"/autoCloseFlag"] = true;
+    updates["shifts/"+sid+"/pendingReview"] = true;
+    const empId = s.employeeId;
+    if(empId && employees[empId] && employees[empId].openShiftId===sid){
+      updates["employees/"+empId+"/openShiftId"] = null;
+    }
+    db.ref().update(updates); // כתיבה אטומית אחת — או שהכל נשמר, או שכלום
   });
 }
 setInterval(()=>{ if(firebaseReady) checkAutoClose(); }, 60000);
