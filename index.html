@@ -299,6 +299,10 @@
   .emp-tile .badge .blip{width:8px;height:8px;border-radius:50%;background:var(--live);animation:pulse 1.6s infinite}
   .emp-tile.onbreak{background:#fff7ed;border-color:#fdba74}
   .emp-tile.onbreak .badge{color:#c2410c}
+  .emp-tile.closing{background:#eef6f4;border-color:#cfe6e0;cursor:default}
+  .emp-tile.closing .badge{color:var(--primary)}
+  .emp-tile.closing .cta{color:var(--primary)}
+  .emp-tile.closing:hover{transform:none;box-shadow:var(--shadow)}
   .break-btn{margin-top:12px;width:100%;padding:10px;border-radius:10px;border:1.5px solid #fdba74;background:#fff;color:#c2410c;font-weight:800;font-size:14px;cursor:pointer}
   .break-btn.ret{background:#16a34a;border-color:#16a34a;color:#fff}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
@@ -471,6 +475,8 @@
   .sc-name{font-size:23px;font-weight:800;letter-spacing:-.01em;margin:3px 0 2px}
   .sc-time{font-size:46px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.02em;margin:2px 0 8px}
   .sc-msg{font-size:16px;color:var(--ink-soft);line-height:1.5;margin:0}
+  .sc-grace{margin-top:14px;padding:12px 16px;background:#eef6f4;border:1px solid #cfe6e0;border-radius:14px;font-size:14px;font-weight:800;color:var(--primary-d);line-height:1.7}
+  .sc-grace .count-down{font-size:22px;font-variant-numeric:tabular-nums}
   .sc-hint{font-size:12.5px;color:var(--muted);margin-top:18px}
 
   /* ---------- טיימר חי + כרטיס "במשמרת עכשיו" בדשבורד ---------- */
@@ -510,7 +516,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v51</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v52</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -535,7 +541,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v51</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v52</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -1508,6 +1514,18 @@ function fmtHours(h){ const H=Math.floor(h); const M=Math.round((h-H)*60); retur
 function vibrate(p){ try{ if(navigator.vibrate) navigator.vibrate(p); }catch(e){} }
 // משך חי לטיימר רץ: "שע':דק':שנ'"
 function fmtDurationLive(ms){ if(ms<0) ms=0; const t=Math.floor(ms/1000); const H=Math.floor(t/3600); const M=Math.floor((t%3600)/60); const S=t%60; return H+":"+pad(M)+":"+pad(S); }
+// ספירה לאחור קצרה: "דק':שנ'"
+function fmtCountdown(ms){ if(ms<0) ms=0; const t=Math.ceil(ms/1000); const M=Math.floor(t/60); const S=t%60; return M+":"+pad(S); }
+// משמרת בחלון "זמן סגירה": נסגרה עם תוספת דקות ושעת היציאה הרשומה עדיין בעתיד
+function closingShiftOf(empId){
+  const now=Date.now();
+  let found=null;
+  Object.keys(shifts).forEach(id=>{
+    const s=shifts[id];
+    if(s && s.employeeId===empId && s.closingGraceMin && s.clockOut && s.clockOut>now) found={id,...s};
+  });
+  return found;
+}
 function inCurrentMonth(ts){ const d=new Date(ts), n=new Date(); return d.getFullYear()===n.getFullYear() && d.getMonth()===n.getMonth(); }
 
 const HEB_MONTHS=["ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"];
@@ -2741,7 +2759,18 @@ function renderEmployeeDashboard(){
       </div>`;
       lsEl.classList.remove("hidden");
     } else {
-      lsEl.innerHTML=""; lsEl.classList.add("hidden");
+      // חלון "זמן סגירה": היציאה נרשמה עם דקות נוספות שעדיין רצות
+      const cs=closingShiftOf(currentEmpId);
+      if(cs){
+        lsEl.innerHTML=`<div class="card live-card">
+          <div class="lc-head">⏳ זמן סגירה בתשלום</div>
+          <div class="lc-timer count-down" data-until="${cs.clockOut}">${fmtCountdown(cs.clockOut-Date.now())}</div>
+          <div class="lc-sub">היציאה נרשמה ${fmtTime(cs.clockOut)} — הדקות האלה נספרות בשכר, אפשר לסגור בנחת</div>
+        </div>`;
+        lsEl.classList.remove("hidden");
+      } else {
+        lsEl.innerHTML=""; lsEl.classList.add("hidden");
+      }
     }
   }
 
@@ -2924,6 +2953,19 @@ function renderTerminal(){
   grid.innerHTML = list.map(e=>{
     const os = e.openShiftId ? shifts[e.openShiftId] : null;
     const live = !!(os && !os.clockOut);
+    // חלון "זמן סגירה": היציאה כבר נרשמה, הדקות הנוספות עדיין רצות
+    const closing = !live ? closingShiftOf(e.id) : null;
+    if(closing){
+      return `
+      <div class="emp-tile closing">
+        <div class="badge">⏳ זמן סגירה</div>
+        <div>
+          <div class="nm">${esc(e.name)}</div>
+          <div class="state">היציאה נרשמה ${fmtTime(closing.clockOut)} · נותרו <span class="count-down" data-until="${closing.clockOut}">${fmtCountdown(closing.clockOut-Date.now())}</span></div>
+        </div>
+        <div class="cta">אפשר לסגור את החנות בנחת — הדקות בתשלום ✓</div>
+      </div>`;
+    }
     const brk = live ? currentBreakOf(os) : null;
     const onBreak = !!brk;
     const cin = live ? os.clockIn : 0;
@@ -3119,11 +3161,15 @@ let _clockSuccessTimer=null;
 function showClockSuccess(opts){
   opts=opts||{};
   const isIn = opts.kind!=='out';
+  const grace = !isIn && (opts.graceMin||0)>0;
+  const until = grace ? opts.timeMs : 0; // שעת היציאה הרשומה (בעתיד) — סוף חלון זמן הסגירה
   const t = fmtTime(opts.timeMs);
   const kicker = isIn ? 'כניסה נרשמה' : 'יציאה נרשמה';
   const msg = isIn
     ? 'שתהיה לך משמרת מצוינת 💪'
-    : ('עבדת '+fmtHours(opts.hours||0)+' היום'+(opts.graceMin?` · נוספו ${opts.graceMin} דק' זמן סגירה`:'')+' · תודה ולהתראות 👋');
+    : ('עבדת '+fmtHours(opts.hours||0)+' היום · תודה ולהתראות 👋');
+  const graceBlock = grace ? `
+    <div class="sc-grace">⏳ זמן סגירה בתשלום · נותרו <span class="count-down" data-until="${until}">${fmtCountdown(until-Date.now())}</span><br>אפשר לסגור את החנות בנחת — הדקות האלה נספרות בשכר</div>` : '';
   $("clockSuccessCard").innerHTML = `
     <div class="sc-ring ${isIn?'':'out'}">
       <svg class="sc-check ${isIn?'':'out'}" viewBox="0 0 60 60" aria-hidden="true">
@@ -3135,11 +3181,13 @@ function showClockSuccess(opts){
     <div class="sc-name">${esc(opts.name||'')}</div>
     <div class="sc-time">${t}</div>
     <p class="sc-msg">${msg}</p>
+    ${graceBlock}
     <div class="sc-hint">המסך נסגר מעצמו · אפשר להקיש כדי לסגור</div>`;
   $("clockSuccess").classList.add("show");
   vibrate(isIn ? [20,60,30] : [25,45,25]);
   clearTimeout(_clockSuccessTimer);
-  _clockSuccessTimer=setTimeout(hideClockSuccess, 2800);
+  const hideAfter = grace ? Math.max(2800, (until-Date.now())+800) : 2800;
+  _clockSuccessTimer=setTimeout(hideClockSuccess, hideAfter);
 }
 function hideClockSuccess(){
   clearTimeout(_clockSuccessTimer);
@@ -4638,6 +4686,16 @@ function updateLiveTimers(){
     if(!since) return;
     el.textContent=fmtDurationLive(now - since);
   });
+  // ספירות לאחור של "זמן סגירה"; כשספירה מסתיימת — רענון תצוגה אחד
+  let expired=false;
+  document.querySelectorAll(".count-down[data-until]").forEach(el=>{
+    const until=parseInt(el.getAttribute("data-until"),10);
+    if(!until) return;
+    const left=until-now;
+    el.textContent=fmtCountdown(left);
+    if(left<=0 && !el._done){ el._done=true; expired=true; }
+  });
+  if(expired) renderActive();
 }
 setInterval(tickClock,1000); tickClock();
 
