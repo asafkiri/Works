@@ -516,7 +516,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v54</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v55</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -541,7 +541,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v54</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v55</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -1766,10 +1766,11 @@ function enterEmployeeMode(user){
     // קודם לפי authUid
     Object.keys(emps).forEach(k=>{ if(emps[k].authUid===user.uid) id=k; });
     // גיבוי: לפי שם המשתמש (אם הקישור עוד לא נשמר) - ולקשר
+    let linkP=Promise.resolve();
     if(!id){
       const local=(user.email||"").split("@")[0].toLowerCase();
       Object.keys(emps).forEach(k=>{ if((emps[k].username||"").toLowerCase()===local && emps[k].linked!==true) id=k; });
-      if(id) db.ref("employees/"+id).update({ authUid:user.uid, linked:true, tempPassword:null });
+      if(id) linkP=db.ref("employees/"+id).update({ authUid:user.uid, linked:true, tempPassword:null });
     }
     if(!id){
       // אין רשומת עובד מקושרת - לא חשבון תקין במערכת
@@ -1786,6 +1787,12 @@ function enterEmployeeMode(user){
     db.ref("payments/"+id).on("value", snap=>{ myPayments = snap.val()||{}; if(currentRole==="employee") renderEmployeeDashboard(); });
     db.ref("forms/"+id).on("value", snap=>{ myForms = snap.val()||{}; if(currentRole==="employee") renderEmployeeDashboard(); });
     db.ref("payslips/"+id).on("value", snap=>{ myPayslips = snap.val()||{}; if(currentRole==="employee") renderEmployeeDashboard(); });
+    // פרטיות: מוודאים שהמיפוי חשבון→עובד קיים (נדרש לחוקי האבטחה), ורק אז
+    // נרשמים למשמרות ולסידור של העובד הזה בלבד — בשאילתות מסוננות.
+    linkP
+      .then(()=> db.ref("uidToEmp/"+user.uid).set(id))
+      .catch(()=>{ /* אם המיפוי נכשל (חוקים ישנים) - ההאזנה תעבוד לפי החוקים הקיימים */ })
+      .then(()=> attachMyShiftListeners(id));
     $("authScreen").classList.add("hidden");
     $("app").classList.add("hidden");
     $("empApp").classList.remove("hidden");
@@ -1793,13 +1800,33 @@ function enterEmployeeMode(user){
   });
 }
 
+// האזנה לנתוני העובד המחובר בלבד: משמרות וסידור מסוננים לפי המזהה שלו.
+// חוקי האבטחה מאשרים לעובד לקרוא רק שאילתות כאלה - לא את הרשימה המלאה.
+function attachMyShiftListeners(id){
+  db.ref("shifts").orderByChild("employeeId").equalTo(id).on("value", snap=>{
+    shifts = snap.val()||{};
+    if(currentRole==="employee") renderEmployeeDashboard();
+  });
+  db.ref("recurringShifts").orderByChild("employeeId").equalTo(id).on("value", snap=>{
+    recurring = snap.val()||{};
+    if(currentRole==="employee") renderEmployeeDashboard();
+  });
+  db.ref("oneTimeShifts").orderByChild("employeeId").equalTo(id).on("value", snap=>{
+    oneTime = snap.val()||{};
+    if(currentRole==="employee") renderEmployeeDashboard();
+  });
+}
+
 let listenersStarted=false;
 function startDataListeners(){
   if(listenersStarted) return; listenersStarted=true;
   db.ref("employees").on("value", snap=>{ employees = snap.val() || {}; renderActive(); if(currentRole==="manager") migrateToSecure(); });
-  db.ref("shifts").on("value",    snap=>{ shifts    = snap.val() || {}; renderActive(); checkAutoClose(); });
-  db.ref("recurringShifts").on("value", snap=>{ recurring = snap.val() || {}; if(currentView==="console") renderSchedule(); if(currentRole==="employee") renderEmployeeDashboard(); });
-  db.ref("oneTimeShifts").on("value",   snap=>{ oneTime   = snap.val() || {}; if(currentView==="console") renderSchedule(); if(currentRole==="employee") renderEmployeeDashboard(); if(currentRole==="manager") cleanupPastOneTimes(); });
+  // משמרות וסידור מלאים - למנהל בלבד. עובד מאזין רק לשלו (attachMyShiftListeners)
+  if(currentRole==="manager"){
+    db.ref("shifts").on("value",    snap=>{ shifts    = snap.val() || {}; renderActive(); checkAutoClose(); });
+    db.ref("recurringShifts").on("value", snap=>{ recurring = snap.val() || {}; if(currentView==="console") renderSchedule(); });
+    db.ref("oneTimeShifts").on("value",   snap=>{ oneTime   = snap.val() || {}; if(currentView==="console") renderSchedule(); cleanupPastOneTimes(); });
+  }
   // תוספת זמן סגירה: {enabled, times, minutes} או null אם לא הוגדר
   db.ref("config/closingGrace").on("value", snap=>{
     closingGrace = snap.val() || null;
@@ -1843,6 +1870,14 @@ function migrateToSecure(){
   db.ref("config/consolePin").once("value").then(snap=>{
     const oldPin=snap.val();
     if(oldPin!=null){ updates["secure/consolePin"]=oldPin; updates["config/consolePin"]=null; }
+    // מיפוי חשבון→עובד (נדרש לחוקי הפרטיות): משלימים לכל עובד מקושר שחסר לו
+    return db.ref("uidToEmp").once("value");
+  }).then(msnap=>{
+    const map=(msnap && msnap.val())||{};
+    Object.keys(employees).forEach(id=>{
+      const e=employees[id];
+      if(e && e.authUid && map[e.authUid]!==id) updates["uidToEmp/"+e.authUid]=id;
+    });
     if(Object.keys(updates).length===0) return;
     return db.ref().update(updates).then(()=>toast("נתונים רגישים הועברו לאחסון מאובטח ✓"));
   }).catch(()=>{ toast("העברת האבטחה נכשלה — ודא שפרסמת את חוקי האבטחה החדשים"); });
@@ -4198,7 +4233,13 @@ async function addLogin(empId){
   const pass=await uiPrompt({title:"הוספת התחברות", label:"סיסמה זמנית (לפחות 6 תווים):", value:""});
   if(pass===null) return;
   if(pass.length<6){ toast("הסיסמה קצרה מדי"); return; }
-  db.ref("employees/"+empId).update({ username:user, tempPassword:pass, authUid:null, linked:false })
+  const updates={};
+  updates["employees/"+empId+"/username"]=user;
+  updates["employees/"+empId+"/tempPassword"]=pass;
+  updates["employees/"+empId+"/authUid"]=null;
+  updates["employees/"+empId+"/linked"]=false;
+  if(e.authUid) updates["uidToEmp/"+e.authUid]=null; // ניקוי מיפוי של החשבון הישן
+  db.ref().update(updates)
     .then(()=>toast("ההתחברות נוספה ✓ — מסור לעובד"));
 }
 
@@ -4222,7 +4263,12 @@ async function resetEmpPass(empId){
     if(pass===null) return;
     pass=pass.trim();
     if(pass.length<6){ toast("הסיסמה קצרה מדי"); return; }
-    db.ref("employees/"+empId).update({ authUid:null, linked:false, tempPassword:pass })
+    const updates={};
+    updates["employees/"+empId+"/authUid"]=null;
+    updates["employees/"+empId+"/linked"]=false;
+    updates["employees/"+empId+"/tempPassword"]=pass;
+    if(e.authUid) updates["uidToEmp/"+e.authUid]=null; // ניקוי מיפוי של החשבון הישן
+    db.ref().update(updates)
       .then(()=> uiAlert(
         "✓ הקישור אופס. נשארו שני צעדים קצרים:\n\n"+
         "1) בקונסולת Firebase ← Authentication, מחק את המשתמש:\n"+e.username+"@"+LOGIN_DOMAIN+"\n(שלוש נקודות ליד השורה ← Delete account)\n\n"+
