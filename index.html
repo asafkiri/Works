@@ -516,7 +516,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v53</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v54</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -541,7 +541,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v53</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v54</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -1459,6 +1459,23 @@ let empView="list";   let empSubId=null;
 
 // זיהוי תפקיד המשתמש המחובר
 let currentRole=null;     // 'manager' | 'employee'
+// --- צומת מאובטח (secure): תעריפים וקודי החתמה, קריאים רק למנהל ---
+let secureRates={};       // empId -> תעריף לשעה (מנהל בלבד; עובד מקבל רק את שלו ב-myRate)
+let secureClockPins={};   // empId -> קוד החתמה בטרמינל (מנהל בלבד)
+let myRate=null;          // התעריף של העובד המחובר (נטען ב-enterEmployeeMode)
+// תעריף לפי עובד, עם נפילה-לאחור לשדה הישן (לפני המעבר לצומת המאובטח)
+function rateOf(empId){
+  if(currentRole==="employee" && empId===currentEmpId && myRate!=null) return myRate;
+  if(secureRates && secureRates[empId]!=null) return secureRates[empId];
+  const e=employees[empId];
+  return (e && e.hourlyRate!=null) ? e.hourlyRate : 0;
+}
+// קוד החתמה לפי עובד, עם נפילה-לאחור לשדה הישן
+function clockPinOf(empId){
+  if(secureClockPins && secureClockPins[empId]!=null) return secureClockPins[empId];
+  const e=employees[empId];
+  return (e && e.clockPin!=null) ? e.clockPin : null;
+}
 let currentEmpId=null;    // מזהה רשומת העובד המחובר (במצב עובד)
 let suppressRouting=false;// השהיית ניתוב בזמן יצירת חשבון עובד בכניסה ראשונה
 let empMonthKey=null;     // החודש הנבחר בדשבורד העובד
@@ -1765,6 +1782,7 @@ function enterEmployeeMode(user){
     currentRole="employee"; currentEmpId=id; empMonthKey=null; empNav="home";
     // הקפה: מאזינים לרשומות של העובד הנוכחי בלבד
     db.ref("takings/"+id).on("value", snap=>{ myTakings = snap.val()||{}; if(currentRole==="employee") renderEmployeeDashboard(); });
+    db.ref("secure/rates/"+id).on("value", snap=>{ myRate = snap.val(); if(currentRole==="employee") renderEmployeeDashboard(); });
     db.ref("payments/"+id).on("value", snap=>{ myPayments = snap.val()||{}; if(currentRole==="employee") renderEmployeeDashboard(); });
     db.ref("forms/"+id).on("value", snap=>{ myForms = snap.val()||{}; if(currentRole==="employee") renderEmployeeDashboard(); });
     db.ref("payslips/"+id).on("value", snap=>{ myPayslips = snap.val()||{}; if(currentRole==="employee") renderEmployeeDashboard(); });
@@ -1778,17 +1796,11 @@ function enterEmployeeMode(user){
 let listenersStarted=false;
 function startDataListeners(){
   if(listenersStarted) return; listenersStarted=true;
-  db.ref("employees").on("value", snap=>{ employees = snap.val() || {}; renderActive(); });
+  db.ref("employees").on("value", snap=>{ employees = snap.val() || {}; renderActive(); if(currentRole==="manager") migrateToSecure(); });
   db.ref("shifts").on("value",    snap=>{ shifts    = snap.val() || {}; renderActive(); checkAutoClose(); });
   db.ref("recurringShifts").on("value", snap=>{ recurring = snap.val() || {}; if(currentView==="console") renderSchedule(); if(currentRole==="employee") renderEmployeeDashboard(); });
   db.ref("oneTimeShifts").on("value",   snap=>{ oneTime   = snap.val() || {}; if(currentView==="console") renderSchedule(); if(currentRole==="employee") renderEmployeeDashboard(); if(currentRole==="manager") cleanupPastOneTimes(); });
-  db.ref("config/consolePin").on("value", snap=>{
-    pinConfig = snap.val() || null;
-    if(currentView==="console") renderPinStatus();
-    // נעילה בטעינה: אם הוגדר PIN ועדיין לא נפתח בסשן - מפנים לטרמינל
-    if(pinConfig && !consoleUnlocked && currentView==="console"){ applyView("terminal"); }
-  });
-  // תוספת זמן סגירה: {enabled, fromTime:"21:30", minutes:3} או null אם לא הוגדר
+  // תוספת זמן סגירה: {enabled, times, minutes} או null אם לא הוגדר
   db.ref("config/closingGrace").on("value", snap=>{
     closingGrace = snap.val() || null;
     if(currentView==="console" && consoleFolder==="settings") renderClosingGrace();
@@ -1798,6 +1810,15 @@ function startDataListeners(){
   db.ref("config/taxConfig").on("value", snap=>{ taxCfg = snap.val() || null; renderActive(); });
   // הקפה לעובדים: המנהל טוען את כל הרשומות (העובד טוען רק את שלו ב-enterEmployeeMode)
   if(currentRole==="manager"){
+    // הצומת המאובטח: קוד קונסולה, תעריפים וקודי החתמה — קריאים רק למנהל
+    db.ref("secure/consolePin").on("value", snap=>{
+      pinConfig = snap.val() || null;
+      if(currentView==="console") renderPinStatus();
+      // נעילה בטעינה: אם הוגדר PIN ועדיין לא נפתח בסשן - מפנים לטרמינל
+      if(pinConfig && !consoleUnlocked && currentView==="console"){ applyView("terminal"); }
+    });
+    db.ref("secure/rates").on("value", snap=>{ secureRates = snap.val()||{}; renderActive(); });
+    db.ref("secure/clockPins").on("value", snap=>{ secureClockPins = snap.val()||{}; renderActive(); });
     db.ref("takings").on("value", snap=>{ allTakings = snap.val()||{}; renderActive(); });
     db.ref("payments").on("value", snap=>{ allPayments = snap.val()||{}; renderActive(); });
     db.ref("forms").on("value", snap=>{ allForms = snap.val()||{}; renderActive(); });
@@ -1805,6 +1826,26 @@ function startDataListeners(){
     db.ref("config/empNotesSeenAt").on("value", snap=>{ empNotesSeenAt = snap.val()||0; renderActive(); });
     db.ref("config/takingsSeenAt").on("value", snap=>{ const v=snap.val(); takingsSeen=(v && typeof v==='object')?v:{}; renderActive(); });
   }
+}
+
+// מעבר חד-פעמי לצומת המאובטח: מעתיק תעריפים, קודי החתמה וקוד קונסולה,
+// ומוחק אותם מהמיקומים הישנים שהיו קריאים לכל עובד מחובר. אידמפוטנטי — רץ רק אם נשאר מה להעביר.
+let _secureMigrationRan=false;
+function migrateToSecure(){
+  if(_secureMigrationRan || currentRole!=="manager") return;
+  const updates={};
+  Object.keys(employees).forEach(id=>{
+    const e=employees[id]; if(!e) return;
+    if(e.hourlyRate!=null){ updates["secure/rates/"+id]=e.hourlyRate; updates["employees/"+id+"/hourlyRate"]=null; }
+    if(e.clockPin!=null){ updates["secure/clockPins/"+id]=e.clockPin; updates["employees/"+id+"/clockPin"]=null; }
+  });
+  _secureMigrationRan=true;
+  db.ref("config/consolePin").once("value").then(snap=>{
+    const oldPin=snap.val();
+    if(oldPin!=null){ updates["secure/consolePin"]=oldPin; updates["config/consolePin"]=null; }
+    if(Object.keys(updates).length===0) return;
+    return db.ref().update(updates).then(()=>toast("נתונים רגישים הועברו לאחסון מאובטח ✓"));
+  }).catch(()=>{ toast("העברת האבטחה נכשלה — ודא שפרסמת את חוקי האבטחה החדשים"); });
 }
 
 /* ============================================================
@@ -2024,13 +2065,13 @@ async function setPin(){
   if(v===null) return;
   const code=v.trim();
   if(!/^\d{4,}$/.test(code)){ toast("הקוד חייב להיות לפחות 4 ספרות"); return; }
-  db.ref("config/consolePin").set(code).then(()=>{ consoleUnlocked=true; toast("קוד ה-PIN נשמר ✓"); });
+  db.ref("secure/consolePin").set(code).then(()=>{ consoleUnlocked=true; toast("קוד ה-PIN נשמר ✓"); });
 }
 async function removePin(){
   if(!pinConfig){ toast("אין קוד מוגדר"); return; }
   const ok=await uiConfirm("להסיר את קוד ה-PIN? הקונסולה תהיה פתוחה לכל מי שמחובר למכשיר.", {danger:true, okText:"הסר"});
   if(!ok) return;
-  db.ref("config/consolePin").remove().then(()=>toast("קוד ה-PIN הוסר"));
+  db.ref("secure/consolePin").remove().then(()=>toast("קוד ה-PIN הוסר"));
 }
 function renderPinStatus(){
   const st=$("pinStatus"); if(!st) return;
@@ -2755,7 +2796,7 @@ function renderHakafaConsole(){
 
 // חישוב סיכומי חודש לעובד
 function empMonthTotals(monthKey){
-  const e=employees[currentEmpId]; const rate=e?e.hourlyRate||0:0;
+  const e=employees[currentEmpId]; const rate=rateOf(currentEmpId);
   const list=payShiftsFor(currentEmpId, monthKey);
   let totalH=0;
   list.forEach(s=>{ totalH+=netHoursOf(s); });
@@ -3055,7 +3096,7 @@ let clockPadEmpId=null;
 let clockPadBuf="";
 function openClockPad(empId){
   const e=employees[empId]; if(!e) return;
-  if(!e.clockPin){
+  if(!clockPinOf(empId)){
     uiAlert("לעובד "+e.name+" עדיין לא הוגדר קוד החתמה.\nהמנהל יכול להגדיר קוד בקונסולה (ניהול עובדים).");
     return;
   }
@@ -3090,7 +3131,7 @@ function keypadDelete(){
 }
 function verifyClockPin(){
   const e=employees[clockPadEmpId]; if(!e){ closeClockPad(); return; }
-  if(clockPadBuf===String(e.clockPin)){
+  if(clockPadBuf===String(clockPinOf(clockPadEmpId))){
     const id=clockPadEmpId;
     closeClockPad();
     clockIn(id);
@@ -3360,7 +3401,7 @@ function empFolderHtml(e, subText, fnName){
 }
 // דף פרטי עובד מלא (תצוגה נקייה עם פעולות)
 function empDetailHtml(e){
-  const {hours,pay} = monthTotals(e.id, e.hourlyRate||0);
+  const {hours,pay} = monthTotals(e.id, rateOf(e.id));
   const linked = e.linked===true;
   const loginVal = e.username
     ? `${esc(e.username)} ${linked?'<span class="pill edit">התחבר ✓</span>':'<span class="pill live">טרם התחבר</span>'}`
@@ -3377,16 +3418,16 @@ function empDetailHtml(e){
          <div class="det-k"><div class="det-lbl">התחברות לדשבורד</div><div class="det-val">לא הוגדרה</div></div>
          <button class="btn line sm" onclick="addLogin('${e.id}')">הוסף</button>
        </div>`;
-  const pinVal = e.clockPin ? esc(String(e.clockPin)) : '<span style="color:var(--danger)">לא הוגדר ⚠</span>';
+  const pinVal = clockPinOf(e.id) ? esc(String(clockPinOf(e.id))) : '<span style="color:var(--danger)">לא הוגדר ⚠</span>';
   return `<div class="card">
     <div class="det-row">
-      <div class="det-k"><div class="det-lbl">תעריף לשעה</div><div class="det-val">₪${e.hourlyRate||0}</div></div>
+      <div class="det-k"><div class="det-lbl">תעריף לשעה</div><div class="det-val">₪${rateOf(e.id)}</div></div>
       <button class="btn line sm" onclick="editRate('${e.id}')">שנה</button>
     </div>
     ${loginRow}
     <div class="det-row">
       <div class="det-k"><div class="det-lbl">קוד החתמה בטרמינל</div><div class="det-val">${pinVal}</div></div>
-      <button class="btn line sm" onclick="setClockPin('${e.id}')">${e.clockPin?'שנה':'הגדר'}</button>
+      <button class="btn line sm" onclick="setClockPin('${e.id}')">${clockPinOf(e.id)?'שנה':'הגדר'}</button>
     </div>
     <div class="det-row">
       <div class="det-k"><div class="det-lbl">שכר החודש (לפי החתמות)</div><div class="det-val">${fmtHours(hours)} · ₪${pay.toFixed(0)}</div></div>
@@ -3420,7 +3461,7 @@ function renderEmpList(){
   const active=all.filter(e=> e.active!==false);
   const inactive=all.filter(e=> e.active===false);
 
-  const folder = e => empFolderHtml(e, `₪${e.hourlyRate||0}/שעה${e.clockPin?'':' · ⚠ אין קוד החתמה'}`, "openEmpDetail");
+  const folder = e => empFolderHtml(e, `₪${rateOf(e.id)}/שעה${clockPinOf(e.id)?'':' · ⚠ אין קוד החתמה'}`, "openEmpDetail");
   foldersBox.innerHTML = active.length ? active.map(folder).join("")
     : '<div class="empty">עדיין אין עובדים פעילים. הוסף עובד למעלה כדי להתחיל.</div>';
   const arch=$("empArchiveFolders");
@@ -3719,7 +3760,7 @@ function isNightShift(s){ return nightHoursInShift(s.clockIn, s.clockOut)>=2; }
 // חישוב שכר חודשי לעובד. אם שעות נוספות מופעלות — מחשב 125%/150% (יומי+לילה+שבועי 42).
 // אחרת — שעות × תעריף פשוט. מחזיר פירוט מלא.
 function computeEmpPay(empId, monthKey){
-  const e=employees[empId]; const rate=e?e.hourlyRate||0:0;
+  const e=employees[empId]; const rate=rateOf(empId);
   const otOn = e && e.overtimeEnabled===true;
   const allShifts=Object.values(shifts).filter(s=> s.employeeId===empId && s.clockIn && s.clockOut && !s.pendingReview)
     .sort((a,b)=>(a.clockIn||0)-(b.clockIn||0));
@@ -3865,7 +3906,7 @@ function onPayMonthChange(){
 function renderPayDetail(){
   const box=$("payBody"); if(!box) return;
   const e=employees[paySubEmpId]; if(!e){ box.innerHTML=""; return; }
-  const rate=e.hourlyRate||0;
+  const rate=rateOf(paySubEmpId);
   const list=payShiftsFor(paySubEmpId, paySelMonthKey);
 
   if(list.length===0){
@@ -3953,7 +3994,7 @@ async function payFullMonth(empId, monthKey){
 // אוסף את נתוני הדוח לעובד/חודש הנבחרים (משותף לשני סוגי הדוחות)
 function payReportData(){
   const e=employees[paySubEmpId]; if(!e) return null;
-  const rate=e.hourlyRate||0;
+  const rate=rateOf(paySubEmpId);
   const list=payShiftsFor(paySubEmpId, paySelMonthKey);
   if(list.length===0){ toast("אין משמרות לייצוא"); return null; }
   const days=["א","ב","ג","ד","ה","ו","ש"];
@@ -4109,10 +4150,16 @@ function addEmployee(){
   // בדיקת כפילות מול עובדים קיימים (אותיות קטנות)
   const taken=Object.values(employees).some(e=> (e.username||"").toLowerCase()===user);
   if(taken){ toast("שם המשתמש כבר תפוס על ידי עובד אחר"); return; }
-  db.ref("employees").push({
-    name, hourlyRate:rate, active:true, openShiftId:null, createdAt:TS,
-    username:user, tempPassword:pass, authUid:null, linked:false, clockPin:pin, birthDate:birth
-  }).then(()=>{
+  // כתיבה אטומית: הרשומה הציבורית + התעריף וקוד ההחתמה בצומת המאובטח, ביחד
+  const newId=db.ref("employees").push().key;
+  const updates={};
+  updates["employees/"+newId]={
+    name, active:true, openShiftId:null, createdAt:TS,
+    username:user, tempPassword:pass, authUid:null, linked:false, birthDate:birth
+  };
+  updates["secure/rates/"+newId]=rate;
+  updates["secure/clockPins/"+newId]=pin;
+  db.ref().update(updates).then(()=>{
     $("newEmpName").value=""; $("newEmpRate").value="";
     $("newEmpUser").value=""; $("newEmpPass").value=""; $("newEmpPin").value=""; $("newEmpBirth").value="";
     toast("העובד נוסף ✓ — מסור לו שם משתמש, סיסמה וקוד החתמה");
@@ -4122,20 +4169,20 @@ function addEmployee(){
 // הגדרה/שינוי של קוד החתמה (4 ספרות) לעובד
 async function setClockPin(empId){
   const e=employees[empId]; if(!e) return;
-  const v=await uiPrompt({title:"קוד החתמה בטרמינל", label:"קוד 4 ספרות עבור "+e.name+":", value:e.clockPin||"", inputmode:"numeric", maxlength:4});
+  const v=await uiPrompt({title:"קוד החתמה בטרמינל", label:"קוד 4 ספרות עבור "+e.name+":", value:clockPinOf(empId)||"", inputmode:"numeric", maxlength:4});
   if(v===null) return;
   const pin=v.trim();
   if(!/^\d{4}$/.test(pin)){ toast("הקוד חייב להיות 4 ספרות בדיוק"); return; }
-  db.ref("employees/"+empId+"/clockPin").set(pin).then(()=>toast("קוד ההחתמה עודכן ✓"));
+  db.ref("secure/clockPins/"+empId).set(pin).then(()=>toast("קוד ההחתמה עודכן ✓"));
 }
 
 async function editRate(empId){
   const e=employees[empId]; if(!e) return;
-  const v=await uiPrompt({title:"תעריף לשעה", label:"תעריף חדש (₪) עבור "+e.name+":", value:e.hourlyRate||0, inputmode:"decimal"});
+  const v=await uiPrompt({title:"תעריף לשעה", label:"תעריף חדש (₪) עבור "+e.name+":", value:rateOf(empId), inputmode:"decimal"});
   if(v===null) return;
   const r=parseFloat(v);
   if(isNaN(r)||r<0){ toast("תעריף לא תקין"); return; }
-  db.ref("employees/"+empId+"/hourlyRate").set(r).then(()=>toast("התעריף עודכן ✓"));
+  db.ref("secure/rates/"+empId).set(r).then(()=>toast("התעריף עודכן ✓"));
 }
 
 // הוספת התחברות לעובד שנוצר ללא שם משתמש (עובדים ישנים)
