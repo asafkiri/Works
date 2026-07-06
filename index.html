@@ -477,6 +477,10 @@
   .sc-msg{font-size:16px;color:var(--ink-soft);line-height:1.5;margin:0}
   .sc-grace{margin-top:14px;padding:12px 16px;background:#eef6f4;border:1px solid #cfe6e0;border-radius:14px;font-size:14px;font-weight:800;color:var(--primary-d);line-height:1.7}
   .sc-grace .count-down{font-size:22px;font-variant-numeric:tabular-nums}
+  .conn-banner{background:#7f1d1d;color:#fff;font-weight:800;font-size:15px;text-align:center;padding:12px 16px;border-radius:14px;margin-bottom:14px;animation:connPulse 1.6s ease-in-out infinite}
+  @keyframes connPulse{0%,100%{opacity:1}50%{opacity:.75}}
+  .pending-spin{font-size:44px;margin-bottom:10px;animation:connPulse 1.2s ease-in-out infinite}
+  #clockPending{cursor:default}
   .sc-hint{font-size:12.5px;color:var(--muted);margin-top:18px}
 
   /* ---------- טיימר חי + כרטיס "במשמרת עכשיו" בדשבורד ---------- */
@@ -516,7 +520,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v55</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v57</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -541,7 +545,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v55</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v57</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -940,6 +944,7 @@
 
   <!-- ---------------- טרמינל חנות ---------------- -->
   <div id="viewTerminal" class="wrap hidden">
+    <div id="connBanner" class="conn-banner hidden">⚠️ אין חיבור לאינטרנט — אי אפשר להחתים כרגע. בדקו את הרשת.</div>
     <div class="kiosk-head">
       <div class="clock" id="kioskClock">--:--</div>
       <div class="date" id="kioskDate"></div>
@@ -1383,6 +1388,15 @@
 </div>
 
 <!-- ============================ מסך הצלחה אחרי החתמה (טרמינל) ============================ -->
+<!-- ============================ שכבת "ההחתמה עדיין לא נשמרה" ============================ -->
+<div id="clockPending" class="success-screen">
+  <div class="success-card">
+    <div class="pending-spin">⏳</div>
+    <div class="sc-kicker" style="color:#b45309">ההחתמה עדיין לא נשמרה</div>
+    <p class="sc-msg" style="font-weight:800">ממתין לחיבור לאינטרנט...<br>אל תכבו את המכשיר ואל תעזבו את המסך —<br>ברגע שהחיבור יחזור, ההחתמה תישמר ותקבלו אישור.</p>
+  </div>
+</div>
+
 <div id="clockSuccess" class="success-screen" onclick="hideClockSuccess()">
   <div class="success-card" id="clockSuccessCard"></div>
 </div>
@@ -1820,6 +1834,8 @@ function attachMyShiftListeners(id){
 let listenersStarted=false;
 function startDataListeners(){
   if(listenersStarted) return; listenersStarted=true;
+  // מעקב חיבור ל-Firebase: מפעיל את הבאנר בטרמינל וחוסם החתמות בניתוק
+  db.ref(".info/connected").on("value", snap=>{ dbConnected=(snap.val()===true); updateConnBanner(); });
   db.ref("employees").on("value", snap=>{ employees = snap.val() || {}; renderActive(); if(currentRole==="manager") migrateToSecure(); });
   // משמרות וסידור מלאים - למנהל בלבד. עובד מאזין רק לשלו (attachMyShiftListeners)
   if(currentRole==="manager"){
@@ -2865,7 +2881,7 @@ function renderEmployeeDashboard(){
         lsEl.innerHTML=`<div class="card live-card">
           <div class="lc-head">⏳ זמן סגירה בתשלום</div>
           <div class="lc-timer count-down" data-until="${cs.clockOut}">${fmtCountdown(cs.clockOut-Date.now())}</div>
-          <div class="lc-sub">היציאה נרשמה ${fmtTime(cs.clockOut)} — הדקות האלה נספרות בשכר, אפשר לסגור בנחת</div>
+          <div class="lc-sub">המשמרת שלך נסגרה ונשמרה ✓ יציאה ${fmtTime(cs.clockOut)} — הדקות שנותרו נספרות בשכר, אפשר לסגור בנחת</div>
         </div>`;
         lsEl.classList.remove("hidden");
       } else {
@@ -3061,7 +3077,7 @@ function renderTerminal(){
         <div class="badge">⏳ זמן סגירה</div>
         <div>
           <div class="nm">${esc(e.name)}</div>
-          <div class="state">היציאה נרשמה ${fmtTime(closing.clockOut)} · נותרו <span class="count-down" data-until="${closing.clockOut}">${fmtCountdown(closing.clockOut-Date.now())}</span></div>
+          <div class="state">המשמרת סגורה ✓ יציאה ${fmtTime(closing.clockOut)} · זמן סגירה: נותרו <span class="count-down" data-until="${closing.clockOut}">${fmtCountdown(closing.clockOut-Date.now())}</span></div>
         </div>
         <div class="cta">אפשר לסגור את החנות בנחת — הדקות בתשלום ✓</div>
       </div>`;
@@ -3093,9 +3109,17 @@ function renderTerminal(){
 
 function onEmployeeTap(empId){
   const e=employees[empId]; if(!e) return;
-  if(e.openShiftId){
-    const os=shifts[e.openShiftId];
-    if(os && currentBreakOf(os)){ endBreak(empId); return; } // בהפסקה -> לחיצה מחזירה מההפסקה
+  // אין חיבור -> אין החתמה. בלי וי, בלי ספירה — הודעה ברורה בלבד.
+  if(!dbConnected){
+    vibrate([40,40,40]);
+    uiAlert("אין חיבור לאינטרנט — אי אפשר להחתים כרגע.\nבדקו את הרשת ונסו שוב; ההחתמה תתאפשר ברגע שהחיבור יחזור.", "אין חיבור");
+    return;
+  }
+  // אותה בדיקת "פתוחה באמת" כמו בתצוגת האריח — מצביע תקוע לא פותח מסך סיום
+  const os = e.openShiftId ? shifts[e.openShiftId] : null;
+  const live = !!(os && !os.clockOut);
+  if(live){
+    if(currentBreakOf(os)){ endBreak(empId); return; } // בהפסקה -> לחיצה מחזירה מההפסקה
     // יש משמרת פתוחה -> סיום (ללא קוד, עם הערה אופציונלית)
     pendingClockOutEmp = empId;
     $("noteWho").textContent = e.name + " · סיום משמרת";
@@ -3110,7 +3134,8 @@ function onEmployeeTap(empId){
 function startBreak(empId){
   const e=employees[empId]; if(!e || !e.openShiftId) return;
   const os=shifts[e.openShiftId];
-  if(os && currentBreakOf(os)) return; // כבר בהפסקה
+  if(!os || os.clockOut) return; // מצביע תקוע על משמרת סגורה — לא כותבים הפסקה
+  if(currentBreakOf(os)) return; // כבר בהפסקה
   db.ref("shifts/"+e.openShiftId+"/breaks").push().set({ start: TS, end: null })
     .then(()=> toast("יצאת להפסקה ☕"))
     .catch(()=> toast("שגיאה בשמירה"));
@@ -3118,7 +3143,8 @@ function startBreak(empId){
 function endBreak(empId){
   const e=employees[empId]; if(!e || !e.openShiftId) return;
   const os=shifts[e.openShiftId];
-  const open=os?currentBreakOf(os):null;
+  if(!os || os.clockOut) return; // מצביע תקוע על משמרת סגורה — אין מה לסגור
+  const open=currentBreakOf(os);
   if(!open) return;
   const mins=Math.round((Date.now()-open.start)/60000);
   db.ref("shifts/"+e.openShiftId+"/breaks/"+open.id+"/end").set(TS)
@@ -3127,6 +3153,29 @@ function endBreak(empId){
 }
 
 /* ---------- מקלדת קוד החתמה ---------- */
+/* ---------- אמינות החתמה: מעקב חיבור + אישור שרת ---------- */
+let dbConnected=true;
+function updateConnBanner(){
+  const b=$("connBanner"); if(b) b.classList.toggle("hidden", dbConnected);
+}
+// כתיבת החתמה עם אישור שרת אמיתי: מסך ההצלחה מופיע רק אחרי שהשרת אישר.
+// אם אין אישור תוך 4 שניות — שכבת אזהרה בולטת עד שהכתיבה נשמרת בפועל.
+let _pendingTimer=null;
+function commitClock(updates, onOk){
+  clearTimeout(_pendingTimer);
+  _pendingTimer=setTimeout(()=>{ $("clockPending").classList.add("show"); }, 4000);
+  db.ref().update(updates)
+    .then(()=>{
+      clearTimeout(_pendingTimer);
+      $("clockPending").classList.remove("show");
+      onOk();
+    })
+    .catch(()=>{
+      clearTimeout(_pendingTimer);
+      $("clockPending").classList.remove("show");
+      uiAlert("ההחתמה לא נשמרה! נסו שוב, ואם זה חוזר — בדקו את חיבור האינטרנט.", "שגיאה בשמירה");
+    });
+}
 let clockPadEmpId=null;
 let clockPadBuf="";
 function openClockPad(empId){
@@ -3213,10 +3262,8 @@ function clockIn(empId){
     edited: false
   };
   updates["employees/"+empId+"/openShiftId"] = ref.key;
-  // כתיבה אטומית אחת — אין יותר מצב ביניים של משמרת שנשמרה בלי קישור
-  db.ref().update(updates)
-    .then(()=> showClockSuccess({name, kind:'in', timeMs:inMs}))
-    .catch(e=> toast("שגיאה בשמירה"));
+  // כתיבה אטומית אחת, עם אישור שרת אמיתי לפני מסך ההצלחה
+  commitClock(updates, ()=> showClockSuccess({name, kind:'in', timeMs:inMs}));
 }
 
 // ביטול סיום משמרת — סוגר את המודאל ומשאיר את המשמרת פתוחה (ללא שמירה)
@@ -3249,10 +3296,8 @@ function confirmClockOut(){
   if(graceMin>0) updates["shifts/"+shiftId+"/closingGraceMin"] = graceMin;
   if(openBrk) updates["shifts/"+shiftId+"/breaks/"+openBrk.id+"/end"] = TS;
   updates["employees/"+empId+"/openShiftId"] = null;
-  // כתיבה אטומית אחת — אין מצב שהמשמרת נסגרת אבל הקישור נשאר (או להפך)
-  db.ref().update(updates)
-    .then(()=> showClockSuccess({name, kind:'out', timeMs:finalOut, hours:hrs, graceMin}))
-    .catch(e=> toast("שגיאה בשמירה"));
+  // כתיבה אטומית אחת, עם אישור שרת אמיתי לפני מסך ההצלחה והספירה
+  commitClock(updates, ()=> showClockSuccess({name, kind:'out', timeMs:finalOut, hours:hrs, graceMin}));
   pendingClockOutEmp=null;
 }
 
@@ -3269,7 +3314,7 @@ function showClockSuccess(opts){
     ? 'שתהיה לך משמרת מצוינת 💪'
     : ('עבדת '+fmtHours(opts.hours||0)+' היום · תודה ולהתראות 👋');
   const graceBlock = grace ? `
-    <div class="sc-grace">⏳ זמן סגירה בתשלום · נותרו <span class="count-down" data-until="${until}">${fmtCountdown(until-Date.now())}</span><br>אפשר לסגור את החנות בנחת — הדקות האלה נספרות בשכר</div>` : '';
+    <div class="sc-grace">היציאה נרשמה והמשמרת סגורה ✓<br>⏳ זמן סגירה בתשלום · נותרו <span class="count-down" data-until="${until}">${fmtCountdown(until-Date.now())}</span><br>אפשר לסגור את החנות בנחת — הדקות האלה נספרות בשכר</div>` : '';
   $("clockSuccessCard").innerHTML = `
     <div class="sc-ring ${isIn?'':'out'}">
       <svg class="sc-check ${isIn?'':'out'}" viewBox="0 0 60 60" aria-hidden="true">
@@ -3412,7 +3457,7 @@ function renderOpenShifts(){
   const open=Object.keys(employees)
     .filter(id=>employees[id].openShiftId)
     .map(id=>({id, e:employees[id], s:shifts[employees[id].openShiftId]}))
-    .filter(x=>x.s);
+    .filter(x=>x.s && !x.s.clockOut); // מצביע תקוע על משמרת סגורה לא נחשב "במשמרת"
   if(open.length===0){ box.innerHTML='<div class="empty">אף אחד לא במשמרת כרגע.</div>'; return; }
   box.innerHTML = open.map(x=>{
     const dur = fmtHours(hoursBetween(x.s.clockIn, Date.now()));
