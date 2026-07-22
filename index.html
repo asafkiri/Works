@@ -413,9 +413,21 @@
   .grace-fold[open] .grace-chevron{transform:rotate(180deg)}
   .grace-fold-body{padding:0 20px 20px;border-top:1px solid var(--line)}
   .grace-fold-body > .sub{margin-top:14px}
+  .grace-time-head,.grace-day-row{
+    display:grid;grid-template-columns:72px minmax(0,1fr) minmax(0,1fr);gap:8px;align-items:center;
+  }
+  .grace-time-head{margin:10px 0 6px;color:var(--muted);font-size:12px;font-weight:800;text-align:center}
+  .grace-time-head span:first-child{text-align:right}
+  .grace-day-row{margin-bottom:8px}
+  .grace-day-name{font-weight:700;font-size:14px}
+  .grace-day-row input[type=time]{min-width:0;padding:10px 7px;text-align:center;font-size:14px;direction:ltr;font-variant-numeric:tabular-nums}
+  .grace-range-note{color:var(--muted);font-size:12px;line-height:1.5;margin:4px 0 12px}
   @media(max-width:560px){
     .grace-fold > summary{padding:17px}
     .grace-fold-body{padding:0 17px 17px}
+    .grace-time-head,.grace-day-row{grid-template-columns:66px minmax(0,1fr) minmax(0,1fr);gap:6px}
+    .grace-day-name{font-size:13px}
+    .grace-day-row input[type=time]{padding:10px 5px;font-size:13px}
   }
 
   /* ---------- אזור הדפסה / ייצוא PDF ---------- */
@@ -538,7 +550,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v59</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v60</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -563,7 +575,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v59</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v60</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -858,13 +870,13 @@
             <span class="grace-chevron" aria-hidden="true">⌄</span>
           </summary>
           <div class="grace-fold-body">
-            <p class="sub">בכניסה בשעת הפתיחה שנקבעה או לפניה, שעת הכניסה נרשמת מוקדם יותר במספר הדקות שהוגדר — זמן פתיחה בתשלום עבור הכנת החנות.</p>
+            <p class="sub">בכניסה בתוך טווח הפתיחה שנקבע, שעת הכניסה נרשמת מוקדם יותר במספר הדקות שהוגדר — זמן פתיחה בתשלום עבור הכנת החנות.</p>
             <div class="net-toggle-row">
               <span class="lbl">הפעל תוספת זמן לפתיחה</span>
               <label class="switch"><input type="checkbox" id="ogEnabled" aria-label="הפעל תוספת זמן לפתיחה" onchange="ogSyncFields()"><span class="sl"></span></label>
             </div>
             <div id="ogFields" class="hidden">
-              <label class="fld">שעת פתיחה לכל יום — התוספת חלה על כניסה בשעה הזו או לפניה. השאר יום ריק אם באותו יום אין תוספת.</label>
+              <label class="fld">טווח פתיחה לכל יום — התוספת חלה רק על כניסה בין "משעה" ל"עד שעה", כולל. השאר את שני השדות ריקים אם באותו יום אין תוספת.</label>
               <div id="ogDayRows" style="margin-top:6px"></div>
               <div class="net-field" style="margin-top:12px">
                 <label class="fld">דקות שמופחתות משעת הכניסה (1–15)</label>
@@ -883,14 +895,15 @@
             <span class="grace-chevron" aria-hidden="true">⌄</span>
           </summary>
           <div class="grace-fold-body">
-            <p class="sub">ביציאה אחרי השעה שנקבעה, נוספות אוטומטית דקות לשעת היציאה — פיצוי על סגירת החנות (תריס, כיבוי אורות) שנעשית אחרי ההחתמה בטרמינל.</p>
+            <p class="sub">ביציאה בתוך טווח הסגירה שנקבע, נוספות אוטומטית דקות לשעת היציאה — פיצוי על סגירת החנות (תריס, כיבוי אורות) שנעשית אחרי ההחתמה בטרמינל.</p>
             <div class="net-toggle-row">
               <span class="lbl">הפעל תוספת זמן לסגירה</span>
               <label class="switch"><input type="checkbox" id="cgEnabled" aria-label="הפעל תוספת זמן לסגירה" onchange="cgSyncFields()"><span class="sl"></span></label>
             </div>
             <div id="cgFields" class="hidden">
-              <label class="fld">שעת סגירה לכל יום — התוספת חלה על יציאה מהשעה הזו ואילך. השאר יום ריק אם באותו יום אין תוספת.</label>
+              <label class="fld">טווח סגירה לכל יום — התוספת חלה רק על יציאה בין "משעה" ל"עד שעה", כולל. השאר את שני השדות ריקים אם באותו יום אין תוספת.</label>
               <div id="cgDayRows" style="margin-top:6px"></div>
+              <p class="grace-range-note">אפשר להגדיר טווח שעובר חצות, למשל 20:00 עד 01:00.</p>
               <div class="net-field" style="margin-top:12px">
                 <label class="fld">דקות שנוספות לשעת היציאה (1–15)</label>
                 <input type="number" id="cgMinutes" inputmode="numeric" min="1" max="15" step="1" value="3">
@@ -1509,8 +1522,8 @@ let occEditDate = null;           // עריכת מופע בודד: התאריך 
 
 // --- נעילת קונסולה (PIN) ---
 let pinConfig = null;        // קוד ה-PIN השמור (או null אם לא הוגדר)
-let openingGrace = null;     // תוספת זמן פתיחה: {enabled, times, minutes} או null
-let closingGrace = null;     // תוספת זמן סגירה: {enabled, fromTime, minutes} או null
+let openingGrace = null;     // תוספת פתיחה: {enabled, fromTimes, times(עד), minutes} או null
+let closingGrace = null;     // תוספת סגירה: {enabled, times(משעה), toTimes, minutes} או null
 let consoleUnlocked = false; // האם הקונסולה נפתחה בסשן הנוכחי
 let pendingDeviceManager = false; // האם ממתינים ל-PIN כדי להפוך מכשיר ל"מנהל"
 let consoleFolder = null;    // התיקייה הפתוחה בקונסולה (null = תפריט הבית)
@@ -2198,21 +2211,89 @@ function renderPinStatus(){
 }
 
 /* ---------- תוספת זמן פתיחה ---------- */
+const GRACE_DAY_NAMES=["ראשון","שני","שלישי","רביעי","חמישי","שישי","שבת"];
+
+// מחזיר את טווח הזמן ליום. בנתונים הישנים הייתה רק שעת סף אחת,
+// ולכן ממירים אותה לטווח ששומר בדיוק על ההתנהגות הקודמת.
+function graceRangeValues(c,dow,kind,useDefaults){
+  c=c||{};
+  const hasLegacyTime=c.times!==undefined || c.fromTime!==undefined;
+  const legacyTime=c.times!==undefined ? ((c.times && c.times[dow])||"") : (c.fromTime||"");
+  if(kind==="opening"){
+    if(c.fromTimes!==undefined){
+      return {from:(c.fromTimes && c.fromTimes[dow])||"", to:legacyTime};
+    }
+    if(hasLegacyTime) return legacyTime ? {from:"00:00",to:legacyTime} : {from:"",to:""};
+    return useDefaults ? {from:"05:00",to:"06:00"} : {from:"",to:""};
+  }
+  if(c.toTimes!==undefined){
+    return {from:legacyTime, to:(c.toTimes && c.toTimes[dow])||""};
+  }
+  if(hasLegacyTime){
+    if(!legacyTime) return {from:"",to:""};
+    return {from:legacyTime,to:hhmmToMin(legacyTime)>=720?"05:59":"23:59"};
+  }
+  return useDefaults ? {from:"21:30",to:"23:59"} : {from:"",to:""};
+}
+
+function renderGraceDayRows(rowsId,c,kind){
+  const rowsEl=$(rowsId); if(!rowsEl) return;
+  const fromPrefix=kind==="opening"?"ogFrom":"cgT";
+  const toPrefix=kind==="opening"?"ogT":"cgTo";
+  rowsEl.innerHTML=`<div class="grace-time-head" aria-hidden="true"><span>יום</span><span>משעה</span><span>עד שעה</span></div>`+
+    GRACE_DAY_NAMES.map((nm,i)=>{
+      const r=graceRangeValues(c,i,kind,true);
+      return `<div class="grace-day-row" role="group" aria-label="יום ${nm}">
+        <span class="grace-day-name">${nm}</span>
+        <input type="time" id="${fromPrefix}${i}" value="${esc(r.from)}" aria-label="יום ${nm}, משעה">
+        <input type="time" id="${toPrefix}${i}" value="${esc(r.to)}" aria-label="יום ${nm}, עד שעה">
+      </div>`;
+    }).join("");
+}
+
+function collectGraceRanges(fromPrefix,toPrefix){
+  const fromTimes={},toTimes={};
+  for(let i=0;i<7;i++){
+    const fromEl=$(fromPrefix+i),toEl=$(toPrefix+i);
+    fromTimes[i]=fromEl?(fromEl.value||""):"";
+    toTimes[i]=toEl?(toEl.value||""):"";
+  }
+  return {fromTimes,toTimes};
+}
+
+function validateGraceRanges(ranges){
+  let any=false;
+  for(let i=0;i<7;i++){
+    const from=ranges.fromTimes[i],to=ranges.toTimes[i];
+    if((from&&!to)||(!from&&to)){
+      toast(`ביום ${GRACE_DAY_NAMES[i]} יש למלא גם "משעה" וגם "עד שעה"`);
+      return false;
+    }
+    if(from&&to) any=true;
+  }
+  if(!any){ toast("יש למלא טווח זמן מלא לפחות ליום אחד"); return false; }
+  return true;
+}
+
+// טווח שחוצה חצות שייך ליום שבו הוא התחיל; הקצוות כלולים לפי דקה.
+function graceRangeApplies(c,dow,nowMin,kind){
+  const prev=graceRangeValues(c,(dow+6)%7,kind,false);
+  if(prev.from&&prev.to){
+    const prevFrom=hhmmToMin(prev.from),prevTo=hhmmToMin(prev.to);
+    if(prevFrom>prevTo && nowMin<=prevTo) return true;
+  }
+  const today=graceRangeValues(c,dow,kind,false);
+  if(!today.from||!today.to) return false;
+  const from=hhmmToMin(today.from),to=hhmmToMin(today.to);
+  if(from<=to) return nowMin>=from&&nowMin<=to;
+  return nowMin>=from;
+}
+
 function renderOpeningGrace(){
   const en=$("ogEnabled"); if(!en) return;
   const c=openingGrace||{};
   en.checked = c.enabled===true;
-  const dayNames=["ראשון","שני","שלישי","רביעי","חמישי","שישי","שבת"];
-  const rowsEl=$("ogDayRows");
-  if(rowsEl){
-    rowsEl.innerHTML = dayNames.map((nm,i)=>{
-      const v = (c.times && c.times[i]!=null) ? c.times[i] : (c.fromTime||"06:00");
-      return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-        <span style="flex:0 0 72px;font-weight:700;font-size:14px">יום ${nm}</span>
-        <input type="time" id="ogT${i}" value="${esc(v)}" style="flex:1">
-      </div>`;
-    }).join("");
-  }
+  renderGraceDayRows("ogDayRows",c,"opening");
   if(c.minutes!=null) $("ogMinutes").value=c.minutes;
   ogSyncFields();
 }
@@ -2223,23 +2304,16 @@ function ogSyncFields(){
 function saveOpeningGrace(){
   const enabled=$("ogEnabled").checked;
   const minutes=parseInt($("ogMinutes").value,10);
-  const times={};
-  for(let i=0;i<7;i++){ const el=$("ogT"+i); times[i]= el ? (el.value||"") : ""; }
+  const ranges=collectGraceRanges("ogFrom","ogT");
   if(enabled){
-    const any=Object.keys(times).some(k=>times[k]);
-    if(!any){ toast("יש למלא שעה לפחות ליום אחד"); return; }
+    if(!validateGraceRanges(ranges)) return;
     if(isNaN(minutes)||minutes<1||minutes>15){ toast("מספר הדקות חייב להיות בין 1 ל-15"); return; }
   }
   // הנתיב config/closingGrace כבר מורשה לשמירה; הפתיחה נשמרת כילד נפרד בתוכו.
-  db.ref("config/closingGrace/opening").set({ enabled, times, minutes:isNaN(minutes)?3:minutes, updatedAt:Date.now() })
+  // times נשמר כשעת הסיום גם בשביל תאימות לגרסאות הישנות.
+  db.ref("config/closingGrace/opening").set({ enabled, fromTimes:ranges.fromTimes, times:ranges.toTimes, minutes:isNaN(minutes)?3:minutes, updatedAt:Date.now() })
     .then(()=>toast(enabled?"תוספת זמן הפתיחה הופעלה ✓":"תוספת זמן הפתיחה כובתה"))
     .catch(()=>toast("השמירה נכשלה, נסה שוב"));
-}
-// השעה שנקבעה לפתיחה ביום מסוים (או null אם אין ליום זה)
-function openingGraceTimeFor(dow){
-  const c=openingGrace||{};
-  if(c.times && c.times[dow]!=null) return c.times[dow]||null;
-  return c.fromTime||null;
 }
 // כמה דקות יש להפחית משעת הכניסה בזמן נתון (0 אם לא חל)
 function openingGraceMinFor(inMs){
@@ -2247,8 +2321,7 @@ function openingGraceMinFor(inMs){
   if(!c || c.enabled!==true) return 0;
   const d=new Date(inMs);
   const nowMin=d.getHours()*60+d.getMinutes();
-  const t=openingGraceTimeFor(d.getDay());
-  if(!t || nowMin>hhmmToMin(t)) return 0;
+  if(!graceRangeApplies(c,d.getDay(),nowMin,"opening")) return 0;
   const m=parseInt(c.minutes,10);
   return (isNaN(m)||m<1) ? 0 : Math.min(15, m);
 }
@@ -2258,18 +2331,7 @@ function renderClosingGrace(){
   const en=$("cgEnabled"); if(!en) return;
   const c=closingGrace||{};
   en.checked = c.enabled===true;
-  // בניית שורות הימים (א'–ש') עם השעה השמורה לכל יום; נפילה לשעה הישנה אם קיימת
-  const dayNames=["ראשון","שני","שלישי","רביעי","חמישי","שישי","שבת"];
-  const rowsEl=$("cgDayRows");
-  if(rowsEl){
-    rowsEl.innerHTML = dayNames.map((nm,i)=>{
-      const v = (c.times && c.times[i]!=null) ? c.times[i] : (c.fromTime||"21:30");
-      return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-        <span style="flex:0 0 72px;font-weight:700;font-size:14px">יום ${nm}</span>
-        <input type="time" id="cgT${i}" value="${esc(v)}" style="flex:1">
-      </div>`;
-    }).join("");
-  }
+  renderGraceDayRows("cgDayRows",c,"closing");
   if(c.minutes!=null) $("cgMinutes").value=c.minutes;
   cgSyncFields();
 }
@@ -2280,23 +2342,16 @@ function cgSyncFields(){
 function saveClosingGrace(){
   const enabled=$("cgEnabled").checked;
   const minutes=parseInt($("cgMinutes").value,10);
-  const times={};
-  for(let i=0;i<7;i++){ const el=$("cgT"+i); times[i]= el ? (el.value||"") : ""; }
+  const ranges=collectGraceRanges("cgT","cgTo");
   if(enabled){
-    const any=Object.keys(times).some(k=>times[k]);
-    if(!any){ toast("יש למלא שעה לפחות ליום אחד"); return; }
+    if(!validateGraceRanges(ranges)) return;
     if(isNaN(minutes)||minutes<1||minutes>15){ toast("מספר הדקות חייב להיות בין 1 ל-15"); return; }
   }
   // update שומר את closingGrace.opening ולא מוחק את הגדרת הפתיחה.
-  db.ref("config/closingGrace").update({ enabled, times, minutes:isNaN(minutes)?3:minutes, updatedAt:Date.now() })
+  // times נשמר כשעת ההתחלה גם בשביל תאימות לגרסאות הישנות.
+  db.ref("config/closingGrace").update({ enabled, times:ranges.fromTimes, toTimes:ranges.toTimes, minutes:isNaN(minutes)?3:minutes, updatedAt:Date.now() })
     .then(()=>toast(enabled?"תוספת זמן הסגירה הופעלה ✓":"תוספת זמן הסגירה כובתה"))
     .catch(()=>toast("השמירה נכשלה, נסה שוב"));
-}
-// השעה שנקבעה ליום מסוים בשבוע (או null אם אין ליום זה); תומך גם בהגדרה הישנה (שעה אחת)
-function graceTimeFor(dow){
-  const c=closingGrace||{};
-  if(c.times && c.times[dow]!=null) return c.times[dow]||null;
-  return c.fromTime||null;
 }
 // כמה דקות תוספת מגיעות ליציאה בזמן נתון (0 אם לא חל)
 function closingGraceMinFor(outMs){
@@ -2304,17 +2359,7 @@ function closingGraceMinFor(outMs){
   if(!c || c.enabled!==true) return 0;
   const d=new Date(outMs);
   const nowMin=d.getHours()*60+d.getMinutes();
-  const dow=d.getDay();
-  let applies=false;
-  // חל מהשעה שנקבעה ליום הזה ואילך
-  const tToday=graceTimeFor(dow);
-  if(tToday && nowMin>=hhmmToMin(tToday)) applies=true;
-  // אחרי חצות (עד 06:00): שייך לסגירה של אתמול, אם השעה של אתמול היא שעת ערב
-  if(!applies && nowMin<360){
-    const tPrev=graceTimeFor((dow+6)%7);
-    if(tPrev && hhmmToMin(tPrev)>=720) applies=true;
-  }
-  if(!applies) return 0;
+  if(!graceRangeApplies(c,d.getDay(),nowMin,"closing")) return 0;
   const m=parseInt(c.minutes,10);
   return (isNaN(m)||m<1) ? 0 : Math.min(15, m);
 }
