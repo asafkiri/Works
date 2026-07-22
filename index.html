@@ -538,7 +538,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v58</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v59</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -563,7 +563,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v58</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v59</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -1892,14 +1892,21 @@ function startDataListeners(){
     db.ref("recurringShifts").on("value", snap=>{ recurring = snap.val() || {}; if(currentView==="console") renderSchedule(); });
     db.ref("oneTimeShifts").on("value",   snap=>{ oneTime   = snap.val() || {}; if(currentView==="console") renderSchedule(); cleanupPastOneTimes(); });
   }
-  // תוספות זמן פתיחה וסגירה: הגדרות עצמאיות לכל יום בשבוע
-  db.ref("config/openingGrace").on("value", snap=>{
-    openingGrace = snap.val() || null;
-    if(currentView==="console" && consoleFolder==="settings") renderOpeningGrace();
-  });
+  // שתי ההגדרות נשמרות תחת הנתיב הקיים של הסגירה, שמורשה כבר בחוקי Firebase.
+  // הפתיחה נמצאת ב-closingGrace.opening כדי ששמירה של צד אחד לא תדרוס את השני.
   db.ref("config/closingGrace").on("value", snap=>{
-    closingGrace = snap.val() || null;
-    if(currentView==="console" && consoleFolder==="settings") renderClosingGrace();
+    const root=snap.val() || null;
+    const nextOpening=(root && root.opening) ? root.opening : null;
+    const nextClosing=root ? {...root} : null;
+    if(nextClosing) delete nextClosing.opening;
+    const openingChanged=JSON.stringify(openingGrace)!==JSON.stringify(nextOpening);
+    const closingChanged=JSON.stringify(closingGrace)!==JSON.stringify(nextClosing);
+    openingGrace=nextOpening;
+    closingGrace=nextClosing;
+    if(currentView==="console" && consoleFolder==="settings"){
+      if(openingChanged) renderOpeningGrace();
+      if(closingChanged) renderClosingGrace();
+    }
   });
   // שלב 1: נתוני מס מ-Firebase (אם קיימים). אם אין — taxCfg נשאר null והחישוב
   // ממשיך עם ברירת המחדל של 2026. רק קריאה; אין כאן כתיבה או מסך.
@@ -2223,7 +2230,8 @@ function saveOpeningGrace(){
     if(!any){ toast("יש למלא שעה לפחות ליום אחד"); return; }
     if(isNaN(minutes)||minutes<1||minutes>15){ toast("מספר הדקות חייב להיות בין 1 ל-15"); return; }
   }
-  db.ref("config/openingGrace").set({ enabled, times, minutes:isNaN(minutes)?3:minutes, updatedAt:Date.now() })
+  // הנתיב config/closingGrace כבר מורשה לשמירה; הפתיחה נשמרת כילד נפרד בתוכו.
+  db.ref("config/closingGrace/opening").set({ enabled, times, minutes:isNaN(minutes)?3:minutes, updatedAt:Date.now() })
     .then(()=>toast(enabled?"תוספת זמן הפתיחה הופעלה ✓":"תוספת זמן הפתיחה כובתה"))
     .catch(()=>toast("השמירה נכשלה, נסה שוב"));
 }
@@ -2279,7 +2287,8 @@ function saveClosingGrace(){
     if(!any){ toast("יש למלא שעה לפחות ליום אחד"); return; }
     if(isNaN(minutes)||minutes<1||minutes>15){ toast("מספר הדקות חייב להיות בין 1 ל-15"); return; }
   }
-  db.ref("config/closingGrace").set({ enabled, times, minutes:isNaN(minutes)?3:minutes, updatedAt:Date.now() })
+  // update שומר את closingGrace.opening ולא מוחק את הגדרת הפתיחה.
+  db.ref("config/closingGrace").update({ enabled, times, minutes:isNaN(minutes)?3:minutes, updatedAt:Date.now() })
     .then(()=>toast(enabled?"תוספת זמן הסגירה הופעלה ✓":"תוספת זמן הסגירה כובתה"))
     .catch(()=>toast("השמירה נכשלה, נסה שוב"));
 }
