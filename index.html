@@ -400,6 +400,24 @@
     .screen-title{font-size:19px}
   }
 
+  /* ---------- הגדרות זמן פתיחה / סגירה מתקפלות ---------- */
+  .card.grace-fold{padding:0;overflow:hidden}
+  .grace-fold > summary{
+    list-style:none;cursor:pointer;padding:20px;
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    font-size:18px;font-weight:800;letter-spacing:-.01em;
+  }
+  .grace-fold > summary::-webkit-details-marker{display:none}
+  .grace-fold > summary:focus-visible{outline:3px solid rgba(15,110,102,.28);outline-offset:-3px}
+  .grace-chevron{color:var(--muted);font-size:20px;line-height:1;transition:transform .18s}
+  .grace-fold[open] .grace-chevron{transform:rotate(180deg)}
+  .grace-fold-body{padding:0 20px 20px;border-top:1px solid var(--line)}
+  .grace-fold-body > .sub{margin-top:14px}
+  @media(max-width:560px){
+    .grace-fold > summary{padding:17px}
+    .grace-fold-body{padding:0 17px 17px}
+  }
+
   /* ---------- אזור הדפסה / ייצוא PDF ---------- */
   #printArea{display:none}
   .pr-wrap{padding:26px;color:#000;background:#fff;direction:rtl;font-family:inherit}
@@ -520,7 +538,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v57</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v58</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -545,7 +563,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v57</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v58</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -834,25 +852,55 @@
           </div>
         </div>
 
-        <div class="card">
-          <h2>תוספת זמן סגירה</h2>
-          <p class="sub">ביציאה אחרי השעה שנקבעה, נוספות אוטומטית דקות לשעת היציאה — פיצוי על סגירת החנות (תריס, כיבוי אורות) שנעשית אחרי ההחתמה בטרמינל.</p>
-          <div class="net-toggle-row">
-            <span class="lbl">הפעל תוספת זמן סגירה</span>
-            <label class="switch"><input type="checkbox" id="cgEnabled" onchange="cgSyncFields()"><span class="sl"></span></label>
-          </div>
-          <div id="cgFields" class="hidden">
-            <label class="fld">שעת סגירה לכל יום — התוספת חלה על יציאה מהשעה הזו ואילך. השאר יום ריק אם באותו יום אין תוספת.</label>
-            <div id="cgDayRows" style="margin-top:6px"></div>
-            <div class="net-field" style="margin-top:12px">
-              <label class="fld">דקות שנוספות לשעת היציאה (1–15)</label>
-              <input type="number" id="cgMinutes" inputmode="numeric" min="1" max="15" step="1" value="3">
+        <details class="card grace-fold">
+          <summary>
+            <span>תוספת זמן לפתיחה</span>
+            <span class="grace-chevron" aria-hidden="true">⌄</span>
+          </summary>
+          <div class="grace-fold-body">
+            <p class="sub">בכניסה בשעת הפתיחה שנקבעה או לפניה, שעת הכניסה נרשמת מוקדם יותר במספר הדקות שהוגדר — זמן פתיחה בתשלום עבור הכנת החנות.</p>
+            <div class="net-toggle-row">
+              <span class="lbl">הפעל תוספת זמן לפתיחה</span>
+              <label class="switch"><input type="checkbox" id="ogEnabled" aria-label="הפעל תוספת זמן לפתיחה" onchange="ogSyncFields()"><span class="sl"></span></label>
+            </div>
+            <div id="ogFields" class="hidden">
+              <label class="fld">שעת פתיחה לכל יום — התוספת חלה על כניסה בשעה הזו או לפניה. השאר יום ריק אם באותו יום אין תוספת.</label>
+              <div id="ogDayRows" style="margin-top:6px"></div>
+              <div class="net-field" style="margin-top:12px">
+                <label class="fld">דקות שמופחתות משעת הכניסה (1–15)</label>
+                <input type="number" id="ogMinutes" inputmode="numeric" min="1" max="15" step="1" value="3">
+              </div>
+            </div>
+            <div class="modal-actions" style="margin-top:8px">
+              <button class="btn" onclick="saveOpeningGrace()">שמור</button>
             </div>
           </div>
-          <div class="modal-actions" style="margin-top:8px">
-            <button class="btn" onclick="saveClosingGrace()">שמור</button>
+        </details>
+
+        <details class="card grace-fold">
+          <summary>
+            <span>תוספת זמן לסגירה</span>
+            <span class="grace-chevron" aria-hidden="true">⌄</span>
+          </summary>
+          <div class="grace-fold-body">
+            <p class="sub">ביציאה אחרי השעה שנקבעה, נוספות אוטומטית דקות לשעת היציאה — פיצוי על סגירת החנות (תריס, כיבוי אורות) שנעשית אחרי ההחתמה בטרמינל.</p>
+            <div class="net-toggle-row">
+              <span class="lbl">הפעל תוספת זמן לסגירה</span>
+              <label class="switch"><input type="checkbox" id="cgEnabled" aria-label="הפעל תוספת זמן לסגירה" onchange="cgSyncFields()"><span class="sl"></span></label>
+            </div>
+            <div id="cgFields" class="hidden">
+              <label class="fld">שעת סגירה לכל יום — התוספת חלה על יציאה מהשעה הזו ואילך. השאר יום ריק אם באותו יום אין תוספת.</label>
+              <div id="cgDayRows" style="margin-top:6px"></div>
+              <div class="net-field" style="margin-top:12px">
+                <label class="fld">דקות שנוספות לשעת היציאה (1–15)</label>
+                <input type="number" id="cgMinutes" inputmode="numeric" min="1" max="15" step="1" value="3">
+              </div>
+            </div>
+            <div class="modal-actions" style="margin-top:8px">
+              <button class="btn" onclick="saveClosingGrace()">שמור</button>
+            </div>
           </div>
-        </div>
+        </details>
 
         <div class="folder-grid">
           <button class="folder" onclick="openTaxSettings()">
@@ -1461,6 +1509,7 @@ let occEditDate = null;           // עריכת מופע בודד: התאריך 
 
 // --- נעילת קונסולה (PIN) ---
 let pinConfig = null;        // קוד ה-PIN השמור (או null אם לא הוגדר)
+let openingGrace = null;     // תוספת זמן פתיחה: {enabled, times, minutes} או null
 let closingGrace = null;     // תוספת זמן סגירה: {enabled, fromTime, minutes} או null
 let consoleUnlocked = false; // האם הקונסולה נפתחה בסשן הנוכחי
 let pendingDeviceManager = false; // האם ממתינים ל-PIN כדי להפוך מכשיר ל"מנהל"
@@ -1843,7 +1892,11 @@ function startDataListeners(){
     db.ref("recurringShifts").on("value", snap=>{ recurring = snap.val() || {}; if(currentView==="console") renderSchedule(); });
     db.ref("oneTimeShifts").on("value",   snap=>{ oneTime   = snap.val() || {}; if(currentView==="console") renderSchedule(); cleanupPastOneTimes(); });
   }
-  // תוספת זמן סגירה: {enabled, times, minutes} או null אם לא הוגדר
+  // תוספות זמן פתיחה וסגירה: הגדרות עצמאיות לכל יום בשבוע
+  db.ref("config/openingGrace").on("value", snap=>{
+    openingGrace = snap.val() || null;
+    if(currentView==="console" && consoleFolder==="settings") renderOpeningGrace();
+  });
   db.ref("config/closingGrace").on("value", snap=>{
     closingGrace = snap.val() || null;
     if(currentView==="console" && consoleFolder==="settings") renderClosingGrace();
@@ -1967,7 +2020,7 @@ function openFolder(name){
   if(name==="pay"){ payView="list"; paySubEmpId=null; }
   if(name==="schedule"){ schedView="list"; schedSubEmpId=null; }
   if(name==="employees"){ empView="list"; empSubId=null; }
-  if(name==="settings"){ const m=$("settings-main"), t=$("settings-tax"); if(m) m.classList.remove("hidden"); if(t) t.classList.add("hidden"); renderClosingGrace(); }
+  if(name==="settings"){ const m=$("settings-main"), t=$("settings-tax"); if(m) m.classList.remove("hidden"); if(t) t.classList.add("hidden"); renderOpeningGrace(); renderClosingGrace(); }
   if(name==="hakafa"){ hkConsoleView="list"; hkConsoleEmpId=null; }
   if(name==="forms"){ formsConsoleView="list"; formsConsoleEmpId=null; }
   if(name==="payslips"){ payslipsConsoleView="list"; payslipsConsoleEmpId=null; }
@@ -2135,6 +2188,61 @@ function renderPinStatus(){
     $("pinSetBtn").textContent="הגדר קוד";
     $("pinRemoveBtn").style.display="none";
   }
+}
+
+/* ---------- תוספת זמן פתיחה ---------- */
+function renderOpeningGrace(){
+  const en=$("ogEnabled"); if(!en) return;
+  const c=openingGrace||{};
+  en.checked = c.enabled===true;
+  const dayNames=["ראשון","שני","שלישי","רביעי","חמישי","שישי","שבת"];
+  const rowsEl=$("ogDayRows");
+  if(rowsEl){
+    rowsEl.innerHTML = dayNames.map((nm,i)=>{
+      const v = (c.times && c.times[i]!=null) ? c.times[i] : (c.fromTime||"06:00");
+      return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <span style="flex:0 0 72px;font-weight:700;font-size:14px">יום ${nm}</span>
+        <input type="time" id="ogT${i}" value="${esc(v)}" style="flex:1">
+      </div>`;
+    }).join("");
+  }
+  if(c.minutes!=null) $("ogMinutes").value=c.minutes;
+  ogSyncFields();
+}
+function ogSyncFields(){
+  const f=$("ogFields"); if(!f) return;
+  f.classList.toggle("hidden", !$("ogEnabled").checked);
+}
+function saveOpeningGrace(){
+  const enabled=$("ogEnabled").checked;
+  const minutes=parseInt($("ogMinutes").value,10);
+  const times={};
+  for(let i=0;i<7;i++){ const el=$("ogT"+i); times[i]= el ? (el.value||"") : ""; }
+  if(enabled){
+    const any=Object.keys(times).some(k=>times[k]);
+    if(!any){ toast("יש למלא שעה לפחות ליום אחד"); return; }
+    if(isNaN(minutes)||minutes<1||minutes>15){ toast("מספר הדקות חייב להיות בין 1 ל-15"); return; }
+  }
+  db.ref("config/openingGrace").set({ enabled, times, minutes:isNaN(minutes)?3:minutes, updatedAt:Date.now() })
+    .then(()=>toast(enabled?"תוספת זמן הפתיחה הופעלה ✓":"תוספת זמן הפתיחה כובתה"))
+    .catch(()=>toast("השמירה נכשלה, נסה שוב"));
+}
+// השעה שנקבעה לפתיחה ביום מסוים (או null אם אין ליום זה)
+function openingGraceTimeFor(dow){
+  const c=openingGrace||{};
+  if(c.times && c.times[dow]!=null) return c.times[dow]||null;
+  return c.fromTime||null;
+}
+// כמה דקות יש להפחית משעת הכניסה בזמן נתון (0 אם לא חל)
+function openingGraceMinFor(inMs){
+  const c=openingGrace;
+  if(!c || c.enabled!==true) return 0;
+  const d=new Date(inMs);
+  const nowMin=d.getHours()*60+d.getMinutes();
+  const t=openingGraceTimeFor(d.getDay());
+  if(!t || nowMin>hhmmToMin(t)) return 0;
+  const m=parseInt(c.minutes,10);
+  return (isNaN(m)||m<1) ? 0 : Math.min(15, m);
 }
 
 /* ---------- תוספת זמן סגירה ---------- */
@@ -3250,20 +3358,25 @@ function clockIn(empId){
     return;
   }
   const inMs = Date.now();
+  // תוספת זמן פתיחה: כניסה בשעת הפתיחה או לפניה נרשמת מוקדם יותר
+  const graceMin = openingGraceMinFor(inMs);
+  const finalIn = inMs - graceMin*60000;
   const ref = db.ref("shifts").push();
   const updates = {};
-  updates["shifts/"+ref.key] = {
+  const shiftData = {
     employeeId: empId,
-    clockIn: TS,
+    clockIn: graceMin>0 ? finalIn : TS,
     clockOut: null,
     autoCloseFlag: false,
     employeeNote: "",
     managerFeedback: "",
     edited: false
   };
+  if(graceMin>0) shiftData.openingGraceMin = graceMin;
+  updates["shifts/"+ref.key] = shiftData;
   updates["employees/"+empId+"/openShiftId"] = ref.key;
   // כתיבה אטומית אחת, עם אישור שרת אמיתי לפני מסך ההצלחה
-  commitClock(updates, ()=> showClockSuccess({name, kind:'in', timeMs:inMs}));
+  commitClock(updates, ()=> showClockSuccess({name, kind:'in', timeMs:finalIn, openingGraceMin:graceMin}));
 }
 
 // ביטול סיום משמרת — סוגר את המודאל ומשאיר את המשמרת פתוחה (ללא שמירה)
@@ -3306,6 +3419,7 @@ let _clockSuccessTimer=null;
 function showClockSuccess(opts){
   opts=opts||{};
   const isIn = opts.kind!=='out';
+  const openingGraceApplied = isIn && (opts.openingGraceMin||0)>0;
   const grace = !isIn && (opts.graceMin||0)>0;
   const until = grace ? opts.timeMs : 0; // שעת היציאה הרשומה (בעתיד) — סוף חלון זמן הסגירה
   const t = fmtTime(opts.timeMs);
@@ -3315,6 +3429,8 @@ function showClockSuccess(opts){
     : ('עבדת '+fmtHours(opts.hours||0)+' היום · תודה ולהתראות 👋');
   const graceBlock = grace ? `
     <div class="sc-grace">היציאה נרשמה והמשמרת סגורה ✓<br>⏳ זמן סגירה בתשלום · נותרו <span class="count-down" data-until="${until}">${fmtCountdown(until-Date.now())}</span><br>אפשר לסגור את החנות בנחת — הדקות האלה נספרות בשכר</div>` : '';
+  const openingGraceBlock = openingGraceApplied ? `
+    <div class="sc-grace">🌅 נוספו ${opts.openingGraceMin} דקות זמן פתיחה בתשלום<br>שעת הכניסה המעודכנת מוצגת למעלה</div>` : '';
   $("clockSuccessCard").innerHTML = `
     <div class="sc-ring ${isIn?'':'out'}">
       <svg class="sc-check ${isIn?'':'out'}" viewBox="0 0 60 60" aria-hidden="true">
@@ -3326,6 +3442,7 @@ function showClockSuccess(opts){
     <div class="sc-name">${esc(opts.name||'')}</div>
     <div class="sc-time">${t}</div>
     <p class="sc-msg">${msg}</p>
+    ${openingGraceBlock}
     ${graceBlock}
     <div class="sc-hint">המסך נסגר מעצמו · אפשר להקיש כדי לסגור</div>`;
   $("clockSuccess").classList.add("show");
