@@ -17,14 +17,15 @@
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 
 <!-- ============================================================
-     Firebase SDK (גרסה 8 - namespaced, פשוטה לקובץ יחיד)
+     Firebase SDK (Compat - שומר על ה-API הקיים ומוסיף תמיכת Push עדכנית)
      אם התצוגה בתוך Claude לא מתחברת - זה תקין. הורד את הקובץ
      והרץ אותו אצלך (או העלה לאחסון), שם Firebase יעבוד רגיל.
      ============================================================ -->
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.16.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.16.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.16.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.16.0/firebase-messaging-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.16.0/firebase-functions-compat.js"></script>
 
 <style>
   :root{
@@ -545,11 +546,15 @@
     .live-card .lc-blip,.live-count .blip,.emp-tile .badge .blip{animation:none}
   }
 
-  /* ---------- v61: תזכורות החתמה ---------- */
+  /* ---------- v63: תזכורות החתמה ---------- */
   .rem-card{border:1.5px solid var(--primary-ring);}
   .rem-head{font-weight:800;color:var(--ink);margin-bottom:6px}
   .rem-sub{font-size:13px;color:var(--muted);line-height:1.55}
   .rem-on{margin:10px 2px 0;font-size:12.5px;font-weight:700;color:var(--ok);text-align:center}
+  .rem-checking{margin:10px 2px 0;font-size:12.5px;font-weight:700;color:var(--live-d);text-align:center}
+  .rem-error{margin-top:8px;padding:10px 12px;border:1px solid var(--danger-line);border-radius:var(--r-sm);
+    background:var(--danger-bg);color:var(--danger);font-size:12.5px;font-weight:700;line-height:1.5;text-align:center}
+  .rem-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:9px}
   .rem-snooze-label{margin-top:14px;font-size:13px;font-weight:700;color:var(--ink-soft)}
   .rem-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
   .rem-chips .chip{flex:1 1 29%;padding:10px 0;border:1.5px solid var(--line-2);border-radius:var(--r-sm);
@@ -563,7 +568,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v61</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v63</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -588,7 +593,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v61</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v63</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -1361,7 +1366,7 @@
 
 <!-- ============================ מודאל קלט כללי (מחליף prompt) ============================ -->
 
-<!-- v61: מודאל תזכורת החתמה — "ביצעתי" או סנוז -->
+<!-- v63: מודאל תזכורת החתמה — "ביצעתי" או סנוז -->
 <div id="reminderModal" class="modal-bg">
   <div class="modal">
     <h3 id="reminderTitle">🔔 תזכורת החתמה</h3>
@@ -1829,7 +1834,22 @@ function authErrText(err){
   return "שגיאה בהתחברות. נסה שוב.";
 }
 
-function doLogout(){ if(auth) auth.signOut(); }
+let logoutInProgress=false;
+async function doLogout(){
+  if(!auth || logoutInProgress) return;
+  logoutInProgress=true;
+  const employeeId = currentRole==="employee" ? currentEmpId : null;
+  try{
+    if(employeeId) await clearCurrentPushRegistration(employeeId);
+  }catch(e){
+    console.warn("Push cleanup on logout failed:", e);
+  }
+  try{
+    await auth.signOut();
+  }finally{
+    logoutInProgress=false;
+  }
+}
 
 /* ============================================================
    6. מאזין מצב התחברות + טעינת נתונים
@@ -1841,6 +1861,7 @@ if(auth){
       routeAfterLogin(user);
     } else {
       currentRole=null; currentEmpId=null;
+      pushIdentityReady=false;
       $("app").classList.add("hidden");
       $("empApp").classList.add("hidden");
       $("authScreen").classList.remove("hidden");
@@ -1893,6 +1914,7 @@ function enterEmployeeMode(user){
       return;
     }
     currentRole="employee"; currentEmpId=id; empMonthKey=null; empNav="home";
+    pushIdentityReady=false;
     // הקפה: מאזינים לרשומות של העובד הנוכחי בלבד
     db.ref("takings/"+id).on("value", snap=>{ myTakings = snap.val()||{}; if(currentRole==="employee") renderEmployeeDashboard(); });
     db.ref("secure/rates/"+id).on("value", snap=>{ myRate = snap.val(); if(currentRole==="employee") renderEmployeeDashboard(); });
@@ -1904,12 +1926,17 @@ function enterEmployeeMode(user){
     linkP
       .then(()=> db.ref("uidToEmp/"+user.uid).set(id))
       .catch(()=>{ /* אם המיפוי נכשל (חוקים ישנים) - ההאזנה תעבוד לפי החוקים הקיימים */ })
-      .then(()=> attachMyShiftListeners(id));
+      .then(()=>{
+        if(currentRole!=="employee" || currentEmpId!==id) return;
+        pushIdentityReady=true;
+        attachMyShiftListeners(id);
+        initPushForEmployee(id, false).catch(()=>{});
+        renderEmpReminders();
+      });
     $("authScreen").classList.add("hidden");
     $("app").classList.add("hidden");
     $("empApp").classList.remove("hidden");
     renderEmployeeDashboard();
-    initPushForEmployee(id);
     maybeShowPendingReminder();
   });
 }
@@ -3244,12 +3271,13 @@ function renderEmployeeDashboard(){
   applyEmpDashNav();
 }
 
-// מחיקת משמרות חד-פעמיות שתאריכן עבר (תוכנית בלבד - בטוח למחוק)
+// משאירים יומיים אחורה כדי שנודניק של משמרת שהסתיימה סמוך לחצות
+// עדיין יוכל להישלח לפני ניקוי תוכנית המשמרת.
 function cleanupPastOneTimes(){
-  const today=isoDate(new Date());
+  const cutoff=isoDate(new Date(Date.now()-2*86400000));
   Object.keys(oneTime).forEach(id=>{
     const o=oneTime[id];
-    if(o && o.date && o.date < today){ db.ref("oneTimeShifts/"+id).remove(); }
+    if(o && o.date && o.date < cutoff){ db.ref("oneTimeShifts/"+id).remove(); }
   });
 }
 
@@ -5084,46 +5112,95 @@ $("uiPromptInput").addEventListener("keydown", e=>{ if(e.key==="Enter") uiPrompt
 if(!firebaseReady){ $("configBanner")?.classList.remove("hidden"); }
 
 /* ============================================================
-   17. תזכורות החתמה בפוש (v61)
+   17. תזכורות החתמה בפוש (v63)
    ------------------------------------------------------------
-   העיקרון: פונקציית ענן רצה כל דקה ושולחת התראה לעובד בדיוק
-   בשעת הכניסה/היציאה שבסידור. ההחתמה עצמה נשארת בטרמינל בלבד —
-   ההתראה היא תזכורת: "ביצעתי" סוגר אותה, או סנוז 5–60 דקות.
-   נתיבים חדשים ב-RTDB:
+   פונקציית ענן רצה כל דקה ושולחת data-only לעובד בדיוק בשעת
+   הכניסה/היציאה שבסידור. ה-Service Worker מציג את ההתראה ברקע.
+   נתיבים ב-RTDB:
      pushTokens/{empId}/{key} = {token, ua, updatedAt}
      reminders/{empId}/{YYYY-MM-DD}/{slot} = {sentCount,lastSentAt,snoozeUntil,done}
    ============================================================ */
 
-// המפתח הציבורי (VAPID) של הפרויקט — נוצר בקונסולה: Cloud Messaging → Web Push certificates
+// המפתח הציבורי (VAPID) של הפרויקט — Firebase → Cloud Messaging → Web Push certificates
 const VAPID_KEY = "BLu6TXvX2DXeSUhNQaT1-8qxRpd569PlkSiXxC9IPMvNcoMixsh8Sg_fYEll_SPW8AlfAjBuDN63bKEWqZNXfK0";
+const PUSH_REGION = "europe-west1";
 
-// Messaging נתמך? (באייפון — רק כשהאפליקציה מותקנת במסך הבית, iOS 16.4+)
-const messaging = (firebaseReady && firebase.messaging && firebase.messaging.isSupported && firebase.messaging.isSupported())
-  ? firebase.messaging() : null;
-
-const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent || "");
+const isIOS =
+  /iphone|ipad|ipod/i.test(navigator.userAgent || "") ||
+  (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 function isStandalone(){
   try{
     return (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone === true;
   }catch(e){ return false; }
 }
 
+/* ---------- אתחול Messaging מוגן ---------- */
+let messaging = null;
+let messagingInitPromise = null;
+let foregroundMessagingBound = false;
+
+async function getMessagingSafe(){
+  if(messaging) return messaging;
+  if(messagingInitPromise) return messagingInitPromise;
+  messagingInitPromise = (async()=>{
+    if(!firebaseReady || !firebase.messaging || !window.isSecureContext) return null;
+    if(!("serviceWorker" in navigator) || !("Notification" in window)) return null;
+    let supported = true;
+    if(firebase.messaging.isSupported){
+      supported = await Promise.resolve(firebase.messaging.isSupported()).catch(()=>false);
+    }
+    if(!supported) return null;
+    const instance = firebase.messaging();
+    messaging = instance;
+    bindForegroundMessaging(instance);
+    return instance;
+  })().catch(err=>{
+    console.warn("FCM unavailable:", err);
+    return null;
+  });
+  return messagingInitPromise;
+}
+
 /* ---------- תזכורת שהגיעה מלחיצה על התראה (פרמטרים ב-URL) ---------- */
 let pendingReminder = null;
+let pendingPushTest = null;
 (function(){
   try{
     const q = new URLSearchParams(location.search);
     const k = q.get("reminder");
     if(k === "in" || k === "out"){
-      pendingReminder = { kind:k, time:q.get("time")||"", date:q.get("date")||"", slot:q.get("slot")||"" };
+      pendingReminder = {
+        kind:k,
+        time:q.get("time")||"",
+        date:q.get("date")||"",
+        slot:q.get("slot")||"",
+        employeeId:q.get("emp")||""
+      };
+    }
+    if(q.get("pushTest") === "1"){
+      pendingPushTest = { employeeId:q.get("emp")||"" };
+    }
+    if(pendingReminder || pendingPushTest){
       history.replaceState(null, "", location.pathname); // מנקים את הכתובת
     }
   }catch(e){}
 })();
 
 function maybeShowPendingReminder(){
-  if(!pendingReminder || currentRole !== "employee") return;
+  if(currentRole !== "employee") return;
+  if(pendingPushTest){
+    const test = pendingPushTest;
+    pendingPushTest = null;
+    if(!test.employeeId || test.employeeId === currentEmpId){
+      setTimeout(()=>toast("בדיקת ההתראות הצליחה ✓"), 250);
+    }
+  }
+  if(!pendingReminder) return;
   const r = pendingReminder; pendingReminder = null;
+  if(r.employeeId && r.employeeId !== currentEmpId){
+    toast("ההתראה שייכת לחשבון עובד אחר");
+    return;
+  }
   openReminderChooser(r);
 }
 
@@ -5140,7 +5217,6 @@ function openReminderChooser(r){
   vibrate([15,40,15]);
 }
 
-// כתיבת מצב התזכורת של העובד (דורש את חוקי האבטחה החדשים של pushTokens/reminders)
 function _remRef(){
   if(!_remCtx || !currentEmpId || !_remCtx.date || !_remCtx.slot) return null;
   return db.ref("reminders/" + currentEmpId + "/" + _remCtx.date + "/" + _remCtx.slot);
@@ -5148,67 +5224,284 @@ function _remRef(){
 
 async function reminderDone(){
   const ref = _remRef();
-  // בדיקת אמת קטנה מול המערכת — שלא יסגרו תזכורת בטעות
-  const e = employees[currentEmpId] || {};
   const isIn = _remCtx && _remCtx.kind !== "out";
-  if(isIn && !e.openShiftId){
+  const hasOpenShift = !!findOpenShiftId(currentEmpId);
+  if(isIn && !hasOpenShift){
     const ok = await uiConfirm("לפי המערכת עדיין לא נרשמה לך כניסה.\nלסמן בכל זאת שביצעת?", {okText:"כן, ביצעתי"});
     if(!ok) return;
   }
-  if(!isIn && e.openShiftId){
+  if(!isIn && hasOpenShift){
     const ok = await uiConfirm("לפי המערכת אתה עדיין מוחתם בפנים.\nלסמן בכל זאת שביצעת יציאה?", {okText:"כן, ביצעתי"});
     if(!ok) return;
   }
-  closeModal("reminderModal");
-  if(ref) ref.update({ done:true, doneAt: Date.now() }).catch(()=>{});
-  toast("נרשם ✓");
-}
-
-function reminderSnooze(min){
-  const ref = _remRef();
-  closeModal("reminderModal");
-  if(ref) ref.update({ snoozeUntil: Date.now() + min*60000, sentCount: 0 }).catch(()=>{});
-  toast("נזכיר שוב בעוד " + min + " דקות ⏰");
-}
-
-/* ---------- הרשמה להתראות ושמירת ה-token ---------- */
-async function registerAndSaveToken(empId){
-  if(!messaging || !empId) return null;
-  const reg = await navigator.serviceWorker.register("firebase-messaging-sw.js");
-  const token = await messaging.getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
-  if(!token) throw new Error("no-token");
-  const lsKey = "fcmSaved_" + empId;
-  try{ if(localStorage.getItem(lsKey) === token) return token; }catch(e){}
-  // בלי כפילויות: שומרים את ה-token רק אם הוא לא קיים כבר ברשימה של העובד
-  const snap = await db.ref("pushTokens/" + empId).once("value");
-  const all = snap.val() || {};
-  const exists = Object.keys(all).some(k => all[k] && all[k].token === token);
-  if(!exists){
-    await db.ref("pushTokens/" + empId).push({ token, ua: (navigator.userAgent||"").slice(0,120), updatedAt: Date.now() });
-  }
-  try{ localStorage.setItem(lsKey, token); }catch(e){}
-  return token;
-}
-
-// רענון שקט בכל כניסה של עובד שכבר אישר התראות (token יכול להתחלף)
-function initPushForEmployee(empId){
-  if(!messaging || !("Notification" in window)) return;
-  if(Notification.permission === "granted"){
-    registerAndSaveToken(empId).catch(()=>{});
-  }
-}
-
-// הפעלה ראשונית מהכפתור בדשבורד
-async function enablePushReminders(){
-  if(!messaging || !currentEmpId) return;
+  if(!ref){ toast("לא ניתן לשמור את התזכורת"); return; }
   try{
+    await ref.update({ done:true, doneAt: Date.now() });
+    closeModal("reminderModal");
+    toast("נרשם ✓");
+  }catch(e){
+    toast("השמירה נכשלה — נסה שוב");
+  }
+}
+
+async function reminderSnooze(min){
+  const ref = _remRef();
+  if(!ref){ toast("לא ניתן לשמור את הנודניק"); return; }
+  try{
+    await ref.update({ snoozeUntil: Date.now() + min*60000, sentCount: 0, done:false });
+    closeModal("reminderModal");
+    toast("נזכיר שוב בעוד " + min + " דקות ⏰");
+  }catch(e){
+    toast("השמירה נכשלה — נסה שוב");
+  }
+}
+
+/* ---------- הרשמה אמיתית: SW → token → RTDB → אימות ---------- */
+let pushState = {
+  empId:null,
+  status:"idle", // idle | checking | active | error
+  error:"",
+  token:null,
+  registration:null,
+  promise:null
+};
+let pushIdentityReady = false;
+let pushGeneration = 0;
+
+function resetPushStateFor(empId){
+  if(pushState.empId === empId) return;
+  pushGeneration += 1;
+  pushState = { empId, status:"idle", error:"", token:null, registration:null, promise:null };
+}
+
+async function waitForActiveServiceWorker(reg){
+  if(reg && reg.active) return reg;
+  const worker = reg && (reg.installing || reg.waiting);
+  if(worker && worker.state !== "activated"){
+    await new Promise((resolve, reject)=>{
+      const timeout = setTimeout(()=>{
+        worker.removeEventListener("statechange", onState);
+        reject(new Error("service-worker-activation-timeout"));
+      }, 20000);
+      function onState(){
+        if(worker.state === "activated"){
+          clearTimeout(timeout);
+          worker.removeEventListener("statechange", onState);
+          resolve();
+        }else if(worker.state === "redundant"){
+          clearTimeout(timeout);
+          worker.removeEventListener("statechange", onState);
+          reject(new Error("service-worker-redundant"));
+        }
+      }
+      worker.addEventListener("statechange", onState);
+      onState();
+    });
+  }
+  if(reg && reg.active) return reg;
+
+  const readyReg = await navigator.serviceWorker.ready;
+  if(readyReg && readyReg.scope === reg.scope && readyReg.active){
+    return readyReg;
+  }
+  throw new Error("service-worker-not-active");
+}
+
+async function clearCurrentPushRegistration(empId){
+  const pendingRegistration = pushState.promise;
+  let token = pushState.empId === empId ? pushState.token : null;
+  try{
+    token = token || localStorage.getItem("fcmSaved_" + empId);
+  }catch(e){}
+
+  // מבטלים מיד כל הרשמה שנמצאת כרגע באמצע, כדי שלא תישמר אחרי היציאה.
+  pushGeneration += 1;
+  pushState = {
+    empId:null,
+    status:"idle",
+    error:"",
+    token:null,
+    registration:null,
+    promise:null
+  };
+  pushIdentityReady=false;
+
+  if(pendingRegistration){
+    await Promise.race([
+      pendingRegistration.catch(()=>null),
+      new Promise(resolve=>setTimeout(resolve, 4000))
+    ]);
+    try{
+      token = token || localStorage.getItem("fcmSaved_" + empId);
+    }catch(e){}
+  }
+
+  if(token && db){
+    try{
+      const tokensRef = db.ref("pushTokens/" + empId);
+      const snapshot = await tokensRef.once("value");
+      const removals = [];
+      snapshot.forEach(child=>{
+        if(child.val() && child.val().token === token){
+          removals.push(child.ref.remove());
+        }
+      });
+      await Promise.allSettled(removals);
+    }catch(e){
+      console.warn("Could not remove push token row:", e);
+    }
+  }
+
+  if(messaging){
+    try{ await messaging.deleteToken(); }
+    catch(e){ console.warn("Could not invalidate FCM token:", e); }
+  }
+  try{ localStorage.removeItem("fcmSaved_" + empId); }catch(e){}
+}
+
+async function registerAndSaveToken(empId, generation){
+  if(!empId) throw new Error("missing-employee");
+  const m = await getMessagingSafe();
+  if(!m) throw new Error("messaging-not-supported");
+
+  const swUrl = new URL("firebase-messaging-sw.js", location.href);
+  let reg = await navigator.serviceWorker.register(swUrl.href, { scope:"./" });
+  reg = await waitForActiveServiceWorker(reg);
+  try{ await reg.update(); }catch(e){}
+
+  const token = await m.getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
+  if(!token) throw new Error("no-token");
+  try{ localStorage.setItem("fcmSaved_" + empId, token); }catch(e){}
+  if(generation !== pushGeneration || pushState.empId !== empId){
+    throw new Error("registration-cancelled");
+  }
+
+  const tokensRef = db.ref("pushTokens/" + empId);
+  const snap = await tokensRef.once("value");
+  if(generation !== pushGeneration || pushState.empId !== empId){
+    throw new Error("registration-cancelled");
+  }
+  const all = snap.val() || {};
+  const existingKey = Object.keys(all).find(k => all[k] && all[k].token === token);
+  const tokenData = {
+    token,
+    ua:(navigator.userAgent||"").slice(0,120),
+    updatedAt:Date.now()
+  };
+
+  if(existingKey){
+    await tokensRef.child(existingKey).update(tokenData);
+  }else{
+    await tokensRef.push(tokenData);
+  }
+  if(generation !== pushGeneration || pushState.empId !== empId){
+    throw new Error("registration-cancelled");
+  }
+
+  // לא מציגים "פעיל" עד שווידאנו שה-token באמת קיים בענן
+  const verifySnap = await tokensRef.once("value");
+  const verified = Object.values(verifySnap.val() || {}).some(x => x && x.token === token);
+  if(!verified) throw new Error("token-not-saved");
+
+  return { token, registration:reg };
+}
+
+function initPushForEmployee(empId, force){
+  if(!empId || !("Notification" in window) || Notification.permission !== "granted"){
+    return Promise.resolve(null);
+  }
+  resetPushStateFor(empId);
+  if(pushState.promise) return pushState.promise;
+  if(pushState.status === "active" && !force) return Promise.resolve(pushState.token);
+
+  pushState.status = "checking";
+  pushState.error = "";
+  renderEmpReminders();
+  const targetEmpId = empId;
+  const generation = pushGeneration;
+
+  const promise = registerAndSaveToken(targetEmpId, generation)
+    .then(result=>{
+      if(pushState.empId !== targetEmpId || pushGeneration !== generation) return null;
+      pushState.status = "active";
+      pushState.token = result.token;
+      pushState.registration = result.registration;
+      pushState.error = "";
+      return result.token;
+    })
+    .catch(err=>{
+      console.error("Push registration failed:", err);
+      if(pushState.empId === targetEmpId && pushGeneration === generation){
+        pushState.status = "error";
+        pushState.error = (err && (err.code || err.message)) || "registration-failed";
+      }
+      throw err;
+    })
+    .finally(()=>{
+      if(pushState.empId === targetEmpId && pushGeneration === generation){
+        pushState.promise = null;
+        renderEmpReminders();
+      }
+    });
+
+  pushState.promise = promise;
+  return promise;
+}
+
+async function enablePushReminders(){
+  if(!currentEmpId) return;
+  if(isIOS && !isStandalone()){
+    toast("פתח את האפליקציה מהאייקון במסך הבית");
+    return;
+  }
+  try{
+    const m = await getMessagingSafe();
+    if(!m){ toast("המכשיר הזה אינו תומך בהתראות"); return; }
     const perm = await Notification.requestPermission();
     if(perm === "granted"){
-      await registerAndSaveToken(currentEmpId);
+      await initPushForEmployee(currentEmpId, true);
       toast("תזכורות ההחתמה הופעלו ✓");
+    }else if(perm === "denied"){
+      toast("ההתראות חסומות בהגדרות המכשיר");
     }
-  }catch(e){ toast("ההפעלה נכשלה — נסה שוב"); }
+  }catch(e){
+    toast("החיבור להתראות נכשל — לחץ נסה שוב");
+  }
   renderEmpReminders();
+}
+
+function retryPushRegistration(){
+  if(!currentEmpId) return;
+  initPushForEmployee(currentEmpId, true).then(()=>{
+    toast("החיבור להתראות תוקן ✓");
+  }).catch(()=>{});
+}
+
+/* ---------- בדיקת קצה-לקצה דרך פונקציית הענן ---------- */
+let pushTestBusy = false;
+async function sendPushTest(){
+  if(pushTestBusy || !currentEmpId) return;
+  if(pushState.status !== "active"){
+    toast("קודם יש להשלים את חיבור ההתראות");
+    return;
+  }
+  if(!firebase.functions){
+    toast("בדיקת ההתראות עדיין לא זמינה");
+    return;
+  }
+  pushTestBusy = true;
+  renderEmpReminders();
+  toast("הבדיקה תגיע בעוד כ-8 שניות — צא עכשיו למסך הבית");
+  try{
+    const callable = firebase.app().functions(PUSH_REGION).httpsCallable("sendPushTest");
+    await callable({ delaySeconds:8, token:pushState.token });
+  }catch(err){
+    console.error("Push test failed:", err);
+    toast("שליחת הבדיקה נכשלה — נסה שוב");
+  }finally{
+    pushTestBusy = false;
+    renderEmpReminders();
+  }
 }
 
 /* ---------- כרטיס המצב בדשבורד העובד ---------- */
@@ -5216,47 +5509,155 @@ function renderEmpReminders(){
   const box = $("empRemindersCard"); if(!box) return;
   if(currentRole !== "employee"){ box.innerHTML = ""; return; }
 
-  // אין תמיכה: באייפון מחוץ למסך הבית — מסבירים איך; אחרת מסתירים בשקט
-  if(!messaging || !("Notification" in window)){
-    box.innerHTML = (isIOS && !isStandalone()) ? `
+  if(isIOS && !isStandalone()){
+    box.innerHTML = `
       <div class="card rem-card">
         <div class="rem-head">🔔 תזכורות החתמה</div>
-        <div class="rem-sub">כדי לקבל תזכורת בדיוק בשעת הכניסה והיציאה שלך, קודם מוסיפים את האפליקציה למסך הבית:<br>שיתוף <b>⎋</b> ← <b>הוסף למסך הבית</b>, ואז נכנסים משם ומפעילים כאן.</div>
-      </div>` : "";
+        <div class="rem-sub">כדי לקבל תזכורת בדיוק בשעת הכניסה והיציאה שלך, הוסף את האפליקציה למסך הבית עם <b>פתח כיישום אינטרנט</b>, ואז היכנס מהאייקון והפעל כאן.</div>
+      </div>`;
+    return;
+  }
+
+  if(!window.isSecureContext || !("Notification" in window) || !("serviceWorker" in navigator)){
+    box.innerHTML = `
+      <div class="card rem-card">
+        <div class="rem-head">🔕 אין תמיכה בהתראות</div>
+        <div class="rem-sub">המכשיר או צורת הפתיחה הנוכחית אינם מאפשרים התראות.</div>
+      </div>`;
     return;
   }
 
   const p = Notification.permission;
-  if(p === "granted"){
-    initPushForEmployee(currentEmpId); // מרענן token בשקט
-    box.innerHTML = `<div class="rem-on">🔔 תזכורות החתמה פעילות ✓</div>`;
-  } else if(p === "denied"){
+  if(p === "denied"){
     box.innerHTML = `
       <div class="card rem-card">
         <div class="rem-head">🔕 ההתראות חסומות</div>
-        <div class="rem-sub">חסמת התראות לאפליקציה. כדי לקבל תזכורות החתמה, פתח את הגדרות הטלפון ← התראות ← שעון נוכחות, והפעל.</div>
+        <div class="rem-sub">פתח את הגדרות הטלפון ← התראות ← שעון נוכחות, והפעל התראות.</div>
       </div>`;
-  } else {
+    return;
+  }
+
+  if(p !== "granted"){
     box.innerHTML = `
       <div class="card rem-card">
         <div class="rem-head">🔔 תזכורות החתמה</div>
         <div class="rem-sub">נזכיר לך להחתים כניסה ויציאה בדיוק בשעות המשמרת שלך בסידור. שכחת? סנוז ונחזור.</div>
         <button class="btn" style="width:100%;margin-top:10px" onclick="enablePushReminders()">הפעל תזכורות</button>
       </div>`;
+    return;
+  }
+
+  resetPushStateFor(currentEmpId);
+  if(!pushIdentityReady){
+    box.innerHTML = `<div class="rem-checking">⏳ משלים את חיבור החשבון להתראות…</div>`;
+    return;
+  }
+  if(pushState.status === "idle"){
+    initPushForEmployee(currentEmpId, false).catch(()=>{});
+  }
+
+  if(pushState.status === "checking"){
+    box.innerHTML = `<div class="rem-checking">⏳ בודק שהמכשיר מחובר להתראות…</div>`;
+  }else if(pushState.status === "active"){
+    box.innerHTML = `
+      <div class="rem-on">🔔 תזכורות ההחתמה פעילות ✓</div>
+      <div class="rem-actions">
+        <button class="btn line sm" onclick="sendPushTest()" ${pushTestBusy?"disabled":""}>${pushTestBusy?"שולח בדיקה…":"שלח לי התראת בדיקה"}</button>
+      </div>`;
+  }else{
+    box.innerHTML = `
+      <div class="card rem-card">
+        <div class="rem-head">⚠️ חיבור ההתראות לא הושלם</div>
+        <div class="rem-sub">ההרשאה קיימת, אבל המכשיר עדיין לא נרשם לקבלת תזכורות.</div>
+        <div class="rem-error">לא נציג שההתראות פעילות עד שהחיבור יושלם באמת.</div>
+        <button class="btn" style="width:100%;margin-top:10px" onclick="retryPushRegistration()">נסה שוב</button>
+      </div>`;
   }
 }
 
-/* ---------- התראה שמגיעה כשהאפליקציה פתוחה על המסך ---------- */
-if(messaging){
-  messaging.onMessage(payload => {
-    try{
-      const d = (payload && payload.data) || {};
-      if(d.kind === "in" || d.kind === "out"){
-        if(currentRole === "employee"){
-          openReminderChooser({ kind:d.kind, time:d.time||"", date:d.date||"", slot:d.slot||"" });
-        }
+/* ---------- הודעה שמגיעה כשהאפליקציה פתוחה ---------- */
+function pushTargetUrl(data){
+  const url = new URL("./", location.href);
+  if(data.kind === "in" || data.kind === "out"){
+    url.searchParams.set("reminder", data.kind);
+    if(data.time) url.searchParams.set("time", data.time);
+    if(data.date) url.searchParams.set("date", data.date);
+    if(data.slot) url.searchParams.set("slot", data.slot);
+  }else{
+    url.searchParams.set("pushTest", "1");
+  }
+  if(data.employeeId) url.searchParams.set("emp", data.employeeId);
+  return url.href;
+}
+
+async function showForegroundSystemNotification(data){
+  const reg = pushState.registration || await navigator.serviceWorker.ready;
+  const isIn = data.kind === "in";
+  const isOut = data.kind === "out";
+  const title = data.title ||
+    (isIn ? "🔔 תזכורת כניסה" : isOut ? "🕔 תזכורת יציאה" : "🔔 התראת בדיקה");
+  const body = data.body ||
+    (isIn ? "הגיע הזמן להחתים כניסה." : isOut ? "הגיע הזמן להחתים יציאה." : "ההתראות פועלות בהצלחה.");
+  await reg.showNotification(String(title).slice(0,100), {
+    body:String(body).slice(0,240),
+    icon:new URL("icon-192.png", location.href).href,
+    badge:new URL("icon-192.png", location.href).href,
+    tag:String(data.tag || (data.kind==="test" ? "works-push-test" : "works-reminder")).slice(0,120),
+    renotify:true,
+    dir:"rtl",
+    lang:"he",
+    data:{ source:"works-reminder", url:pushTargetUrl(data) }
+  });
+}
+
+function handleForegroundDisplayFailure(data, error){
+  console.warn("Foreground notification display failed:", error);
+  const belongsToCurrentEmployee =
+    currentRole === "employee" &&
+    (!data.employeeId || data.employeeId === currentEmpId);
+  if(belongsToCurrentEmployee){
+    pushState.status = "error";
+    pushState.error = "notification-display-failed";
+    renderEmpReminders();
+  }
+  toast(
+    data.kind === "test"
+      ? "הבדיקה הגיעה, אבל התראת המערכת לא הוצגה"
+      : "התזכורת הגיעה, אבל התראת המערכת לא הוצגה"
+  );
+}
+
+function bindForegroundMessaging(instance){
+  if(foregroundMessagingBound || !instance) return;
+  foregroundMessagingBound = true;
+  instance.onMessage(payload => {
+    const d = (payload && payload.data) || {};
+    if(d.kind === "in" || d.kind === "out"){
+      const belongsToCurrentEmployee =
+        !d.employeeId || d.employeeId === currentEmpId;
+      if(currentRole === "employee" && belongsToCurrentEmployee){
+        openReminderChooser({
+          kind:d.kind,
+          time:d.time||"",
+          date:d.date||"",
+          slot:d.slot||"",
+          employeeId:d.employeeId||""
+        });
+      }else if(currentRole !== "employee"){
+        showForegroundSystemNotification(d)
+          .catch(error=>handleForegroundDisplayFailure(d, error));
       }
-    }catch(e){}
+      return;
+    }
+    if(d.kind === "test"){
+      if(
+        currentRole === "employee" &&
+        d.employeeId &&
+        d.employeeId !== currentEmpId
+      ) return;
+      showForegroundSystemNotification(d)
+        .catch(error=>handleForegroundDisplayFailure(d, error));
+    }
   });
 }
 
