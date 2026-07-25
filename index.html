@@ -24,6 +24,7 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js"></script>
 
 <style>
   :root{
@@ -543,6 +544,18 @@
     .success-card{animation:none}
     .live-card .lc-blip,.live-count .blip,.emp-tile .badge .blip{animation:none}
   }
+
+  /* ---------- v61: תזכורות החתמה ---------- */
+  .rem-card{border:1.5px solid var(--primary-ring);}
+  .rem-head{font-weight:800;color:var(--ink);margin-bottom:6px}
+  .rem-sub{font-size:13px;color:var(--muted);line-height:1.55}
+  .rem-on{margin:10px 2px 0;font-size:12.5px;font-weight:700;color:var(--ok);text-align:center}
+  .rem-snooze-label{margin-top:14px;font-size:13px;font-weight:700;color:var(--ink-soft)}
+  .rem-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+  .rem-chips .chip{flex:1 1 29%;padding:10px 0;border:1.5px solid var(--line-2);border-radius:var(--r-sm);
+    background:var(--panel);color:var(--ink);font-weight:800;font-size:14px;cursor:pointer}
+  .rem-chips .chip:active{background:var(--primary-soft);border-color:var(--primary)}
+  .rem-hint{margin-top:12px;font-size:11.5px;color:var(--muted);text-align:center}
 </style>
 </head>
 <body>
@@ -550,7 +563,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v60</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v61</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -575,7 +588,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v60</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v61</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -1033,6 +1046,8 @@
         <div class="eh-sub" id="empOwedSub">—</div>
         <div class="eh-est">הסכום הוא הערכה בלבד — הסכום הסופי נקבע בתלוש מהרו"ח</div>
       </div>
+
+      <div id="empRemindersCard"></div>
       <div class="folder-grid">
         <button class="folder lg" onclick="openEmpNav('pay')">
           <span class="f-ico">💰</span>
@@ -1345,6 +1360,27 @@
 </div>
 
 <!-- ============================ מודאל קלט כללי (מחליף prompt) ============================ -->
+
+<!-- v61: מודאל תזכורת החתמה — "ביצעתי" או סנוז -->
+<div id="reminderModal" class="modal-bg">
+  <div class="modal">
+    <h3 id="reminderTitle">🔔 תזכורת החתמה</h3>
+    <p class="who" id="reminderMsg" style="white-space:pre-line"></p>
+    <button class="btn" style="width:100%" onclick="reminderDone()">✓ ביצעתי החתמה — אפשר לסגור</button>
+    <div class="rem-snooze-label">עדיין לא? נזכיר שוב בעוד:</div>
+    <div class="rem-chips">
+      <button class="chip" onclick="reminderSnooze(5)">5 דק'</button>
+      <button class="chip" onclick="reminderSnooze(10)">10 דק'</button>
+      <button class="chip" onclick="reminderSnooze(20)">20 דק'</button>
+      <button class="chip" onclick="reminderSnooze(30)">30 דק'</button>
+      <button class="chip" onclick="reminderSnooze(40)">40 דק'</button>
+      <button class="chip" onclick="reminderSnooze(50)">50 דק'</button>
+      <button class="chip" onclick="reminderSnooze(60)">60 דק'</button>
+    </div>
+    <div class="rem-hint">אם תסגור בלי לבחור — נזכיר שוב בעוד 20 דקות (עד 3 פעמים)</div>
+  </div>
+</div>
+
 <div id="uiPromptModal" class="modal-bg">
   <div class="modal">
     <h3 id="uiPromptTitle"></h3>
@@ -1873,6 +1909,8 @@ function enterEmployeeMode(user){
     $("app").classList.add("hidden");
     $("empApp").classList.remove("hidden");
     renderEmployeeDashboard();
+    initPushForEmployee(id);
+    maybeShowPendingReminder();
   });
 }
 
@@ -3024,6 +3062,7 @@ function renderEmployeeDashboard(){
   const e=employees[currentEmpId];
   if(!e){ return; } // הנתונים עדיין נטענים
   $("empHello").textContent="שלום, "+e.name+" 👋";
+  renderEmpReminders();
 
   // --- כרטיס "אתה במשמרת עכשיו" (טיימר חי) ---
   const lsEl=$("empLiveShift");
@@ -5043,6 +5082,184 @@ $("uiPromptInput").addEventListener("keydown", e=>{ if(e.key==="Enter") uiPrompt
 
 // אם אין הגדרות - הצג באנר בתוך האפליקציה (אם בכל זאת ניגשים)
 if(!firebaseReady){ $("configBanner")?.classList.remove("hidden"); }
+
+/* ============================================================
+   17. תזכורות החתמה בפוש (v61)
+   ------------------------------------------------------------
+   העיקרון: פונקציית ענן רצה כל דקה ושולחת התראה לעובד בדיוק
+   בשעת הכניסה/היציאה שבסידור. ההחתמה עצמה נשארת בטרמינל בלבד —
+   ההתראה היא תזכורת: "ביצעתי" סוגר אותה, או סנוז 5–60 דקות.
+   נתיבים חדשים ב-RTDB:
+     pushTokens/{empId}/{key} = {token, ua, updatedAt}
+     reminders/{empId}/{YYYY-MM-DD}/{slot} = {sentCount,lastSentAt,snoozeUntil,done}
+   ============================================================ */
+
+// המפתח הציבורי (VAPID) של הפרויקט — נוצר בקונסולה: Cloud Messaging → Web Push certificates
+const VAPID_KEY = "BLu6TXvX2DXeSUhNQaT1-8qxRpd569PlkSiXxC9IPMvNcoMixsh8Sg_fYEll_SPW8AlfAjBuDN63bKEWqZNXfK0";
+
+// Messaging נתמך? (באייפון — רק כשהאפליקציה מותקנת במסך הבית, iOS 16.4+)
+const messaging = (firebaseReady && firebase.messaging && firebase.messaging.isSupported && firebase.messaging.isSupported())
+  ? firebase.messaging() : null;
+
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent || "");
+function isStandalone(){
+  try{
+    return (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone === true;
+  }catch(e){ return false; }
+}
+
+/* ---------- תזכורת שהגיעה מלחיצה על התראה (פרמטרים ב-URL) ---------- */
+let pendingReminder = null;
+(function(){
+  try{
+    const q = new URLSearchParams(location.search);
+    const k = q.get("reminder");
+    if(k === "in" || k === "out"){
+      pendingReminder = { kind:k, time:q.get("time")||"", date:q.get("date")||"", slot:q.get("slot")||"" };
+      history.replaceState(null, "", location.pathname); // מנקים את הכתובת
+    }
+  }catch(e){}
+})();
+
+function maybeShowPendingReminder(){
+  if(!pendingReminder || currentRole !== "employee") return;
+  const r = pendingReminder; pendingReminder = null;
+  openReminderChooser(r);
+}
+
+/* ---------- המודאל: "ביצעתי" / סנוז ---------- */
+let _remCtx = null;
+function openReminderChooser(r){
+  _remCtx = r || {};
+  const isIn = _remCtx.kind !== "out";
+  $("reminderTitle").textContent = isIn ? "🔔 תזכורת כניסה" : "🕔 תזכורת יציאה";
+  $("reminderMsg").textContent = isIn
+    ? ("המשמרת שלך מתחילה" + (_remCtx.time ? " ב-" + _remCtx.time : "") + ".\nאם עדיין לא החתמת כניסה — זה הזמן, בטרמינל בחנות.")
+    : ("המשמרת שלך מסתיימת" + (_remCtx.time ? " ב-" + _remCtx.time : "") + ".\nתחתים יציאה בטרמינל בדרך החוצה 👋");
+  openModal("reminderModal");
+  vibrate([15,40,15]);
+}
+
+// כתיבת מצב התזכורת של העובד (דורש את חוקי האבטחה החדשים של pushTokens/reminders)
+function _remRef(){
+  if(!_remCtx || !currentEmpId || !_remCtx.date || !_remCtx.slot) return null;
+  return db.ref("reminders/" + currentEmpId + "/" + _remCtx.date + "/" + _remCtx.slot);
+}
+
+async function reminderDone(){
+  const ref = _remRef();
+  // בדיקת אמת קטנה מול המערכת — שלא יסגרו תזכורת בטעות
+  const e = employees[currentEmpId] || {};
+  const isIn = _remCtx && _remCtx.kind !== "out";
+  if(isIn && !e.openShiftId){
+    const ok = await uiConfirm("לפי המערכת עדיין לא נרשמה לך כניסה.\nלסמן בכל זאת שביצעת?", {okText:"כן, ביצעתי"});
+    if(!ok) return;
+  }
+  if(!isIn && e.openShiftId){
+    const ok = await uiConfirm("לפי המערכת אתה עדיין מוחתם בפנים.\nלסמן בכל זאת שביצעת יציאה?", {okText:"כן, ביצעתי"});
+    if(!ok) return;
+  }
+  closeModal("reminderModal");
+  if(ref) ref.update({ done:true, doneAt: Date.now() }).catch(()=>{});
+  toast("נרשם ✓");
+}
+
+function reminderSnooze(min){
+  const ref = _remRef();
+  closeModal("reminderModal");
+  if(ref) ref.update({ snoozeUntil: Date.now() + min*60000, sentCount: 0 }).catch(()=>{});
+  toast("נזכיר שוב בעוד " + min + " דקות ⏰");
+}
+
+/* ---------- הרשמה להתראות ושמירת ה-token ---------- */
+async function registerAndSaveToken(empId){
+  if(!messaging || !empId) return null;
+  const reg = await navigator.serviceWorker.register("firebase-messaging-sw.js");
+  const token = await messaging.getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
+  if(!token) throw new Error("no-token");
+  const lsKey = "fcmSaved_" + empId;
+  try{ if(localStorage.getItem(lsKey) === token) return token; }catch(e){}
+  // בלי כפילויות: שומרים את ה-token רק אם הוא לא קיים כבר ברשימה של העובד
+  const snap = await db.ref("pushTokens/" + empId).once("value");
+  const all = snap.val() || {};
+  const exists = Object.keys(all).some(k => all[k] && all[k].token === token);
+  if(!exists){
+    await db.ref("pushTokens/" + empId).push({ token, ua: (navigator.userAgent||"").slice(0,120), updatedAt: Date.now() });
+  }
+  try{ localStorage.setItem(lsKey, token); }catch(e){}
+  return token;
+}
+
+// רענון שקט בכל כניסה של עובד שכבר אישר התראות (token יכול להתחלף)
+function initPushForEmployee(empId){
+  if(!messaging || !("Notification" in window)) return;
+  if(Notification.permission === "granted"){
+    registerAndSaveToken(empId).catch(()=>{});
+  }
+}
+
+// הפעלה ראשונית מהכפתור בדשבורד
+async function enablePushReminders(){
+  if(!messaging || !currentEmpId) return;
+  try{
+    const perm = await Notification.requestPermission();
+    if(perm === "granted"){
+      await registerAndSaveToken(currentEmpId);
+      toast("תזכורות ההחתמה הופעלו ✓");
+    }
+  }catch(e){ toast("ההפעלה נכשלה — נסה שוב"); }
+  renderEmpReminders();
+}
+
+/* ---------- כרטיס המצב בדשבורד העובד ---------- */
+function renderEmpReminders(){
+  const box = $("empRemindersCard"); if(!box) return;
+  if(currentRole !== "employee"){ box.innerHTML = ""; return; }
+
+  // אין תמיכה: באייפון מחוץ למסך הבית — מסבירים איך; אחרת מסתירים בשקט
+  if(!messaging || !("Notification" in window)){
+    box.innerHTML = (isIOS && !isStandalone()) ? `
+      <div class="card rem-card">
+        <div class="rem-head">🔔 תזכורות החתמה</div>
+        <div class="rem-sub">כדי לקבל תזכורת בדיוק בשעת הכניסה והיציאה שלך, קודם מוסיפים את האפליקציה למסך הבית:<br>שיתוף <b>⎋</b> ← <b>הוסף למסך הבית</b>, ואז נכנסים משם ומפעילים כאן.</div>
+      </div>` : "";
+    return;
+  }
+
+  const p = Notification.permission;
+  if(p === "granted"){
+    initPushForEmployee(currentEmpId); // מרענן token בשקט
+    box.innerHTML = `<div class="rem-on">🔔 תזכורות החתמה פעילות ✓</div>`;
+  } else if(p === "denied"){
+    box.innerHTML = `
+      <div class="card rem-card">
+        <div class="rem-head">🔕 ההתראות חסומות</div>
+        <div class="rem-sub">חסמת התראות לאפליקציה. כדי לקבל תזכורות החתמה, פתח את הגדרות הטלפון ← התראות ← שעון נוכחות, והפעל.</div>
+      </div>`;
+  } else {
+    box.innerHTML = `
+      <div class="card rem-card">
+        <div class="rem-head">🔔 תזכורות החתמה</div>
+        <div class="rem-sub">נזכיר לך להחתים כניסה ויציאה בדיוק בשעות המשמרת שלך בסידור. שכחת? סנוז ונחזור.</div>
+        <button class="btn" style="width:100%;margin-top:10px" onclick="enablePushReminders()">הפעל תזכורות</button>
+      </div>`;
+  }
+}
+
+/* ---------- התראה שמגיעה כשהאפליקציה פתוחה על המסך ---------- */
+if(messaging){
+  messaging.onMessage(payload => {
+    try{
+      const d = (payload && payload.data) || {};
+      if(d.kind === "in" || d.kind === "out"){
+        if(currentRole === "employee"){
+          openReminderChooser({ kind:d.kind, time:d.time||"", date:d.date||"", slot:d.slot||"" });
+        }
+      }
+    }catch(e){}
+  });
+}
+
 </script>
 </body>
 </html>
