@@ -563,7 +563,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v61</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v62</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -588,7 +588,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v61</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v62</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -653,6 +653,7 @@
           <span class="f-arr">→</span>
         </button>
       </div>
+      <div id="mgrNotifCard"></div>
     </div>
 
     <!-- מסך: סקירה -->
@@ -1857,6 +1858,7 @@ function routeAfterLogin(user){
     const mgr=snap.val();
     if(mgr && mgr===user.uid){
       currentRole="manager"; currentEmpId=null;
+      setTimeout(()=>{ initPushForManager(); maybeConsumeGoto(); }, 400);
       $("authScreen").classList.add("hidden");
       $("empApp").classList.add("hidden");
       $("app").classList.remove("hidden");
@@ -1911,6 +1913,7 @@ function enterEmployeeMode(user){
     renderEmployeeDashboard();
     initPushForEmployee(id);
     maybeShowPendingReminder();
+    maybeConsumeGoto();
   });
 }
 
@@ -2091,6 +2094,7 @@ function backToHome(){ consoleFolder=null; applyConsoleNav(); try{window.scrollT
 function applyConsoleNav(){
   const home=$("consoleHome");
   if(home) home.classList.toggle("hidden", consoleFolder!==null);
+  if(consoleFolder===null && typeof renderMgrNotifs==="function") renderMgrNotifs();
   CONSOLE_SCREENS.forEach(s=>{
     const el=$("screen-"+s);
     if(el) el.classList.toggle("hidden", consoleFolder!==s);
@@ -5256,8 +5260,116 @@ if(messaging){
           openReminderChooser({ kind:d.kind, time:d.time||"", date:d.date||"", slot:d.slot||"" });
         }
       }
+      else {
+        const n = (payload && payload.notification) || {};
+        if(n.title) toast(n.title);
+      }
     }catch(e){}
   });
+}
+
+
+/* ============================================================
+   18. התראות אירועים (v62)
+   ------------------------------------------------------------
+   התראות מנהל: הערת עובד, הקפה חדשה, משמרת פתוחה 12+ שעות,
+   ומשמרת שנסגרה אוטומטית. התראות עובד: תלוש חדש והערת מנהל.
+   הצד השולח: פונקציות ענן שמאזינות לאירועים ב-RTDB.
+   נתיב חדש: managerTokens/{key} = {token, ua, updatedAt}
+   ============================================================ */
+
+/* ---------- ניתוב עומק מהתראות (?goto=...) ---------- */
+let pendingGoto = null;
+(function(){
+  try{
+    const q = new URLSearchParams(location.search);
+    const g = q.get("goto");
+    if(g){ pendingGoto = g; history.replaceState(null, "", location.pathname); }
+  }catch(e){}
+})();
+
+function maybeConsumeGoto(){
+  if(!pendingGoto) return;
+  const g = pendingGoto; pendingGoto = null;
+  try{
+    if(currentRole === "employee"){
+      if(["payslips","notes","hakafa","pay","forms","upcoming"].includes(g)) openEmpNav(g);
+    } else if(currentRole === "manager"){
+      if(CONSOLE_SCREENS.includes(g)) openFolder(g);
+    }
+  }catch(e){}
+}
+
+/* ---------- התראות מנהל: שמירת token והפעלה ---------- */
+async function registerAndSaveManagerToken(){
+  if(!messaging) return null;
+  try{ if(getDeviceMode() === "shop") return null; }catch(e){}  // מכשיר חנות/טרמינל לעולם לא נרשם להתראות מנהל
+  const reg = await navigator.serviceWorker.register("firebase-messaging-sw.js");
+  const token = await messaging.getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
+  if(!token) throw new Error("no-token");
+  const lsKey = "fcmSavedMgr";
+  try{ if(localStorage.getItem(lsKey) === token) return token; }catch(e){}
+  const snap = await db.ref("managerTokens").once("value");
+  const all = snap.val() || {};
+  const exists = Object.keys(all).some(k => all[k] && all[k].token === token);
+  if(!exists){
+    await db.ref("managerTokens").push({ token, ua: (navigator.userAgent||"").slice(0,120), updatedAt: Date.now() });
+  }
+  try{ localStorage.setItem(lsKey, token); }catch(e){}
+  return token;
+}
+
+function initPushForManager(){
+  if(currentRole !== "manager" || !messaging || !("Notification" in window)) return;
+  if(Notification.permission === "granted"){
+    registerAndSaveManagerToken().catch(()=>{});
+  }
+}
+
+async function enableManagerNotifs(){
+  if(!messaging || currentRole !== "manager") return;
+  try{
+    const perm = await Notification.requestPermission();
+    if(perm === "granted"){
+      await registerAndSaveManagerToken();
+      toast("התראות המנהל הופעלו ✓");
+    }
+  }catch(e){ toast("ההפעלה נכשלה — נסה שוב"); }
+  renderMgrNotifs();
+}
+
+function renderMgrNotifs(){
+  const box = $("mgrNotifCard"); if(!box) return;
+  if(currentRole !== "manager"){ box.innerHTML = ""; return; }
+  try{ if(getDeviceMode() === "shop"){ box.innerHTML = ""; return; } }catch(e){}
+
+  if(!messaging || !("Notification" in window)){
+    box.innerHTML = (isIOS && !isStandalone()) ? `
+      <div class="card rem-card" style="margin-top:14px">
+        <div class="rem-head">🔔 התראות מנהל</div>
+        <div class="rem-sub">כדי לקבל התראות על הערות, הקפות ומשמרות תקועות — הוסף את האפליקציה למסך הבית (שיתוף ⎋ ← הוסף למסך הבית) והפעל משם.</div>
+      </div>` : "";
+    return;
+  }
+
+  const p = Notification.permission;
+  if(p === "granted"){
+    initPushForManager();
+    box.innerHTML = `<div class="rem-on">🔔 התראות מנהל פעילות ✓</div>`;
+  } else if(p === "denied"){
+    box.innerHTML = `
+      <div class="card rem-card" style="margin-top:14px">
+        <div class="rem-head">🔕 ההתראות חסומות</div>
+        <div class="rem-sub">ההתראות לאפליקציה חסומות בהגדרות המכשיר. הפעל אותן כדי לקבל עדכוני מנהל.</div>
+      </div>`;
+  } else {
+    box.innerHTML = `
+      <div class="card rem-card" style="margin-top:14px">
+        <div class="rem-head">🔔 התראות מנהל</div>
+        <div class="rem-sub">קבל התראה כשעובד מוסיף הערה, רושם הקפה, וכשמשמרת נשארת פתוחה מעל 12 שעות או נסגרת אוטומטית.</div>
+        <button class="btn" style="width:100%;margin-top:10px" onclick="enableManagerNotifs()">הפעל התראות מנהל</button>
+      </div>`;
+  }
 }
 
 </script>
