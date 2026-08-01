@@ -563,7 +563,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v63</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v64</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -588,7 +588,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v63</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v64</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -1049,6 +1049,7 @@
       </div>
 
       <div id="empRemindersCard"></div>
+      <div id="empSchedChangesCard"></div>
       <div class="folder-grid">
         <button class="folder lg" onclick="openEmpNav('pay')">
           <span class="f-ico">💰</span>
@@ -1277,6 +1278,9 @@
       </div>
     </div>
 
+    <label id="notifyChangeRow" style="display:none;margin-top:14px;align-items:center;gap:8px;font-size:13.5px;font-weight:700;color:var(--ink-soft);cursor:pointer">
+      <input type="checkbox" id="notifyChangeCb" style="width:18px;height:18px"> 🔔 שלח לעובד התראה על השינוי (עם בקשת אישור)
+    </label>
     <div class="modal-actions">
       <button class="btn line" onclick="closeModal('shiftModal')">ביטול</button>
       <button class="btn" onclick="saveShift()">שמור</button>
@@ -1932,6 +1936,10 @@ function attachMyShiftListeners(id){
   db.ref("oneTimeShifts").orderByChild("employeeId").equalTo(id).on("value", snap=>{
     oneTime = snap.val()||{};
     if(currentRole==="employee") renderEmployeeDashboard();
+  });
+  db.ref("schedChanges/"+id).on("value", snap=>{
+    mySchedChanges = snap.val()||{};
+    if(currentRole==="employee") renderEmpSchedChanges();
   });
 }
 
@@ -3068,6 +3076,7 @@ function renderEmployeeDashboard(){
   if(!e){ return; } // הנתונים עדיין נטענים
   $("empHello").textContent="שלום, "+e.name+" 👋";
   renderEmpReminders();
+  renderEmpSchedChanges();
 
   // --- כרטיס "אתה במשמרת עכשיו" (טיימר חי) ---
   const lsEl=$("empLiveShift");
@@ -4946,6 +4955,7 @@ function setShiftType(type){
   $("onetimeFields").classList.toggle("hidden", type!=="onetime");
 }
 function clearShiftModal(){
+  const nr=$("notifyChangeRow"); if(nr){ nr.style.display="none"; $("notifyChangeCb").checked=false; }
   $("dayPicker").querySelectorAll("input").forEach(c=>c.checked=false);
   $("shiftDate").removeAttribute("readonly");
   $("shiftDate").value=""; $("shiftStart").value="16:00"; $("shiftEnd").value="22:00";
@@ -4969,6 +4979,7 @@ function openEditRecurring(id){
   clearShiftModal(); setShiftType("recurring");
   (r.daysOfWeek||[]).forEach(d=>{ const cb=$("dayPicker").querySelector('input[value="'+d+'"]'); if(cb) cb.checked=true; });
   $("shiftStart").value=r.startTime; $("shiftEnd").value=r.endTime;
+  const _nr=$("notifyChangeRow"); if(_nr) _nr.style.display="flex";
   openModal("shiftModal");
 }
 function openEditOnetime(id){
@@ -4979,6 +4990,7 @@ function openEditOnetime(id){
   $("shiftTypeSeg").classList.add("hidden");
   clearShiftModal(); setShiftType("onetime");
   $("shiftDate").value=o.date; $("shiftStart").value=o.startTime; $("shiftEnd").value=o.endTime;
+  const _nr=$("notifyChangeRow"); if(_nr) _nr.style.display="flex";
   openModal("shiftModal");
 }
 function saveShift(){
@@ -4991,8 +5003,15 @@ function saveShift(){
     const days=[...$("dayPicker").querySelectorAll("input:checked")].map(c=>parseInt(c.value));
     if(days.length===0){ toast("בחר לפחות יום אחד"); return; }
     if(shiftModalMode==="editRecurring" && editingPlanId){
+      const rOld=recurring[editingPlanId]||{};
+      const empIdR=rOld.employeeId;
+      const parts=[];
+      if(rOld.startTime!==start || rOld.endTime!==end) parts.push("שעות: "+rOld.startTime+"–"+rOld.endTime+" ← "+start+"–"+end);
+      const oldDays=(rOld.daysOfWeek||[]).slice().sort().join(","), newDays=days.slice().sort().join(",");
+      if(oldDays!==newDays) parts.push("ימים: "+schedDaysLabel(rOld.daysOfWeek)+" ← "+schedDaysLabel(days));
+      const summaryR = parts.length ? "המשמרת הקבועה שלך (ימי "+schedDaysLabel(days)+") השתנתה — "+parts.join(" · ") : "";
       db.ref("recurringShifts/"+editingPlanId).update({daysOfWeek:days, startTime:start, endTime:end})
-        .then(()=>{ closeModal("shiftModal"); toast("המשמרת הקבועה עודכנה ✓"); });
+        .then(()=>{ closeModal("shiftModal"); toast("המשמרת הקבועה עודכנה ✓"); sendSchedChange(empIdR, summaryR); });
     } else {
       db.ref("recurringShifts").push({employeeId:empId, daysOfWeek:days, startTime:start, endTime:end, cancelledDates:{}, createdAt:TS})
         .then(()=>{ closeModal("shiftModal"); toast("משמרת קבועה נוספה ✓"); });
@@ -5003,14 +5022,21 @@ function saveShift(){
     if(shiftModalMode==="editOccurrence" && occEditRecurringId && occEditDate){
       const r=recurring[occEditRecurringId];
       const empId2=r?r.employeeId:schedSubEmpId;
+      const summaryOcc = "המשמרת של "+fmtIsoShort(occEditDate)+" השתנתה — שעות: "+r.startTime+"–"+r.endTime+" ← "+start+"–"+end;
       db.ref("recurringShifts/"+occEditRecurringId+"/cancelledDates/"+occEditDate).set(true);
       db.ref("oneTimeShifts").push({employeeId:empId2, date:occEditDate, startTime:start, endTime:end, createdAt:TS})
-        .then(()=>{ $("shiftDate").removeAttribute("readonly"); occEditRecurringId=null; occEditDate=null; closeModal("shiftModal"); toast("המופע עודכן ✓ (הפך לחד-פעמי לאותו יום)"); });
+        .then(()=>{ $("shiftDate").removeAttribute("readonly"); occEditRecurringId=null; occEditDate=null; closeModal("shiftModal"); toast("המופע עודכן ✓ (הפך לחד-פעמי לאותו יום)"); sendSchedChange(empId2, summaryOcc); });
       return;
     }
     if(shiftModalMode==="editOnetime" && editingPlanId){
+      const oOld=oneTime[editingPlanId]||{};
+      const empIdO=oOld.employeeId;
+      const partsO=[];
+      if(oOld.date!==date) partsO.push("תאריך: "+fmtIsoShort(oOld.date)+" ← "+fmtIsoShort(date));
+      if(oOld.startTime!==start || oOld.endTime!==end) partsO.push("שעות: "+oOld.startTime+"–"+oOld.endTime+" ← "+start+"–"+end);
+      const summaryO = partsO.length ? "המשמרת שלך ב-"+fmtIsoShort(date)+" השתנתה — "+partsO.join(" · ") : "";
       db.ref("oneTimeShifts/"+editingPlanId).update({date, startTime:start, endTime:end})
-        .then(()=>{ closeModal("shiftModal"); toast("המשמרת עודכנה ✓"); });
+        .then(()=>{ closeModal("shiftModal"); toast("המשמרת עודכנה ✓"); sendSchedChange(empIdO, summaryO); });
     } else {
       db.ref("oneTimeShifts").push({employeeId:empId, date, startTime:start, endTime:end, createdAt:TS})
         .then(()=>{ closeModal("shiftModal"); toast("משמרת חד-פעמית נוספה ✓"); });
@@ -5068,6 +5094,7 @@ function editOccurrence(dateIso){
   $("shiftDate").value=dateIso; $("shiftStart").value=r.startTime; $("shiftEnd").value=r.endTime;
   $("shiftDate").setAttribute("readonly","readonly");
   closeModal("cancelModal");
+  const _nr=$("notifyChangeRow"); if(_nr) _nr.style.display="flex";
   openModal("shiftModal");
 }
 
@@ -5326,6 +5353,7 @@ function maybeConsumeGoto(){
   try{
     if(currentRole === "employee"){
       if(["payslips","notes","hakafa","pay","forms","upcoming"].includes(g)) openEmpNav(g);
+      else if(g === "schedchange") openEmpNav("home");
     } else if(currentRole === "manager"){
       if(CONSOLE_SCREENS.includes(g)) openFolder(g);
     }
@@ -5402,6 +5430,50 @@ function renderMgrNotifs(){
         <button class="btn" style="width:100%;margin-top:10px" onclick="enableManagerNotifs()">הפעל התראות מנהל</button>
       </div>`;
   }
+}
+
+
+/* ============================================================
+   19. התראות שינוי סידור עם אישור עובד (v64)
+   ------------------------------------------------------------
+   המנהל בוחר בעריכת משמרת אם לשלוח התראה; העובד מקבל פירוט
+   השינוי הספציפי ומאשר; אישור מייצר התראה חזרה למנהל.
+   נתיב: schedChanges/{empId}/{id} = {summary, createdAt, ack, ackedAt}
+   ============================================================ */
+let mySchedChanges = {};
+
+function schedDaysLabel(days){
+  try{ return (days||[]).slice().sort((a,b)=>a-b).map(d=>HE_DAYS_SHORT[d]).join("׳, ")+"׳"; }catch(e){ return ""; }
+}
+
+function sendSchedChange(empId, summary){
+  const cb=$("notifyChangeCb");
+  if(!cb || !cb.checked) return;               // רק כשבחרת לשלוח
+  if(!empId || !summary){ return; }            // אין שינוי אמיתי — אין מה לשלוח
+  db.ref("schedChanges/"+empId).push({ summary, createdAt: TS, ack:false })
+    .then(()=>toast("נשלחה לעובד התראת שינוי ✓"))
+    .catch(()=>toast("שליחת ההתראה נכשלה"));
+}
+
+function renderEmpSchedChanges(){
+  const box=$("empSchedChangesCard"); if(!box) return;
+  if(currentRole!=="employee"){ box.innerHTML=""; return; }
+  const pending=Object.entries(mySchedChanges)
+    .filter(([,v])=>v && v.summary && !v.ack)
+    .sort((a,b)=>(a[1].createdAt||0)-(b[1].createdAt||0));
+  box.innerHTML = pending.map(([id,v])=>`
+    <div class="card rem-card" style="margin-top:14px">
+      <div class="rem-head">🔄 שינוי בסידור שלך</div>
+      <div class="rem-sub">${esc(v.summary)}</div>
+      <button class="btn" style="width:100%;margin-top:10px" onclick="ackSchedChange('${id}')">אישרתי את השינוי ✓</button>
+    </div>`).join("");
+}
+
+function ackSchedChange(id){
+  if(!currentEmpId || !id) return;
+  db.ref("schedChanges/"+currentEmpId+"/"+id).update({ ack:true, ackedAt: TS })
+    .then(()=>toast("האישור נשלח למנהל ✓"))
+    .catch(()=>toast("שגיאה — נסה שוב"));
 }
 
 </script>
