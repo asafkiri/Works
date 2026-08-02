@@ -563,7 +563,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v64</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v65</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -588,7 +588,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v64</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v65</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -5025,7 +5025,7 @@ function saveShift(){
       const summaryOcc = "המשמרת של "+fmtIsoShort(occEditDate)+" השתנתה — שעות: "+r.startTime+"–"+r.endTime+" ← "+start+"–"+end;
       db.ref("recurringShifts/"+occEditRecurringId+"/cancelledDates/"+occEditDate).set(true);
       db.ref("oneTimeShifts").push({employeeId:empId2, date:occEditDate, startTime:start, endTime:end, createdAt:TS})
-        .then(()=>{ $("shiftDate").removeAttribute("readonly"); occEditRecurringId=null; occEditDate=null; closeModal("shiftModal"); toast("המופע עודכן ✓ (הפך לחד-פעמי לאותו יום)"); sendSchedChange(empId2, summaryOcc); });
+        .then(()=>{ $("shiftDate").removeAttribute("readonly"); occEditRecurringId=null; occEditDate=null; closeModal("shiftModal"); toast("המופע עודכן ✓ (הפך לחד-פעמי לאותו יום)"); sendSchedChange(empId2, summaryOcc, occEditDate); });
       return;
     }
     if(shiftModalMode==="editOnetime" && editingPlanId){
@@ -5036,7 +5036,7 @@ function saveShift(){
       if(oOld.startTime!==start || oOld.endTime!==end) partsO.push("שעות: "+oOld.startTime+"–"+oOld.endTime+" ← "+start+"–"+end);
       const summaryO = partsO.length ? "המשמרת שלך ב-"+fmtIsoShort(date)+" השתנתה — "+partsO.join(" · ") : "";
       db.ref("oneTimeShifts/"+editingPlanId).update({date, startTime:start, endTime:end})
-        .then(()=>{ closeModal("shiftModal"); toast("המשמרת עודכנה ✓"); sendSchedChange(empIdO, summaryO); });
+        .then(()=>{ closeModal("shiftModal"); toast("המשמרת עודכנה ✓"); sendSchedChange(empIdO, summaryO, date); });
     } else {
       db.ref("oneTimeShifts").push({employeeId:empId, date, startTime:start, endTime:end, createdAt:TS})
         .then(()=>{ closeModal("shiftModal"); toast("משמרת חד-פעמית נוספה ✓"); });
@@ -5446,11 +5446,13 @@ function schedDaysLabel(days){
   try{ return (days||[]).slice().sort((a,b)=>a-b).map(d=>HE_DAYS_SHORT[d]).join("׳, ")+"׳"; }catch(e){ return ""; }
 }
 
-function sendSchedChange(empId, summary){
+function sendSchedChange(empId, summary, shiftDate){
   const cb=$("notifyChangeCb");
   if(!cb || !cb.checked) return;               // רק כשבחרת לשלוח
   if(!empId || !summary){ return; }            // אין שינוי אמיתי — אין מה לשלוח
-  db.ref("schedChanges/"+empId).push({ summary, createdAt: TS, ack:false })
+  const rec = { summary, createdAt: TS, ack:false };
+  if(shiftDate) rec.shiftDate = shiftDate;     // v65: לתאריך ספציפי — פג תוקף אוטומטי ביום המשמרת
+  db.ref("schedChanges/"+empId).push(rec)
     .then(()=>toast("נשלחה לעובד התראת שינוי ✓"))
     .catch(()=>toast("שליחת ההתראה נכשלה"));
 }
@@ -5458,8 +5460,9 @@ function sendSchedChange(empId, summary){
 function renderEmpSchedChanges(){
   const box=$("empSchedChangesCard"); if(!box) return;
   if(currentRole!=="employee"){ box.innerHTML=""; return; }
+  const todaySc = new Date().toLocaleDateString("en-CA");
   const pending=Object.entries(mySchedChanges)
-    .filter(([,v])=>v && v.summary && !v.ack)
+    .filter(([,v])=>v && v.summary && !v.ack && (!v.shiftDate || v.shiftDate >= todaySc))
     .sort((a,b)=>(a[1].createdAt||0)-(b[1].createdAt||0));
   box.innerHTML = pending.map(([id,v])=>`
     <div class="card rem-card" style="margin-top:14px">
