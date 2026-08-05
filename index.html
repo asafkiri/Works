@@ -522,17 +522,122 @@
   .live-card .lc-timer{font-size:42px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:.01em;margin:8px 0 2px;color:var(--ink)}
   .live-card .lc-sub{font-size:13px;color:var(--live-d)}
 
-  /* ---------- סיכום צוות (מסך שכר) ---------- */
-  .team-sum{background:linear-gradient(135deg, var(--primary) 0%, var(--primary-d) 100%);border:none;color:#fff;border-radius:var(--r-lg);padding:18px 18px 16px;margin-bottom:16px;box-shadow:var(--shadow)}
-  .team-sum .ts-label{font-size:13px;font-weight:700;opacity:.9}
-  .team-sum .ts-amount{font-size:38px;font-weight:800;letter-spacing:-.02em;margin:4px 0 12px;font-variant-numeric:tabular-nums}
-  .team-sum .ts-stats{display:flex;gap:10px;flex-wrap:wrap}
-  .team-sum .ts-stat{flex:1 1 72px;min-width:72px;background:rgba(255,255,255,.13);border-radius:12px;padding:9px 11px}
-  .team-sum .ts-stat .k{font-size:11.5px;opacity:.85}
-  .team-sum .ts-stat .v{font-size:15px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:2px}
-  .team-sum .ts-net{display:flex;align-items:center;justify-content:space-between;gap:10px;background:rgba(255,255,255,.16);border-radius:12px;padding:10px 14px;margin:0 0 12px}
-  .team-sum .ts-net .tn-label{font-size:14px;font-weight:700;opacity:.95}
-  .team-sum .ts-net .tn-val{font-size:30px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.01em;white-space:nowrap}
+  /* ---------- שכר ותשלומים: סיכום ברור לצוות ולכל עובד ---------- */
+  .team-sum{
+    background:linear-gradient(145deg, var(--primary) 0%, var(--primary-d) 100%);
+    border:none;color:#fff;border-radius:var(--r-lg);padding:22px;margin-bottom:16px;box-shadow:var(--shadow)
+  }
+  .team-sum .ts-top{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:18px}
+  .team-sum .ts-eyebrow{font-size:13px;font-weight:800;opacity:.86}
+  .team-sum .ts-period{font-size:19px;font-weight:800;margin-top:2px}
+  .team-sum .ts-hours{flex:0 0 auto;text-align:left;background:rgba(255,255,255,.14);border-radius:12px;padding:8px 12px}
+  .team-sum .ts-hours span{display:block;font-size:11.5px;opacity:.82}
+  .team-sum .ts-hours strong{display:block;font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:2px}
+  .team-sum .ts-result{background:#fff;color:var(--ink);border-radius:16px;padding:16px 18px;margin-bottom:14px}
+  .team-sum .ts-result-label{font-size:15px;font-weight:800;color:var(--ink-soft)}
+  .team-sum .ts-amount{font-size:46px;font-weight:800;line-height:1.05;letter-spacing:-.03em;margin:5px 0 4px;color:var(--primary-d);font-variant-numeric:tabular-nums}
+  .team-sum .ts-result-note{font-size:12.5px;font-weight:700;color:var(--muted);line-height:1.45}
+  .team-sum.overpaid .ts-amount{color:var(--danger)}
+  .team-sum.settled .ts-amount{color:var(--ok)}
+  .team-sum.empty-balance .ts-amount{color:var(--muted)}
+  .team-sum .ts-calc-title{font-size:12px;font-weight:800;opacity:.86;margin:0 2px 8px}
+  .team-sum .ts-calc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:9px}
+  .team-sum .ts-calc-item{min-width:0;background:rgba(255,255,255,.14);border-radius:13px;padding:11px 12px}
+  .team-sum .ts-calc-item .k{display:block;font-size:12px;font-weight:700;line-height:1.35;opacity:.88}
+  .team-sum .ts-calc-item .v{display:block;font-size:21px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:4px;white-space:nowrap;direction:ltr;unicode-bidi:isolate;text-align:right}
+  .team-sum .ts-calc-item.minus .v::before{content:"−";margin-left:2px}
+  .team-sum .ts-calc-item.plus .v::before{content:"+";margin-left:2px}
+  .team-sum .ts-overpaid-note{margin-top:10px;background:#fff3f3;color:#991b1b;border-radius:11px;padding:10px 12px;font-size:12.5px;font-weight:800;line-height:1.45}
+  .team-sum .ts-hakafa-note{margin-top:10px;background:#fff7ed;color:#9a3412;border-radius:11px;padding:10px 12px;font-size:12.5px;font-weight:800;line-height:1.45}
+
+  .pay-list-title{font-size:18px;font-weight:800;margin:0 0 4px}
+  .pay-list-help{color:var(--muted);font-size:13px;line-height:1.55;margin:0 0 16px}
+  .pay-emp-list{display:flex;flex-direction:column;gap:12px}
+  .pay-emp-card{
+    appearance:none;width:100%;border:1px solid var(--line);border-radius:16px;background:#fff;color:var(--ink);
+    padding:16px;text-align:right;font-family:inherit;cursor:pointer;box-shadow:var(--shadow-sm);
+    transition:transform .12s,box-shadow .12s,border-color .12s
+  }
+  .pay-emp-card:hover{transform:translateY(-1px);box-shadow:var(--shadow);border-color:var(--line-2)}
+  .pay-emp-card:active{transform:translateY(0)}
+  .pay-emp-card:focus-visible{outline:3px solid var(--primary-ring);outline-offset:2px}
+  .pay-emp-card .pec-head{display:flex;align-items:center;gap:11px;margin-bottom:12px}
+  .pay-emp-card .pec-avatar{width:44px;height:44px;display:flex;align-items:center;justify-content:center;flex:0 0 auto;background:var(--primary-soft);border-radius:12px;font-size:20px}
+  .pay-emp-card .pec-who{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+  .pay-emp-card .pec-name{font-size:18px;font-weight:800;color:var(--ink)}
+  .pay-emp-card .pec-month{font-size:12.5px;font-weight:600;color:var(--muted)}
+  .pay-emp-card .pec-arrow{font-size:18px;color:var(--muted);opacity:.65;flex:0 0 auto}
+  .pay-emp-card .pec-balance{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--primary-soft);border:1px solid #cfe7e3;border-radius:13px;padding:12px 14px;margin-bottom:10px}
+  .pay-emp-card .pec-balance-label{font-size:13.5px;font-weight:800;line-height:1.35;color:var(--primary-d)}
+  .pay-emp-card .pec-balance-value{font-size:27px;font-weight:800;white-space:nowrap;color:var(--primary-d);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+  .pay-emp-card.overpaid .pec-balance{background:var(--danger-bg);border-color:#fecaca}
+  .pay-emp-card.overpaid .pec-balance-label,.pay-emp-card.overpaid .pec-balance-value{color:var(--danger)}
+  .pay-emp-card.settled .pec-balance{background:var(--ok-bg);border-color:var(--ok-line)}
+  .pay-emp-card.settled .pec-balance-label,.pay-emp-card.settled .pec-balance-value{color:var(--ok)}
+  .pay-emp-card.empty-balance .pec-balance{background:var(--paper);border-color:var(--line)}
+  .pay-emp-card.empty-balance .pec-balance-label,.pay-emp-card.empty-balance .pec-balance-value{color:var(--muted)}
+  .pay-emp-card .pec-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+  .pay-emp-card .pec-stat{min-width:0;background:var(--paper);border-radius:11px;padding:9px 10px}
+  .pay-emp-card .pec-stat .k{display:block;color:var(--muted);font-size:11.5px;font-weight:700;line-height:1.3}
+  .pay-emp-card .pec-stat .v{display:block;color:var(--ink);font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:3px;white-space:nowrap}
+  .pay-emp-card .pec-warning{display:block;background:#fff7ed;color:#9a3412;border:1px solid #fed7aa;border-radius:10px;padding:8px 10px;font-size:11.5px;font-weight:800;line-height:1.45;margin-top:10px}
+  .pay-emp-card .pec-cta{display:block;color:var(--primary-d);font-size:12.5px;font-weight:800;margin-top:11px}
+
+  .pay-detail-summary{border:1px solid #cfe7e3;background:var(--primary-soft);border-radius:16px;padding:17px;margin:4px 0 18px}
+  .pay-detail-summary.overpaid{background:var(--danger-bg);border-color:#fecaca}
+  .pay-detail-summary.settled{background:var(--ok-bg);border-color:var(--ok-line)}
+  .pay-detail-summary.empty-balance{background:var(--paper);border-color:var(--line)}
+  .pay-detail-summary .pds-kicker{font-size:12.5px;font-weight:800;color:var(--muted)}
+  .pay-detail-summary .pds-result{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin:4px 0 14px}
+  .pay-detail-summary .pds-label{font-size:16px;font-weight:800;color:var(--primary-d);line-height:1.35}
+  .pay-detail-summary .pds-value{font-size:38px;font-weight:800;color:var(--primary-d);font-variant-numeric:tabular-nums;letter-spacing:-.025em;white-space:nowrap}
+  .pay-detail-summary.overpaid .pds-label,.pay-detail-summary.overpaid .pds-value{color:var(--danger)}
+  .pay-detail-summary.settled .pds-label,.pay-detail-summary.settled .pds-value{color:var(--ok)}
+  .pay-detail-summary.empty-balance .pds-label,.pay-detail-summary.empty-balance .pds-value{color:var(--muted)}
+  .pay-detail-summary .pds-note{font-size:12px;color:var(--muted);font-weight:700;margin:-7px 0 13px;line-height:1.45}
+  .pay-detail-summary .pds-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+  .pay-detail-summary .pds-stat{background:rgba(255,255,255,.78);border-radius:11px;padding:10px;min-width:0}
+  .pay-detail-summary .pds-stat .k{display:block;color:var(--muted);font-size:11.5px;font-weight:700;line-height:1.3}
+  .pay-detail-summary .pds-stat .v{display:block;color:var(--ink);font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:3px;white-space:nowrap}
+  .pay-detail-summary .pds-stat .v.minus-value{direction:ltr;unicode-bidi:isolate;text-align:right}
+  .pay-detail-summary .pds-warning{background:#fff7ed;color:#9a3412;border:1px solid #fed7aa;border-radius:11px;padding:10px 12px;font-size:12px;font-weight:800;line-height:1.5;margin-top:10px}
+  .pay-section-head{font-size:17px;font-weight:800;color:var(--ink);margin:20px 0 10px}
+  .pay-wage-breakdown{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-top:12px}
+  .pay-wage-breakdown .pay-sum{margin:0;border:0;padding:0}
+  .pay-payment-card{margin-top:14px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:15px 16px}
+  .pay-payment-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:11px;flex-wrap:wrap}
+  .pay-payment-head .pay-section-head{margin:0}
+  .pay-payment-actions{display:flex;gap:7px;flex-wrap:wrap}
+  .pay-payment-actions .btn{flex:1 1 150px}
+  .pay-total-row{display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid var(--line);padding-top:11px;margin-top:10px;font-size:14px;font-weight:800}
+  .pay-total-row strong{font-size:18px;font-variant-numeric:tabular-nums}
+  .pay-extra-fold{margin-top:14px;border:1px solid var(--line);border-radius:14px;background:#fff;overflow:hidden}
+  .pay-extra-fold > summary{list-style:none;cursor:pointer;padding:15px 16px;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .pay-extra-fold > summary::-webkit-details-marker{display:none}
+  .pay-extra-fold .pay-extra-chevron{color:var(--muted);transition:transform .18s}
+  .pay-extra-fold[open] .pay-extra-chevron{transform:rotate(180deg)}
+  .pay-extra-fold .pay-extra-body{padding:0 14px 14px;border-top:1px solid var(--line)}
+  .pay-extra-fold .net-box{margin-top:14px}
+  .pay-extra-lead{font-size:12.5px;color:var(--muted);font-weight:700;line-height:1.55;margin:12px 2px 0}
+  .pay-export{margin-top:18px;border-top:1px solid var(--line);padding-top:16px}
+  .pay-export-actions{display:flex;gap:8px}
+  .pay-export-actions .btn:first-child{flex:1}
+  .pay-export-note{font-size:12px;color:var(--muted);text-align:center;line-height:1.5;margin-top:8px}
+
+  @media(max-width:560px){
+    .team-sum{padding:18px}
+    .team-sum .ts-period{font-size:17px}
+    .team-sum .ts-amount{font-size:42px}
+    .team-sum .ts-calc-grid{grid-template-columns:1fr;gap:7px}
+    .team-sum .ts-calc-item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px}
+    .team-sum .ts-calc-item .v{font-size:20px;margin-top:0}
+    .pay-emp-card{padding:14px}
+    .pay-emp-card .pec-stats,.pay-detail-summary .pds-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .pay-emp-card .pec-balance{align-items:flex-end}
+    .pay-emp-card .pec-balance-value{font-size:25px}
+    .pay-detail-summary .pds-result{align-items:flex-end}
+    .pay-detail-summary .pds-value{font-size:34px}
+  }
 
   /* ---------- חיווי "כמה במשמרת" על אריח הבית ---------- */
   .live-count{display:inline-flex;align-items:center;gap:6px;flex:0 0 auto;font-size:12px;font-weight:800;
@@ -563,7 +668,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v65</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v66</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -588,7 +693,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v65</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v66</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -757,13 +862,14 @@
       <div id="payList">
         <div class="screen-head"><button class="back-btn" onclick="backToHome()">→ חזרה</button><h1 class="screen-title">💰 שכר ותשלומים</h1></div>
         <div class="card" style="padding:12px 14px;margin-bottom:12px">
-          <label class="fld" style="margin:0 0 6px">חודש</label>
+          <label class="fld" style="margin:0 0 6px">החודש שמוצג</label>
           <select id="payTeamMonth" onchange="onPayTeamMonthChange()"></select>
         </div>
         <div id="payTeamSummary"></div>
         <div class="card">
-          <p class="sub">בחר עובד לצפייה בפירוט המשמרות, סך השעות והסכום לתשלום. ניתן לסמן תשלומים ולייצא דף סיכום לרו״ח.</p>
-          <div id="payEmpFolders"></div>
+          <h2 class="pay-list-title">פירוט לפי עובד</h2>
+          <p class="pay-list-help">היתרה הגדולה בכל כרטיס כבר מחושבת <b>אחרי הפחתת תשלומים והקפות</b>. לחץ על עובד כדי לראות משמרות, לרשום תשלום או להפיק דוח.</p>
+          <div id="payEmpFolders" class="pay-emp-list"></div>
           <button class="folder" style="margin-top:14px" onclick="openPayArchive()">
             <span class="f-ico">📦</span>
             <span class="f-txt"><span class="f-title">עובדים שהושבתו</span><span class="f-sub" id="payArchiveCount">ארכיון</span></span>
@@ -777,7 +883,7 @@
         <div class="screen-head"><button class="back-btn" onclick="payBackToList()">→ חזרה</button><h1 class="screen-title">📦 עובדים שהושבתו</h1></div>
         <div class="card">
           <p class="sub">עובדים שהושבתו — הנתונים נשמרים. לחץ על עובד לצפייה בשכר ההיסטורי שלו.</p>
-          <div id="payArchiveFolders"></div>
+          <div id="payArchiveFolders" class="pay-emp-list"></div>
         </div>
       </div>
 
@@ -787,7 +893,7 @@
         <div class="card" id="payCard">
           <div class="row" style="margin-bottom:14px">
             <div style="flex:1">
-              <label class="fld">חודש</label>
+              <label class="fld">החודש שמוצג</label>
               <select id="paySelMonth" onchange="onPayMonthChange()"></select>
             </div>
           </div>
@@ -4102,25 +4208,111 @@ function computeEmpPay(empId, monthKey){
   return { totalH, totalPay:pay, regH, ot125H, ot150H, otPay, hasOT:(ot125H+ot150H)>0.001, otEnabled:true, nightCount, rate };
 }
 
-// רשימת מפתחות-חודש שיש בהם משמרות לעובד (כולל החודש הנוכחי תמיד), מהחדש לישן
+// רשימת חודשים שבהם יש לעובד פעילות כלשהי: משמרות, תשלומים או הקפה.
+// כך גם חודש בלי משמרות לא מסתיר תשלום/הקפה שכבר נרשמו בו.
 function monthsForEmp(empId){
   const set={};
   Object.values(shifts).forEach(s=>{ if(s.employeeId===empId && s.clockIn) set[monthKeyOf(s.clockIn)]=true; });
+  const paymentSrc=(currentRole==="employee"&&empId===currentEmpId) ? (myPayments||{}) : ((allPayments&&allPayments[empId])||{});
+  const takingSrc=(currentRole==="employee"&&empId===currentEmpId) ? (myTakings||{}) : ((allTakings&&allTakings[empId])||{});
+  Object.values(paymentSrc).forEach(p=>{
+    if(p&&p.monthKey) set[p.monthKey]=true;
+    else if(p&&p.createdAt) set[monthKeyOf(p.createdAt)]=true;
+  });
+  Object.values(takingSrc).forEach(t=>{ if(t&&t.createdAt) set[monthKeyOf(t.createdAt)]=true; });
   set[currentMonthKey()]=true;
   return Object.keys(set).sort().reverse();
 }
 
-// סיכום צוות: סך שעות/ברוטו/שולם/נותר לכל העובדים הפעילים בחודש מסוים
+// תמונת מצב פשוטה לעובד: שכר שנצבר פחות תשלומים והקפות.
+// זהו אותו חישוב שהיה קיים קודם; הפונקציה מרכזת אותו כדי שכל המסכים יציגו אותו באותו סדר.
+function payBalanceSnapshot(empId, monthKey){
+  const cp=computeEmpPay(empId, monthKey);
+  const paid=paymentsSumFor(empId, monthKey);
+  const takings=takingsSumFor(empId, monthKey);
+  const hakafaLimit=cp.totalPay*0.25;
+  const hakafaOver=cp.totalPay>0 && takings>hakafaLimit;
+  return { cp, hours:cp.totalH, wage:cp.totalPay, paid, takings, balance:cp.totalPay-paid-takings, hakafaLimit, hakafaOver };
+}
+function payBalancePresentation(balance, forTeam, hasActivity){
+  if(hasActivity===false){
+    return {
+      cls:"empty-balance",
+      label:forTeam ? "עדיין לא נצבר שכר לצוות" : "עדיין לא נצבר שכר החודש",
+      note:"אין בחודש משמרות סגורות, תשלומים או הקפה שנרשמה.",
+      amount:0
+    };
+  }
+  if(balance < -0.005){
+    return {
+      cls:"overpaid",
+      label:forTeam ? "שולם או נוכה ביתר לצוות" : "שולם או נוכה ביתר",
+      note:"סכום התשלומים וההקפות גבוה מהשכר שנצבר בחודש.",
+      amount:Math.abs(balance)
+    };
+  }
+  if(Math.abs(balance) <= 0.005){
+    return {
+      cls:"settled",
+      label:forTeam ? "אין יתרה לתשלום לצוות" : "אין יתרה לתשלום",
+      note:"השכר המחושב כוסה באמצעות התשלומים וההקפות שנרשמו.",
+      amount:0
+    };
+  }
+  return {
+    cls:"due",
+    label:forTeam ? "נותר לשלם לצוות" : "נותר לתשלום",
+    note:"היתרה כבר אחרי הפחתת תשלומים והקפות.",
+    amount:balance
+  };
+}
+function fmtPayMoney(value){
+  const n=Number(value);
+  return (Number.isFinite(n)?Math.round(n):0).toLocaleString("he-IL");
+}
+function payEmployeeSummaryHtml(e, monthKey, openFn){
+  const s=payBalanceSnapshot(e.id, monthKey);
+  const hasActivity=Math.abs(s.hours)+Math.abs(s.wage)+Math.abs(s.paid)+Math.abs(s.takings)>0.005;
+  const p=payBalancePresentation(s.balance, false, hasActivity);
+  const balanceHint=e.netIsNet ? "אחרי תשלומים והקפות" : "אחרי תשלומים והקפות · לפני ניכויי חובה";
+  return `<button class="pay-emp-card ${p.cls}" onclick="${openFn}('${e.id}')" aria-label="פתיחת פירוט השכר של ${esc(e.name)}">
+    <span class="pec-head">
+      <span class="pec-avatar">👤</span>
+      <span class="pec-who"><span class="pec-name">${esc(e.name)}</span><span class="pec-month">${monthLabel(monthKey)}</span></span>
+      <span class="pec-arrow">←</span>
+    </span>
+    <span class="pec-balance">
+      <span class="pec-balance-label">${p.label}<br><small>${balanceHint}</small></span>
+      <span class="pec-balance-value">₪${fmtPayMoney(p.amount)}</span>
+    </span>
+    <span class="pec-stats">
+      <span class="pec-stat"><span class="k">שעות</span><span class="v">${fmtHours(s.hours)}</span></span>
+      <span class="pec-stat"><span class="k">${e.netIsNet?'שכר נטו לפי שעות':'שכר ברוטו לפי שעות'}</span><span class="v">₪${fmtPayMoney(s.wage)}</span></span>
+      <span class="pec-stat"><span class="k">כבר שולם</span><span class="v">₪${fmtPayMoney(s.paid)}</span></span>
+      <span class="pec-stat"><span class="k">הקפות</span><span class="v">₪${fmtPayMoney(s.takings)}</span></span>
+    </span>
+    ${s.hakafaOver?`<span class="pec-warning">⚠ ההקפה גבוהה מ־25% מהשכר. היתרה מפחיתה כרגע את כל ההקפה שנרשמה; יש לבדוק מה לדחות לחודש הבא.</span>`:''}
+    <span class="pec-cta">למשמרות, תשלומים ודוחות ←</span>
+  </button>`;
+}
+
+// סיכום צוות: יתרה חיובית של עובד אינה מתקזזת מול עובד ששולם/נוכה אצלו ביתר.
+// כך "נותר לשלם לצוות" הוא באמת סכום היתרות שעוד צריך לשלם.
 function teamMonthTotals(monthKey){
-  let hours=0, gross=0, paid=0, count=0;
+  let hours=0, gross=0, paid=0, takings=0, due=0, overpaid=0, hakafaOverCount=0, count=0;
   Object.keys(employees).forEach(id=>{
     const e=employees[id]; if(!e || e.active===false) return;
     count++;
     const cp=computeEmpPay(id, monthKey);
-    hours+=cp.totalH; gross+=cp.totalPay;
-    paid += paymentsSumFor(id, monthKey);
+    const empPaid=paymentsSumFor(id, monthKey);
+    const empTakings=takingsSumFor(id, monthKey);
+    const empBalance=cp.totalPay-empPaid-empTakings;
+    hours+=cp.totalH; gross+=cp.totalPay; paid+=empPaid; takings+=empTakings;
+    if(cp.totalPay>0 && empTakings>cp.totalPay*0.25) hakafaOverCount++;
+    if(empBalance>=0) due+=empBalance;
+    else overpaid+=Math.abs(empBalance);
   });
-  return {hours, gross, paid, remaining:gross-paid, count};
+  return {hours, gross, paid, takings, due, overpaid, hakafaOverCount, remaining:gross-paid, count};
 }
 // סך ההקפות של כל הצוות (עובדים פעילים) לחודש מסוים
 function teamTakingsSum(monthKey){
@@ -4140,18 +4332,30 @@ function renderPayTeamSummary(){
   const mk=payTeamMonthKey||currentMonthKey();
   const t=teamMonthTotals(mk);
   if(t.count===0){ el.innerHTML=""; return; }
-  const tk=teamTakingsSum(mk);
-  const net=t.remaining - tk;
-  el.innerHTML=`<div class="team-sum">
-    <div class="ts-label">מגיע לכל הצוות · ${monthLabel(mk)}</div>
-    <div class="ts-amount">₪${t.remaining.toFixed(0)}</div>
-    ${tk>0?`<div class="ts-net"><span class="tn-label">אחרי הורדות הקפה</span><span class="tn-val">₪${net.toFixed(0)}</span></div>`:''}
-    <div class="ts-stats">
-      <div class="ts-stat"><div class="k">שעות החודש</div><div class="v">${fmtHours(t.hours)}</div></div>
-      <div class="ts-stat"><div class="k">סך הכל ברוטו</div><div class="v">₪${t.gross.toFixed(0)}</div></div>
-      <div class="ts-stat"><div class="k">כבר שולם</div><div class="v">₪${t.paid.toFixed(0)}</div></div>
-      <div class="ts-stat"><div class="k">הקפות החודש</div><div class="v">₪${tk.toFixed(0)}</div></div>
+  const tk=t.takings;
+  const hasActivity=Math.abs(t.hours)+Math.abs(t.gross)+Math.abs(t.paid)+Math.abs(t.takings)>0.005;
+  const p=payBalancePresentation(t.due, true, hasActivity);
+  const teamBasis="אצל עובדים שמוגדרים ברוטו, היתרה היא לפני ניכויי חובה.";
+  const teamResultNote=p.note+(hasActivity?" "+teamBasis:"");
+  el.innerHTML=`<div class="team-sum ${p.cls}">
+    <div class="ts-top">
+      <div><div class="ts-eyebrow">סיכום שכר · עובדים הפעילים כיום</div><div class="ts-period">${monthLabel(mk)}</div></div>
+      <div class="ts-hours"><span>סה״כ שעות</span><strong>${fmtHours(t.hours)}</strong></div>
     </div>
+    <div class="ts-result">
+      <div class="ts-result-label">${p.label}</div>
+      <div class="ts-amount">₪${fmtPayMoney(p.amount)}</div>
+      <div class="ts-result-note">${teamResultNote}</div>
+    </div>
+    <div class="ts-calc-title">כך חושבה היתרה לתשלום</div>
+    <div class="ts-calc-grid">
+      <div class="ts-calc-item"><span class="k">שכר מחושב לפי ההחתמות</span><span class="v">₪${fmtPayMoney(t.gross)}</span></div>
+      <div class="ts-calc-item minus"><span class="k">תשלומים ומקדמות שניתנו</span><span class="v">₪${fmtPayMoney(t.paid)}</span></div>
+      <div class="ts-calc-item minus"><span class="k">הקפה שנרשמה לקיזוז</span><span class="v">₪${fmtPayMoney(tk)}</span></div>
+      ${t.overpaid>0?`<div class="ts-calc-item plus"><span class="k">עודף אצל עובדים אחרים שלא קוזז</span><span class="v">₪${fmtPayMoney(t.overpaid)}</span></div>`:''}
+    </div>
+    ${t.overpaid>0?`<div class="ts-overpaid-note">⚠ אצל חלק מהעובדים שולם או נוכה ביתר ₪${fmtPayMoney(t.overpaid)}. הסכום הזה לא קוזז מהיתרה של עובדים אחרים.</div>`:''}
+    ${t.hakafaOverCount>0?`<div class="ts-hakafa-note">⚠ אצל ${t.hakafaOverCount} עובדים ההקפה גבוהה מ־25% מהשכר. הסיכום מפחית את כל ההקפה שנרשמה; יש לבדוק מה צריך לדחות לחודש הבא.</div>`:''}
   </div>`;
 }
 
@@ -4164,10 +4368,7 @@ function renderPayCard(){
   const inactive=all.filter(e=>e.active===false);
 
   const mk=payTeamMonthKey||currentMonthKey();
-  const folder = e => {
-    const cp=computeEmpPay(e.id, mk);
-    return empFolderHtml(e, `${monthLabel(mk)}: ${fmtHours(cp.totalH)} · ₪${cp.totalPay.toFixed(0)}`, "openPayEmp");
-  };
+  const folder = e => payEmployeeSummaryHtml(e, mk, "openPayEmp");
   foldersBox.innerHTML = active.length ? active.map(folder).join("")
     : '<div class="empty">אין עובדים פעילים. הוסף עובד ב"ניהול עובדים".</div>';
   const arch=$("payArchiveFolders");
@@ -4212,17 +4413,11 @@ function renderPayDetail(){
   const e=employees[paySubEmpId]; if(!e){ box.innerHTML=""; return; }
   const rate=rateOf(paySubEmpId);
   const list=payShiftsFor(paySubEmpId, paySelMonthKey);
-
-  if(list.length===0){
-    box.innerHTML=`<div class="empty">אין משמרות סגורות עבור ${esc(e.name)} ב${monthLabel(paySelMonthKey)}.</div>`;
-    return;
-  }
-
   const cp=computeEmpPay(paySubEmpId, paySelMonthKey);
   const otOn=cp.otEnabled;
-  let totalH=0;
-  const rows=list.map(s=>{
-    const h=netHoursOf(s); const amt=h*rate; totalH+=h;
+  const totalH=cp.totalH;
+  const rows=list.length ? list.map(s=>{
+    const h=netHoursOf(s); const amt=h*rate;
     const night=otOn && isNightShift(s);
     const brkMin=Math.round(breakMsOf(s)/60000);
     return `<div class="pay-line">
@@ -4230,69 +4425,118 @@ function renderPayDetail(){
         <div class="pl-date">${fmtDate(s.clockIn)}${night?' <span class="night-tag">🌙 לילה</span>':''}${hasShortBreak(s)?' <span class="short-break-tag">☕ הפסקה קצרה — ללא ניכוי</span>':''}</div>
         <div class="pl-times">${fmtTime(s.clockIn)} ← ${fmtTime(s.clockOut)} · ${fmtHours(h)}${brkMin>0?` · ☕ ${brkMin}ד`:''}</div>
       </div>
-      ${otOn?'':`<div class="pl-amt">₪${amt.toFixed(0)}</div>`}
+      ${otOn?'':`<div class="pl-amt">₪${fmtPayMoney(amt)}</div>`}
     </div>`;
-  }).join("");
+  }).join("") : `<div class="empty">אין משמרות סגורות שנכללות בשכר של ${monthLabel(paySelMonthKey)}. תשלומים והקפה שנרשמו בחודש עדיין מוצגים למעלה.</div>`;
   const totalPay=cp.totalPay;
   const otBlock = otOn ? `
-      <div class="ps-row"><span>שעות רגילות (${fmtHours(cp.regH)})</span><span>₪${(cp.regH*rate).toFixed(0)}</span></div>
-      ${cp.ot125H>0?`<div class="ps-row"><span>נוספות 125% (${fmtHours(cp.ot125H)})</span><span>₪${(cp.ot125H*rate*1.25).toFixed(0)}</span></div>`:''}
-      ${cp.ot150H>0?`<div class="ps-row"><span>נוספות 150% (${fmtHours(cp.ot150H)})</span><span>₪${(cp.ot150H*rate*1.5).toFixed(0)}</span></div>`:''}` : '';
+      <div class="ps-row"><span>שעות רגילות (${fmtHours(cp.regH)})</span><span>₪${fmtPayMoney(cp.regH*rate)}</span></div>
+      ${cp.ot125H>0?`<div class="ps-row"><span>נוספות 125% (${fmtHours(cp.ot125H)})</span><span>₪${fmtPayMoney(cp.ot125H*rate*1.25)}</span></div>`:''}
+      ${cp.ot150H>0?`<div class="ps-row"><span>נוספות 150% (${fmtHours(cp.ot150H)})</span><span>₪${fmtPayMoney(cp.ot150H*rate*1.5)}</span></div>`:''}` : '';
 
-  const payTk=takingsSumFor(paySubEmpId, paySelMonthKey);
+  const payTkList=takingsListFor(paySubEmpId, paySelMonthKey);
+  const payTk=payTkList.reduce((a,t)=>a+(Number(t.price)||0),0);
   const payList = paymentsListFor(paySubEmpId, paySelMonthKey);
   const paidNow = payList.reduce((a,p)=>a+(Number(p.amount)||0),0);
   const leftToPay = totalPay - payTk - paidNow;
+  const hakafaLimit=totalPay*0.25;
+  const hakafaOver=totalPay>0 && payTk>hakafaLimit;
+  const hasActivity=Math.abs(totalH)+Math.abs(totalPay)+Math.abs(payTk)+Math.abs(paidNow)>0.005;
+  const balanceView=payBalancePresentation(leftToPay, false, hasActivity);
+  const wageLabel=e.netIsNet ? "שכר נטו לפי שעות" : "שכר ברוטו לפי שעות";
+  const balanceBasis=e.netIsNet
+    ? "החישוב מבוסס על תעריף נטו לשעה."
+    : "החישוב מבוסס על ברוטו לפי שעות, לפני ניכויי חובה; הערכת הנטו מוצגת בהמשך.";
+  const currentMonthNote=paySelMonthKey===currentMonthKey()
+    ? " החודש עדיין פתוח והסכומים יתעדכנו עם המשמרות הבאות."
+    : "";
+  const balanceDetail=balanceView.note+(hasActivity?" "+balanceBasis:"")+currentMonthNote;
   const paymentsRows = payList.length ? payList.map(p=>`<div class="hk-row">
-    <div class="hk-main"><div class="hk-name">₪${(Number(p.amount)||0).toFixed(0)}${p.note?` · ${esc(p.note)}`:''}</div><div class="hk-date">${fmtDate(p.createdAt)}</div></div>
+    <div class="hk-main"><div class="hk-name">₪${fmtPayMoney(Number(p.amount)||0)}${p.note?` · ${esc(p.note)}`:''}</div><div class="hk-date">${fmtDate(p.createdAt)}</div></div>
     <div class="hk-acts"><button class="btn line sm" onclick="delPayment('${paySubEmpId}','${p.id}')">🗑️</button></div>
-  </div>`).join("") : '<div class="empty" style="padding:10px">עדיין לא נרשמו תשלומים לחודש זה.</div>';
+  </div>`).join("") : '<div class="empty" style="padding:10px">עדיין לא שולם דבר בחודש הזה.</div>';
   box.innerHTML=`
-    <div class="section-title" style="margin:0 0 10px">${monthLabel(paySelMonthKey)} · ${esc(e.name)} · ₪${rate}/שעה${otOn?' · <span class="night-tag">שעות נוספות פעיל</span>':''}</div>
-    ${rows}
-    <div class="pay-sum">
-      <div class="ps-row"><span>סך שעות החודש</span><span>${fmtHours(totalH)}</span></div>
-      ${otBlock}
-      <div class="ps-row big"><span>סך הכל (ברוטו${otOn?' משוער':''})</span><span>₪${totalPay.toFixed(0)}</span></div>
-      ${payTk>0?`<div class="ps-row"><span>הורדות (הקפה)</span><span>−₪${payTk.toFixed(0)}</span></div>`:''}
-      <div class="ps-row"><span>תשלומים/מקדמות שניתנו</span><span>−₪${paidNow.toFixed(0)}</span></div>
-      ${leftToPay<0
-        ? `<div class="ps-row debt"><span>שולם/נוכה יותר ממה שהרוויח</span><span>−₪${Math.abs(leftToPay).toFixed(0)}</span></div>`
-        : `<div class="ps-row big"><span>נותר לתשלום</span><span class="rem">₪${leftToPay.toFixed(0)}</span></div>`}
-      ${otOn?`<div style="font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5">כולל חישוב שעות נוספות (מעל 8 ש׳ ביום / 7 בלילה / 42 בשבוע). זו הערכה — התלוש מהרו"ח הוא הקובע.</div>`:''}
+    <div class="section-title" style="margin:0 0 10px">${monthLabel(paySelMonthKey)} · ₪${rate}/שעה${e.netIsNet?' נטו':' ברוטו'}${otOn?' · <span class="night-tag">שעות נוספות פעילות</span>':''}</div>
+    <div class="pay-detail-summary ${balanceView.cls}">
+      <div class="pds-kicker">סיכום של ${esc(e.name)} · ${monthLabel(paySelMonthKey)}</div>
+      <div class="pds-result"><span class="pds-label">${balanceView.label}</span><span class="pds-value">₪${fmtPayMoney(balanceView.amount)}</span></div>
+      <div class="pds-note">${balanceDetail}</div>
+      <div class="pds-stats">
+        <div class="pds-stat"><span class="k">${wageLabel}</span><span class="v">₪${fmtPayMoney(totalPay)}</span></div>
+        <div class="pds-stat"><span class="k">תשלומים ומקדמות</span><span class="v minus-value">−₪${fmtPayMoney(paidNow)}</span></div>
+        <div class="pds-stat"><span class="k">הקפה שנרשמה (${payTkList.length})</span><span class="v minus-value">−₪${fmtPayMoney(payTk)}</span></div>
+        <div class="pds-stat"><span class="k">שעות שנכללו</span><span class="v">${fmtHours(totalH)}</span></div>
+      </div>
+      ${hakafaOver?`<div class="pds-warning">⚠ ההקפה גבוהה מ־25% מהשכר. היתרה למעלה מפחיתה כרגע את כל ההקפה שנרשמה; יש לבדוק איזה חלק לדחות לחודש הבא.</div>`:''}
     </div>
-    <div class="card" style="margin-top:12px">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
-        <div class="section-title" style="margin:0">תשלומים / מקדמות</div>
-        <div style="display:flex;gap:6px">
-          <button class="btn sm" onclick="addPayment('${paySubEmpId}','${paySelMonthKey}')">➕ הוסף תשלום</button>
-          <button class="btn line sm" onclick="payFullMonth('${paySubEmpId}','${paySelMonthKey}')">💵 שילמתי הכל</button>
+
+    <div class="pay-payment-card">
+      <div class="pay-payment-head">
+        <div class="pay-section-head">תשלומים שכבר שולמו</div>
+        <div class="pay-payment-actions">
+          <button class="btn sm" onclick="addPayment('${paySubEmpId}','${paySelMonthKey}')">➕ רשום תשלום</button>
+          <button class="btn line sm" onclick="payFullMonth('${paySubEmpId}','${paySelMonthKey}')">✓ סמן את כל היתרה כשולמה</button>
         </div>
       </div>
       ${paymentsRows}
-      <div class="ps-row" style="margin-top:6px"><span>סך תשלומים שניתנו החודש</span><span>₪${paidNow.toFixed(0)}</span></div>
+      <div class="pay-total-row"><span>סך התשלומים שנרשמו החודש</span><strong>₪${fmtPayMoney(paidNow)}</strong></div>
     </div>
-    ${netSummaryHtml(totalPay, e, monthRefDate(paySelMonthKey))}
-    <div style="margin-top:14px;display:flex;flex-direction:column;gap:10px">
-      <div style="display:flex;gap:8px">
+
+    <div class="pay-wage-breakdown">
+      <div class="pay-section-head" style="margin:0 0 10px">איך חושב השכר לפי ההחתמות?</div>
+      <div class="pay-sum">
+        <div class="ps-row"><span>סך שעות שנכללו</span><span>${fmtHours(totalH)}</span></div>
+        ${otBlock}
+        <div class="ps-row big"><span>${wageLabel}${otOn?' (משוער)':''}</span><span>₪${fmtPayMoney(totalPay)}</span></div>
+        ${otOn?`<div style="font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5">כולל חישוב שעות נוספות (מעל 8 ש׳ ביום / 7 בלילה / 42 בשבוע). זו הערכה — התלוש מהרו"ח הוא הקובע.</div>`:''}
+      </div>
+    </div>
+
+    <details class="pay-extra-fold">
+      <summary><span>משמרות שנכללו · ${list.length} משמרות · ${fmtHours(totalH)}</span><span class="pay-extra-chevron">⌄</span></summary>
+      <div class="pay-extra-body"><div class="pay-extra-lead">רק משמרות סגורות שאינן ממתינות לאישור נכללות בחישוב.</div>${rows}</div>
+    </details>
+
+    <details class="pay-extra-fold">
+      <summary><span>${e.netIsNet?'הסבר על תעריף הנטו':'הערכת נטו וניכויי חובה'}</span><span class="pay-extra-chevron">⌄</span></summary>
+      <div class="pay-extra-body">
+        <div class="pay-extra-lead">מידע בלבד — הערכת הנטו אינה כוללת הקפה או תשלומים שכבר נרשמו, ואינה משנה את היתרה שמופיעה בראש העמוד.</div>
+        ${netSummaryHtml(totalPay, e, monthRefDate(paySelMonthKey))}
+      </div>
+    </details>
+
+    ${list.length?`<div class="pay-export">
+      <div class="pay-section-head" style="margin:0 0 10px">דוחות וייצוא לרואה החשבון</div>
+      <div class="pay-export-actions">
         <button class="btn" style="flex:1" onclick="imagePayrollAccountant()">📷 דוח לרו"ח (תמונה)</button>
         <button class="btn line" onclick="exportPayrollAccountant()">PDF</button>
       </div>
-      <div style="font-size:12px;color:var(--muted);text-align:center;line-height:1.5">ברירת המחדל היא תמונה (נוח לשליחה בוואטסאפ). אפשר גם PDF להדפסה.</div>
-    </div>`;
+      <div class="pay-export-note">תמונה נוחה לשליחה בוואטסאפ; PDF מתאים להדפסה.</div>
+    </div>`:''}`;
 }
 
+let payFullMonthBusy=false;
 async function payFullMonth(empId, monthKey){
-  const e=employees[empId];
-  const gross=computeEmpPay(empId, monthKey).totalPay;
-  const tk=takingsSumFor(empId, monthKey);
-  const paid=paymentsSumFor(empId, monthKey);
-  const left = gross - tk - paid;
-  if(left<=0){ toast("אין יתרה לתשלום החודש"); return; }
-  const ok=await uiConfirm(`לרשום תשלום מלא של ₪${left.toFixed(0)} ל${e?e.name:""} עבור ${monthLabel(monthKey)}? כך "נותר לתשלום" יתאפס.`, {okText:"שלם הכל"});
-  if(!ok) return;
-  db.ref("payments/"+empId).push().set({ amount:left, note:"תשלום מלא לחודש", monthKey:monthKey, createdAt:TS })
-    .then(()=>toast("נרשם תשלום מלא ✓")).catch(()=>toast("השמירה נכשלה"));
+  if(payFullMonthBusy) return; // מונע רישום כפול מלחיצה מהירה פעמיים
+  payFullMonthBusy=true;
+  try{
+    const e=employees[empId];
+    const gross=computeEmpPay(empId, monthKey).totalPay;
+    const tk=takingsSumFor(empId, monthKey);
+    const paid=paymentsSumFor(empId, monthKey);
+    const left = gross - tk - paid;
+    if(left<=0){ toast("אין יתרה לתשלום החודש"); return; }
+    const lim=hakafaLimitInfo(empId, monthKey);
+    const limitWarning=lim.over ? `\n\n⚠ ההקפה גבוהה מ־25% מהשכר, והסכום הזה מחושב אחרי הפחתת כל ההקפה שנרשמה. בדוק אם צריך לדחות חלק ממנה לחודש הבא לפני האישור.` : "";
+    const ok=await uiConfirm(`לרשום תשלום של כל היתרה לפי המעקב — ₪${fmtPayMoney(left)} ל${e?e.name:""} עבור ${monthLabel(monthKey)}? כך היתרה שמוצגת בעמוד תתאפס.${limitWarning}`, {okText:"שלם את כל היתרה"});
+    if(!ok) return;
+    await db.ref("payments/"+empId).push().set({ amount:left, note:"תשלום מלא לחודש", monthKey:monthKey, createdAt:TS });
+    toast("נרשם תשלום מלא ✓");
+  }catch(e){
+    toast("השמירה נכשלה");
+  }finally{
+    payFullMonthBusy=false;
+  }
 }
 
 // אוסף את נתוני הדוח לעובד/חודש הנבחרים (משותף לשני סוגי הדוחות)
@@ -5022,10 +5266,11 @@ function saveShift(){
     if(shiftModalMode==="editOccurrence" && occEditRecurringId && occEditDate){
       const r=recurring[occEditRecurringId];
       const empId2=r?r.employeeId:schedSubEmpId;
-      const summaryOcc = "המשמרת של "+fmtIsoShort(occEditDate)+" השתנתה — שעות: "+r.startTime+"–"+r.endTime+" ← "+start+"–"+end;
-      db.ref("recurringShifts/"+occEditRecurringId+"/cancelledDates/"+occEditDate).set(true);
-      db.ref("oneTimeShifts").push({employeeId:empId2, date:occEditDate, startTime:start, endTime:end, createdAt:TS})
-        .then(()=>{ $("shiftDate").removeAttribute("readonly"); occEditRecurringId=null; occEditDate=null; closeModal("shiftModal"); toast("המופע עודכן ✓ (הפך לחד-פעמי לאותו יום)"); sendSchedChange(empId2, summaryOcc, occEditDate); });
+      const changedDate=occEditDate; // שומרים לפני איפוס המודאל כדי שהתראת השינוי תקבל תאריך תפוגה
+      const summaryOcc = "המשמרת של "+fmtIsoShort(changedDate)+" השתנתה — שעות: "+r.startTime+"–"+r.endTime+" ← "+start+"–"+end;
+      db.ref("recurringShifts/"+occEditRecurringId+"/cancelledDates/"+changedDate).set(true);
+      db.ref("oneTimeShifts").push({employeeId:empId2, date:changedDate, startTime:start, endTime:end, createdAt:TS})
+        .then(()=>{ $("shiftDate").removeAttribute("readonly"); occEditRecurringId=null; occEditDate=null; closeModal("shiftModal"); toast("המופע עודכן ✓ (הפך לחד-פעמי לאותו יום)"); sendSchedChange(empId2, summaryOcc, changedDate); });
       return;
     }
     if(shiftModalMode==="editOnetime" && editingPlanId){
