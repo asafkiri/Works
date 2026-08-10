@@ -668,7 +668,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v66</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v67</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -693,7 +693,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v66</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v67</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -3672,6 +3672,50 @@ function hideClockSuccess(){
 /* ============================================================
    9. סגירה אוטומטית אחרי 12 שעות (שכח לסגור)
    ============================================================ */
+// ערך חדש ל-transaction של משמרת. חשוב: הפונקציה מקבלת את הערך העדכני
+// מהשרת בכל ניסיון חוזר, ולכן לעולם לא דורסת יציאה שכבר נשמרה ממכשיר אחר.
+function autoCloseShiftValue(current,now,autoCloseHours){
+  if(!current || (current.clockOut!==null && current.clockOut!==undefined)) return;
+  const clockIn=Number(current.clockIn);
+  const threshold=Number(autoCloseHours)*3600000;
+  if(!Number.isFinite(clockIn) || clockIn<=0 || !Number.isFinite(now) || !Number.isFinite(threshold) || threshold<=0) return;
+  if(now-clockIn<threshold) return;
+  return {...current,
+    clockOut:clockIn+threshold,
+    autoCloseFlag:true,
+    pendingReview:true
+  };
+}
+
+// מנקה את קישור העובד רק אם הוא עדיין מצביע למשמרת שנסגרה אוטומטית.
+// אם בינתיים נפתחה משמרת חדשה, ה-transaction מתבטל ולא נוגע בקישור החדש.
+function clearOpenShiftPointerValue(current,shiftId){
+  if(current!==shiftId) return;
+  return null;
+}
+
+const autoCloseInFlight=new Set();
+function autoCloseShiftIfStillOpen(shiftId,now){
+  if(autoCloseInFlight.has(shiftId)) return Promise.resolve();
+  autoCloseInFlight.add(shiftId);
+  return db.ref("shifts/"+shiftId).transaction(
+    current=>autoCloseShiftValue(current,now,AUTO_CLOSE_HOURS),
+    undefined,
+    false
+  ).then(result=>{
+    if(!result.committed) return;
+    const closed=result.snapshot.val();
+    const empId=closed && closed.employeeId;
+    if(!empId) return;
+    return db.ref("employees/"+empId+"/openShiftId").transaction(
+      current=>clearOpenShiftPointerValue(current,shiftId),
+      undefined,
+      false
+    );
+  }).catch(err=>console.error("Auto-close failed",shiftId,err))
+    .finally(()=>autoCloseInFlight.delete(shiftId));
+}
+
 function checkAutoClose(){
   if(currentRole!=="manager") return; // סגירה אוטומטית מתבצעת רק בסשן המנהל (טרמינל), לא בדשבורד עובד
   const now = Date.now();
@@ -3692,16 +3736,9 @@ function checkAutoClose(){
 
     if(s.clockOut) return; // סגורה ותקינה — אין מה לעשות
     if(now - s.clockIn < AUTO_CLOSE_HOURS*3600000) return; // עדיין בטווח
-    const forcedOut = s.clockIn + AUTO_CLOSE_HOURS*3600000;
-    const updates = {};
-    updates["shifts/"+sid+"/clockOut"]      = forcedOut;
-    updates["shifts/"+sid+"/autoCloseFlag"] = true;
-    updates["shifts/"+sid+"/pendingReview"] = true;
-    const empId = s.employeeId;
-    if(empId && employees[empId] && employees[empId].openShiftId===sid){
-      updates["employees/"+empId+"/openShiftId"] = null;
-    }
-    db.ref().update(updates); // כתיבה אטומית אחת — או שהכל נשמר, או שכלום
+    // הבדיקה המקומית היא רק סינון מהיר. ה-transaction בודק שוב את הערך
+    // העדכני בשרת ולא יכתוב אם מכשיר אחר כבר סגר את המשמרת.
+    autoCloseShiftIfStillOpen(sid,now);
   });
 }
 setInterval(()=>{ if(firebaseReady) checkAutoClose(); }, 60000);
