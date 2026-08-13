@@ -2,7 +2,7 @@
 <html lang="he" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>שעון נוכחות עובדים</title>
 
 <!-- אייקון מסך הבית + מצב אפליקציה (עובד באייפון ובגלקסי) -->
@@ -238,33 +238,79 @@
   .up-row .dot2.once{background:var(--live)}
 
   /* ---------- סידור שבועי (כל העובדים) ---------- */
-  .wk-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}
-  .wk-label{font-weight:800;font-size:15px;text-align:center;flex:1;letter-spacing:-.01em}
-  .wk-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px}
-  .wk-sum{font-size:12.5px;color:var(--muted);font-weight:600;text-align:left}
-  .wk-day{border:1px solid var(--line);border-radius:13px;margin-bottom:10px;overflow:hidden;background:#fff}
-  .wk-day-head{display:flex;align-items:center;justify-content:space-between;padding:10px 13px;background:var(--paper);border-bottom:1px solid var(--line)}
-  .wk-day-name{font-weight:800;font-size:14.5px}
-  .wk-day-meta{display:flex;align-items:center;gap:8px}
-  .wk-day-date{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
-  .wk-day-count{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:var(--primary-soft);color:var(--primary-d);font-size:11.5px;font-weight:800}
-  .wk-day-body{padding:4px 13px 8px}
-  .wk-shift{display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:1px dashed var(--line);font-size:14px}
+  .week-card{position:relative}
+  .wk-controls{margin-bottom:14px}
+  .wk-nav{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:8px;margin-bottom:10px}
+  .wk-label{font-weight:800;font-size:15px;text-align:center;letter-spacing:-.01em;line-height:1.35;min-width:0}
+  .wk-label .wk-current{display:block;color:var(--primary-d);font-size:11.5px;margin-bottom:1px}
+  .wk-range-numbers,.time-range,.date-isolate{direction:ltr;unicode-bidi:isolate;font-variant-numeric:tabular-nums;display:inline-block}
+  .wk-toolbar{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+  .wk-today-btn{padding:7px 12px}
+  .wk-sum{display:flex;align-items:center;justify-content:center;gap:7px;flex-wrap:wrap;margin-bottom:12px}
+  .wk-stat{display:inline-flex;align-items:center;justify-content:center;min-height:29px;padding:5px 10px;border-radius:999px;background:var(--paper);border:1px solid var(--line);color:var(--ink-soft);font-size:12px;font-weight:800}
+  .wk-stat strong{font-size:13px;color:var(--ink);margin-inline-end:3px;font-variant-numeric:tabular-nums}
+  .wk-day{border:1px solid var(--line);border-radius:14px;margin-bottom:10px;overflow:hidden;background:#fff;box-shadow:var(--shadow-sm)}
+  .wk-day-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 13px;background:var(--paper);border-bottom:1px solid var(--line)}
+  .wk-day-title{display:flex;align-items:baseline;gap:7px;min-width:0}
+  .wk-day-name{font-weight:800;font-size:14.5px;white-space:nowrap}
+  .wk-day-date{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .wk-day-count{font-size:11.5px;font-weight:800;color:var(--primary-d);background:var(--primary-soft);border-radius:999px;padding:4px 9px;white-space:nowrap}
+  .wk-day-body{padding:3px 13px 6px}
+  .wk-shift{appearance:none;width:100%;border:0;background:transparent;color:var(--ink);font-family:inherit;text-align:right;display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;column-gap:9px;padding:10px 0;border-bottom:1px dashed var(--line);font-size:14px;cursor:pointer;-webkit-tap-highlight-color:transparent}
   .wk-shift:last-child{border-bottom:0}
-  .wk-shift .dot2{width:7px;height:7px;border-radius:50%;background:var(--primary);flex:0 0 auto}
-  .wk-shift .dot2.once{background:var(--live)}
-  .wk-time{font-variant-numeric:tabular-nums;font-weight:700;color:var(--ink);flex:0 0 auto;min-width:96px}
-  .wk-name{flex:1;min-width:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .wk-tag{font-size:11px;font-weight:800;color:var(--muted);background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:2px 8px;flex:0 0 auto}
-  .wk-shift.once .wk-tag{color:var(--live-d);background:var(--live-bg);border-color:var(--live-line)}
-  .wk-shift{cursor:pointer;-webkit-tap-highlight-color:transparent}
   .wk-shift:active{background:var(--paper)}
-  .wk-edit-hint{font-size:13px;color:var(--muted);flex:0 0 auto;margin-inline-start:2px}
+  .wk-shift:focus-visible{outline:3px solid var(--primary-ring);outline-offset:2px;border-radius:9px}
+  .wk-shift-main{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .wk-name{font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .wk-time{font-variant-numeric:tabular-nums;font-weight:650;color:var(--ink-soft);font-size:12.5px;white-space:nowrap}
+  .wk-tag{font-size:10.5px;font-weight:800;color:var(--muted);background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:3px 8px;white-space:nowrap}
+  .wk-shift.once .wk-tag{color:var(--live-d);background:var(--live-bg);border-color:var(--live-line)}
+  .wk-edit-hint{font-size:18px;line-height:1;color:var(--muted);opacity:.7}
+  .wk-shift-cancelled{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;min-height:58px;padding:9px 0;border-bottom:1px dashed var(--line);color:var(--muted)}
+  .wk-shift-cancelled:last-child{border-bottom:0}
+  .wk-shift-cancelled .wk-name,.wk-shift-cancelled .wk-time{text-decoration:line-through;color:var(--muted)}
+  .wk-cancel-side{display:flex;align-items:center;justify-content:flex-end;gap:6px;flex-wrap:wrap}
+  .wk-tag.cancelled{color:var(--danger);background:var(--danger-bg);border-color:var(--danger-line)}
+  .wk-restore{appearance:none;border:1px solid var(--line-2);background:#fff;color:var(--primary-d);border-radius:9px;min-height:44px;padding:7px 11px;font-family:inherit;font-size:11.5px;font-weight:800;cursor:pointer}
+  .wk-restore:active{background:var(--primary-soft)}
   .wk-empty{color:var(--muted);font-size:13px;padding:8px 0}
   .wk-day.today{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-ring)}
   .wk-day.today .wk-day-head{background:var(--primary-soft)}
   .wk-day.today .wk-day-name{color:var(--primary-d)}
-  .wk-day.past{opacity:.6}
+  .wk-day.past{background:#fbfaf8}
+  .wk-day.past .wk-day-head{background:#f7f5f1}
+  .wk-past-toggle{appearance:none;width:100%;border:1px dashed var(--line-2);background:#fff;color:var(--ink-soft);border-radius:12px;padding:10px 13px;margin:0 0 10px;font-family:inherit;font-size:13px;font-weight:800;cursor:pointer}
+  .wk-past-toggle:active{background:var(--paper)}
+  .wk-add-dock{margin-top:14px}
+  .wk-add-dock .btn{width:100%}
+  .wk-action-question{font-size:13px;font-weight:800;color:var(--ink-soft);margin:2px 0 10px}
+  .wk-action-back{margin-top:3px}
+  .shift-type-help{font-size:12.5px;color:var(--muted);line-height:1.45;margin:-8px 2px 14px}
+
+  @media(max-width:560px){
+    .topbar{padding:calc(10px + env(safe-area-inset-top, 0px)) max(13px,env(safe-area-inset-right, 0px)) 10px max(13px,env(safe-area-inset-left, 0px)) !important}
+    #schedWeek .screen-head{margin-bottom:12px}
+    .week-card{background:transparent;border:0;box-shadow:none;padding:0 0 86px;margin:0}
+    .wk-controls{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px;box-shadow:var(--shadow-sm)}
+    .wk-nav .btn,.wk-toolbar .btn,.wk-past-toggle{min-height:44px}
+    .wk-nav .btn{padding:8px 10px;font-size:12.5px}
+    .wk-label{font-size:14px}
+    .wk-add-dock{position:fixed;z-index:22;right:max(13px,env(safe-area-inset-right, 0px));left:max(13px,env(safe-area-inset-left, 0px));bottom:calc(10px + env(safe-area-inset-bottom, 0px));margin:0;pointer-events:none}
+    .wk-add-dock .btn{max-width:894px;margin:0 auto;display:block;pointer-events:auto;box-shadow:0 8px 24px rgba(15,110,102,.28);min-height:50px}
+    .wk-shift{min-height:58px}
+    #shiftModal{align-items:flex-end;padding:calc(10px + env(safe-area-inset-top, 0px)) 0 0}
+    #shiftModal .modal{max-height:calc(100dvh - 10px - env(safe-area-inset-top, 0px));overflow-y:auto;border-radius:22px 22px 0 0;padding-bottom:calc(18px + env(safe-area-inset-bottom, 0px))}
+    #shiftModal .modal-actions{position:sticky;bottom:calc(-18px - env(safe-area-inset-bottom, 0px));background:#fff;padding:12px 0 calc(18px + env(safe-area-inset-bottom, 0px));z-index:2}
+    #shiftModal .seg-modal button,#shiftModal .modal-actions .btn{min-height:44px}
+    #app.schedule-open ~ .toast{bottom:calc(82px + env(safe-area-inset-bottom, 0px))}
+  }
+  @media(max-width:360px){
+    .wk-nav{grid-template-columns:64px minmax(0,1fr) 64px;gap:6px}
+    .wk-nav .btn{font-size:0;padding:8px 6px}
+    .wk-nav .btn:first-child::after{content:"קודם";font-size:12.5px}
+    .wk-nav .btn:last-child::after{content:"הבא";font-size:12.5px}
+    .wk-label{font-size:13px}
+  }
 
   /* ---------- מסך התחברות ---------- */
   .auth-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;
@@ -668,7 +714,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v67</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v68</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -693,7 +739,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v67</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v68</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -908,14 +954,9 @@
 
       <!-- רשימת עובדים (תיקיות) -->
       <div id="schedList">
-        <div class="screen-head"><button class="back-btn" onclick="backToHome()">→ חזרה</button><h1 class="screen-title">📅 סידור עבודה</h1></div>
+        <div class="screen-head"><button class="back-btn" onclick="schedBackToWeek()">→ חזרה ללוח</button><h1 class="screen-title">📅 ניהול לפי עובד</h1></div>
         <div class="card">
-          <p class="sub">בחר עובד לתכנון וניהול הסידור שלו. זו תוכנית בלבד ולא משפיעה על השכר — שכר נקבע אך ורק מהחתמות בטרמינל.</p>
-          <button class="folder" style="border-color:#cfe7e3;background:var(--primary-soft);margin-bottom:14px" onclick="openSchedWeek()">
-            <span class="f-ico">🗓️</span>
-            <span class="f-txt"><span class="f-title">סידור שבועי — כל העובדים</span><span class="f-sub">תצוגת שבוע מלאה של כל המשמרות יחד</span></span>
-            <span class="f-arr">→</span>
-          </button>
+          <p class="sub">בחר עובד כדי לנהל את המשמרות הקבועות והחד־פעמיות שלו. לוח השבוע הוא התצוגה הראשית. הסידור הוא תוכנית בלבד ואינו משפיע על השכר.</p>
           <div id="schedEmpFolders"></div>
           <button class="folder" style="margin-top:14px" onclick="openSchedArchive()">
             <span class="f-ico">📦</span>
@@ -947,19 +988,22 @@
 
       <!-- סידור שבועי — כל העובדים -->
       <div id="schedWeek" class="hidden">
-        <div class="screen-head"><button class="back-btn" onclick="schedBackToList()">→ חזרה</button><h1 class="screen-title">🗓️ סידור שבועי</h1></div>
-        <div class="card">
-          <div class="wk-nav">
-            <button class="btn line sm" onclick="weekPrev()">שבוע קודם</button>
-            <div class="wk-label" id="weekLabel">—</div>
-            <button class="btn line sm" onclick="weekNext()">שבוע הבא</button>
-          </div>
-          <div class="wk-toolbar">
-            <button class="btn line sm" onclick="weekThis()">קפוץ לשבוע הנוכחי</button>
+        <div class="screen-head"><button class="back-btn" onclick="backToHome()">→ חזרה</button><h1 class="screen-title">🗓️ סידור שבועי</h1></div>
+        <div class="card week-card">
+          <div class="wk-controls">
+            <div class="wk-nav">
+              <button class="btn line sm" onclick="weekPrev()" aria-label="הצג שבוע קודם">שבוע קודם</button>
+              <div class="wk-label" id="weekLabel">—</div>
+              <button class="btn line sm" onclick="weekNext()" aria-label="הצג שבוע הבא">שבוע הבא</button>
+            </div>
+            <div class="wk-toolbar">
+              <button class="btn line sm wk-today-btn hidden" id="weekThisBtn" onclick="weekThis()">חזרה לשבוע הנוכחי</button>
+              <button class="btn line sm" onclick="openSchedManagement()">ניהול סידור לפי עובד</button>
+            </div>
             <div class="wk-sum" id="weekSummary"></div>
           </div>
-          <button class="btn" style="width:100%;margin-bottom:14px" onclick="openWeekAddShift()">+ הוסף משמרת</button>
           <div id="weekBody"></div>
+          <div class="wk-add-dock"><button class="btn" onclick="openWeekAddShift()">+ הוסף משמרת</button></div>
         </div>
       </div>
 
@@ -1350,10 +1394,16 @@
     <h3 id="shiftModalTitle">הוספת משמרת</h3>
     <p class="who" id="shiftModalWho"></p>
 
-    <div class="seg-modal" id="shiftTypeSeg">
-      <button id="typeRecurring" class="on" onclick="setShiftType('recurring')">קבועה (חוזרת)</button>
-      <button id="typeOnetime" onclick="setShiftType('onetime')">חד-פעמית</button>
+    <div id="shiftEmployeeField" class="hidden" style="margin-bottom:14px">
+      <label class="fld" for="shiftEmployeeSelect">עובד</label>
+      <select id="shiftEmployeeSelect" onchange="selectShiftEmployee(this.value)"></select>
     </div>
+
+    <div class="seg-modal" id="shiftTypeSeg">
+      <button id="typeOnetime" onclick="setShiftType('onetime')">רק בתאריך הזה</button>
+      <button id="typeRecurring" class="on" onclick="setShiftType('recurring')">חוזרת כל שבוע</button>
+    </div>
+    <p class="shift-type-help" id="shiftTypeHelp"></p>
 
     <div id="recurringFields">
       <label class="fld">ימים בשבוע</label>
@@ -1389,7 +1439,7 @@
     </label>
     <div class="modal-actions">
       <button class="btn line" onclick="closeModal('shiftModal')">ביטול</button>
-      <button class="btn" onclick="saveShift()">שמור</button>
+      <button class="btn" id="shiftSaveBtn" onclick="saveShift()">הוסף משמרת</button>
     </div>
   </div>
 </div>
@@ -1403,18 +1453,6 @@
     <div class="cancel-list" id="cancelList"></div>
     <div class="modal-actions">
       <button class="btn" onclick="closeModal('cancelModal')">סגור</button>
-    </div>
-  </div>
-</div>
-
-<!-- ============================ מודאל: בחירת עובד (הוספה מהסידור השבועי) ============================ -->
-<div id="weekEmpPickModal" class="modal-bg">
-  <div class="modal">
-    <h3>למי להוסיף משמרת?</h3>
-    <p class="who">בחר עובד — ואז ממשיכים כרגיל: משמרת קבועה או חד-פעמית.</p>
-    <div id="weekEmpPickList" style="display:flex;flex-direction:column;gap:8px;max-height:50vh;overflow:auto"></div>
-    <div class="modal-actions">
-      <button class="btn line" onclick="closeModal('weekEmpPickModal')">ביטול</button>
     </div>
   </div>
 </div>
@@ -1663,6 +1701,7 @@ let recurring = {};   // id -> {employeeId, daysOfWeek[], startTime, endTime, ca
 let oneTime   = {};   // id -> {employeeId, date, startTime, endTime}
 let shiftModalMode = "add";       // "add" | "editRecurring" | "editOnetime"
 let shiftModalType = "recurring"; // "recurring" | "onetime"
+let shiftModalEmployeeId = null;  // העובד שנבחר בטופס המשמרת המאוחד
 let editingPlanId = null;         // id של משמרת מתוכננת בעריכה
 let cancelTargetId = null;        // id של משמרת קבועה במודאל ביטול מופע
 let occEditRecurringId = null;    // עריכת מופע בודד: id המשמרת הקבועה
@@ -2194,7 +2233,10 @@ const CONSOLE_SCREENS=["overview","employees","pay","schedule","settings","hakaf
 function openFolder(name){
   consoleFolder=name;
   if(name==="pay"){ payView="list"; paySubEmpId=null; }
-  if(name==="schedule"){ schedView="list"; schedSubEmpId=null; }
+  if(name==="schedule"){
+    schedView="week"; schedSubEmpId=null;
+    weekStart=startOfWeek(new Date()); weekPastExpanded=false;
+  }
   if(name==="employees"){ empView="list"; empSubId=null; }
   if(name==="settings"){ const m=$("settings-main"), t=$("settings-tax"); if(m) m.classList.remove("hidden"); if(t) t.classList.add("hidden"); renderOpeningGrace(); renderClosingGrace(); }
   if(name==="hakafa"){ hkConsoleView="list"; hkConsoleEmpId=null; }
@@ -2209,6 +2251,8 @@ function backToHome(){ consoleFolder=null; applyConsoleNav(); try{window.scrollT
 function applyConsoleNav(){
   const home=$("consoleHome");
   if(home) home.classList.toggle("hidden", consoleFolder!==null);
+  const app=$("app");
+  if(app) app.classList.toggle("schedule-open", consoleFolder==="schedule" && schedView==="week");
   if(consoleFolder===null && typeof renderMgrNotifs==="function") renderMgrNotifs();
   CONSOLE_SCREENS.forEach(s=>{
     const el=$("screen-"+s);
@@ -3241,7 +3285,7 @@ function renderEmployeeDashboard(){
     return `<div class="up-item ${once?'once':''}">
       <div class="ui-main">
         <div class="ui-date">${fmtIsoShort(u.date)}</div>
-        <div class="ui-time">${u.startTime}–${u.endTime}</div>
+        <div class="ui-time">${timeRangeHtml(u.startTime,u.endTime)}</div>
       </div>
       <span class="up-badge ${once?'once':'rec'}">${once?'חד-פעמית':'קבועה'}</span>
     </div>`;
@@ -4971,49 +5015,60 @@ function applySchedNav(){
   $("schedArchive").classList.toggle("hidden", schedView!=="archive");
   $("schedDetail").classList.toggle("hidden", schedView!=="detail");
   $("schedWeek").classList.toggle("hidden", schedView!=="week");
+  const app=$("app"); if(app) app.classList.toggle("schedule-open", consoleFolder==="schedule" && schedView==="week");
 }
 function openSchedEmp(empId){ schedSubEmpId=empId; schedView="detail"; renderSchedule(); try{window.scrollTo(0,0);}catch(e){} }
 function openSchedArchive(){ schedView="archive"; renderSchedule(); try{window.scrollTo(0,0);}catch(e){} }
 function schedBackToList(){ schedView="list"; schedSubEmpId=null; renderSchedule(); try{window.scrollTo(0,0);}catch(e){} }
+function openSchedManagement(){ schedView="list"; schedSubEmpId=null; renderSchedule(); try{window.scrollTo(0,0);}catch(e){} }
+function schedBackToWeek(){ schedView="week"; schedSubEmpId=null; renderSchedule(); try{window.scrollTo(0,0);}catch(e){} }
 
 /* ---------- סידור שבועי — כל העובדים יחד ---------- */
 function startOfWeek(d){ const x=new Date(d); x.setHours(0,0,0,0); x.setDate(x.getDate()-x.getDay()); return x; } // יום ראשון
 function addDaysDate(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
 let weekStart = startOfWeek(new Date()); // יום ראשון של השבוע המוצג
+let weekPastExpanded = false;
 
-function openSchedWeek(){ weekStart=startOfWeek(new Date()); schedView="week"; renderSchedule(); try{window.scrollTo(0,0);}catch(e){} }
-function weekPrev(){ weekStart=addDaysDate(weekStart,-7); renderSchedWeek(); }
-function weekNext(){ weekStart=addDaysDate(weekStart, 7); renderSchedWeek(); }
-function weekThis(){ weekStart=startOfWeek(new Date()); renderSchedWeek(); }
+function openSchedWeek(){ weekStart=startOfWeek(new Date()); weekPastExpanded=false; schedView="week"; renderSchedule(); try{window.scrollTo(0,0);}catch(e){} }
+function weekPrev(){ weekStart=addDaysDate(weekStart,-7); weekPastExpanded=false; renderSchedWeek(); }
+function weekNext(){ weekStart=addDaysDate(weekStart, 7); weekPastExpanded=false; renderSchedWeek(); }
+function weekThis(){ weekStart=startOfWeek(new Date()); weekPastExpanded=false; renderSchedWeek(); }
+function toggleWeekPast(){ weekPastExpanded=!weekPastExpanded; renderSchedWeek(); }
 
-function weekRangeLabel(start){
+function weekRangeLabelHtml(start){
   const end=addDaysDate(start,6);
   const sM=HEB_MONTHS[start.getMonth()], eM=HEB_MONTHS[end.getMonth()];
   if(start.getMonth()===end.getMonth() && start.getFullYear()===end.getFullYear())
-    return start.getDate()+"–"+end.getDate()+" ב"+sM+" "+end.getFullYear();
+    return `<span class="wk-range-numbers">${start.getDate()}–${end.getDate()}</span> ב${sM} <span class="date-isolate">${end.getFullYear()}</span>`;
   if(start.getFullYear()===end.getFullYear())
-    return start.getDate()+" ב"+sM+" – "+end.getDate()+" ב"+eM+" "+end.getFullYear();
-  return start.getDate()+" ב"+sM+" "+start.getFullYear()+" – "+end.getDate()+" ב"+eM+" "+end.getFullYear();
+    return `<span class="date-isolate">${start.getDate()}</span> ב${sM} – <span class="date-isolate">${end.getDate()}</span> ב${eM} <span class="date-isolate">${end.getFullYear()}</span>`;
+  return `<span class="date-isolate">${start.getDate()}</span> ב${sM} <span class="date-isolate">${start.getFullYear()}</span> – <span class="date-isolate">${end.getDate()}</span> ב${eM} <span class="date-isolate">${end.getFullYear()}</span>`;
 }
+function timeRangeHtml(start,end){ return `<span class="time-range">${start}–${end}</span>`; }
+function timeRangeText(start,end){ return "\u2066"+start+"–"+end+"\u2069"; }
 
-// כל המשמרות של עובדים פעילים בתאריך נתון (קבועות שלא בוטלו + חד-פעמיות)
+// כל המשמרות של עובדים פעילים בתאריך נתון. ביטולים נשמרים בתצוגה בלבד,
+// כדי שהמנהל יוכל לראות ולשחזר אותם בלי לשנות את חישובי הסידור.
 function shiftsForDate(iso){
   const dow=parseIso(iso).getDay();
   const out=[];
   Object.keys(recurring).forEach(id=>{
     const r=recurring[id]; if(!r) return;
     if(!(r.daysOfWeek||[]).includes(dow)) return;
-    if((r.cancelledDates||{})[iso]) return;
     const emp=employees[r.employeeId];
     if(!emp || emp.active===false) return;
-    out.push({id, name:emp.name, startTime:r.startTime, endTime:r.endTime, type:'recurring'});
+    const cancelled=!!(r.cancelledDates||{})[iso];
+    // עריכת מופע משתמשת באותו סימון ביטול ויוצרת חד-פעמית חלופית. במקרה כזה
+    // מציגים "הוחלפה" בלי שחזור, כי שחזור עיוור היה יוצר שתי משמרות.
+    const replaced=cancelled && Object.values(oneTime).some(o=>o && o.employeeId===r.employeeId && o.date===iso);
+    out.push({id, employeeId:r.employeeId, name:emp.name, startTime:r.startTime, endTime:r.endTime, type:'recurring', cancelled, replaced});
   });
   Object.keys(oneTime).forEach(id=>{
     const o=oneTime[id]; if(!o) return;
     if(o.date!==iso) return;
     const emp=employees[o.employeeId];
     if(!emp || emp.active===false) return;
-    out.push({id, name:emp.name, startTime:o.startTime, endTime:o.endTime, type:'once'});
+    out.push({id, employeeId:o.employeeId, name:emp.name, startTime:o.startTime, endTime:o.endTime, type:'once'});
   });
   return out.sort((a,b)=> a.startTime===b.startTime
     ? (a.name||"").localeCompare(b.name||"","he")
@@ -5024,16 +5079,20 @@ function hhmmToMin(s){ const p=String(s||"0:0").split(":"); return (parseInt(p[0
 
 function renderSchedWeek(){
   const body=$("weekBody"); if(!body) return;
-  const lbl=$("weekLabel"); if(lbl) lbl.textContent=weekRangeLabel(weekStart);
-
   const todayIso=isoDate(new Date());
+  const isCurrentWeek=isoDate(weekStart)===isoDate(startOfWeek(new Date()));
+  const lbl=$("weekLabel");
+  if(lbl) lbl.innerHTML=(isCurrentWeek?'<span class="wk-current">השבוע</span>':'')+weekRangeLabelHtml(weekStart);
+  const thisBtn=$("weekThisBtn"); if(thisBtn) thisBtn.classList.toggle("hidden",isCurrentWeek);
+
   let totalShifts=0, totalMin=0; const empSet={};
-  let html="";
+  const pastCards=[], visibleCards=[];
 
   for(let i=0;i<7;i++){
     const d=addDaysDate(weekStart,i);
     const iso=isoDate(d);
     const shifts=shiftsForDate(iso);
+    const activeShifts=shifts.filter(s=>!s.cancelled);
     const isToday=iso===todayIso;
     const isPast=iso<todayIso;
 
@@ -5042,55 +5101,82 @@ function renderSchedWeek(){
       rows='<div class="wk-empty">אין משמרות</div>';
     } else {
       rows=shifts.map(s=>{
-        totalShifts++; totalMin+=Math.max(0, hhmmToMin(s.endTime)-hhmmToMin(s.startTime)); empSet[s.name]=1;
+        if(s.cancelled){
+          return `<div class="wk-shift-cancelled">
+            <span class="wk-shift-main">
+              <span class="wk-name">${esc(s.name)}</span>
+              <span class="wk-time">מ־<span class="time-range">${s.startTime}</span> עד <span class="time-range">${s.endTime}</span></span>
+            </span>
+            <span class="wk-cancel-side">
+              <span class="wk-tag cancelled">${s.replaced?'הוחלפה':'בוטלה'}</span>
+              ${s.replaced?'':`<button type="button" class="wk-restore" onclick="restoreWeekCancelled('${s.id}','${iso}')">שחזר</button>`}
+            </span>
+          </div>`;
+        }
+        totalShifts++; totalMin+=Math.max(0, hhmmToMin(s.endTime)-hhmmToMin(s.startTime)); empSet[s.employeeId]=1;
         const once=s.type==='once';
-        return `<div class="wk-shift ${once?'once':''}" onclick="openWeekShiftAction('${s.type}','${s.id}','${iso}')">
-          <span class="dot2 ${once?'once':''}"></span>
-          <span class="wk-time">${s.startTime}–${s.endTime}</span>
-          <span class="wk-name">${esc(s.name)}</span>
+        return `<button type="button" class="wk-shift ${once?'once':''}" onclick="openWeekShiftAction('${s.type}','${s.id}','${iso}')" aria-label="פעולות למשמרת של ${esc(s.name)}">
+          <span class="wk-shift-main">
+            <span class="wk-name">${esc(s.name)}</span>
+            <span class="wk-time">מ־<span class="time-range">${s.startTime}</span> עד <span class="time-range">${s.endTime}</span></span>
+          </span>
           <span class="wk-tag">${once?'חד-פעמית':'קבועה'}</span>
-          <span class="wk-edit-hint">✏️</span>
-        </div>`;
+          <span class="wk-edit-hint" aria-hidden="true">‹</span>
+        </button>`;
       }).join("");
     }
 
-    html+=`<div class="wk-day ${isToday?'today':''} ${isPast?'past':''}">
-      <div class="wk-day-head">
-        <span class="wk-day-name">יום ${HE_DAYS_LONG[d.getDay()]}${isToday?' · היום':''}</span>
-        <span class="wk-day-meta">
-          <span class="wk-day-date">${pad(d.getDate())}/${pad(d.getMonth()+1)}</span>
-          ${shifts.length?`<span class="wk-day-count">${shifts.length}</span>`:''}
+    const card=`<div class="wk-day ${isToday?'today':''} ${isPast?'past':''}">
+      <div class="wk-day-head"${isToday?' aria-current="date"':''}>
+        <span class="wk-day-title">
+          <span class="wk-day-name">${isToday?'היום · ':''}יום ${HE_DAYS_LONG[d.getDay()]}</span>
+          <span class="wk-day-date date-isolate">${pad(d.getDate())}/${pad(d.getMonth()+1)}</span>
         </span>
+        <span class="wk-day-count">${activeShifts.length} ${activeShifts.length===1?'משמרת':'משמרות'}</span>
       </div>
       <div class="wk-day-body">${rows}</div>
     </div>`;
+    if(isCurrentWeek && isPast) pastCards.push(card); else visibleCards.push(card);
   }
 
-  body.innerHTML=html;
+  const pastToggle=pastCards.length
+    ? `<button type="button" class="wk-past-toggle" onclick="toggleWeekPast()">${pastCards.length} ימים קודמים · ${weekPastExpanded?'הסתר':'הצג'}</button>`
+    : "";
+  body.innerHTML=pastToggle+(weekPastExpanded?pastCards.join(""):"")+visibleCards.join("");
 
   const hrs=Math.round(totalMin/6)/10; // שעות עם ספרה אחת אחרי הנקודה
   const nEmp=Object.keys(empSet).length;
   const sum=$("weekSummary");
-  if(sum) sum.textContent = totalShifts
-    ? `${totalShifts} משמרות · ${nEmp} עובדים · כ-${hrs} שע' מתוכננות`
-    : "אין משמרות מתוכננות השבוע";
+  if(sum) sum.innerHTML = totalShifts
+    ? `<span class="wk-stat"><strong>${totalShifts}</strong> משמרות</span><span class="wk-stat"><strong>${nEmp}</strong> עובדים</span><span class="wk-stat"><strong>${hrs}</strong> שעות</span>`
+    : '<span class="wk-stat">אין משמרות מתוכננות השבוע</span>';
+}
+
+function restoreWeekCancelled(recurringId,dateIso){
+  const r=recurring[recurringId]; if(!r || !(r.cancelledDates||{})[dateIso]) return;
+  const hasOneTime=Object.values(oneTime).some(o=>o && o.employeeId===r.employeeId && o.date===dateIso);
+  if(hasOneTime){ toast("יש משמרת חד-פעמית ביום הזה — לא שוחזר כדי למנוע כפילות"); return; }
+  db.ref("recurringShifts/"+recurringId+"/cancelledDates/"+dateIso).remove()
+    .then(()=>toast("המשמרת שוחזרה ✓")).catch(()=>toast("השחזור נכשל"));
 }
 
 /* ---------- הוספה / עריכה / מחיקה מתוך הסידור השבועי ---------- */
-// הוספה: קודם בוחרים עובד, ואז נפתח אותו מודאל משמרת מוכר (קבועה/חד-פעמית)
+// הוספה מהשבוע: עובד, סוג ושעות בטופס אחד. מסלולי השמירה נשארים ללא שינוי.
 function openWeekAddShift(){
   const list=Object.keys(employees).map(id=>({id,...employees[id]}))
     .filter(e=>e.active!==false).sort(byNameHe);
   if(list.length===0){ toast("אין עובדים פעילים"); return; }
-  $("weekEmpPickList").innerHTML=list.map(e=>`
-    <button class="btn line" style="width:100%;justify-content:center" onclick="weekEmpPicked('${e.id}')">👤 ${esc(e.name)}</button>`).join("");
-  openModal("weekEmpPickModal");
+  shiftModalMode="add"; editingPlanId=null; shiftModalEmployeeId=null;
+  $("shiftModalTitle").textContent="הוספת משמרת";
+  $("shiftModalWho").textContent="בחר עובד ומלא את פרטי המשמרת";
+  $("shiftEmployeeSelect").innerHTML='<option value="">בחר עובד</option>'+list.map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join("");
+  $("shiftEmployeeField").classList.remove("hidden");
+  $("shiftTypeSeg").classList.remove("hidden");
+  clearShiftModal(); setShiftType("onetime"); updateShiftSaveLabel();
+  openModal("shiftModal");
 }
-function weekEmpPicked(empId){
-  closeModal("weekEmpPickModal");
-  if(!employees[empId]) return;
-  schedSubEmpId=empId; // saveShift שומר לפי המשתנה הזה; נשארים בתצוגת השבוע
-  openAddShift();
+function selectShiftEmployee(empId){
+  shiftModalEmployeeId=(empId && employees[empId] && employees[empId].active!==false)?empId:null;
 }
 
 // לחיצה על משמרת בשבוע: תפריט פעולות לפי סוג המשמרת
@@ -5101,15 +5187,34 @@ function openWeekShiftAction(kind, id, dateIso){
   const emp=employees[src.employeeId];
   wkActCtx={kind, id, date:dateIso};
   $("wkActTitle").textContent = kind==='once' ? "משמרת חד-פעמית" : "משמרת קבועה";
-  $("wkActWho").textContent = (emp?emp.name:"")+" · "+fmtIsoShort(dateIso)+" · "+src.startTime+"–"+src.endTime;
-  $("wkActButtons").innerHTML = kind==='once'
-    ? `<button class="btn" onclick="wkActEditOnce()">✏️ ערוך משמרת</button>
-       <button class="btn danger" onclick="wkActDeleteOnce()">🗑️ מחק משמרת</button>`
-    : `<button class="btn" onclick="wkActEditOccurrence()">✏️ ערוך רק את היום הזה</button>
-       <button class="btn line" onclick="wkActEditSeries()">🔁 ערוך את המשמרת הקבועה (כל הימים)</button>
-       <button class="btn line" onclick="wkActCancelDay()">🚫 בטל רק את היום הזה</button>
-       <button class="btn danger" onclick="wkActDeleteSeries()">🗑️ מחק את המשמרת הקבועה</button>`;
+  $("wkActWho").textContent = (emp?emp.name:"")+" · "+fmtIsoShort(dateIso)+" · "+timeRangeText(src.startTime,src.endTime);
+  renderWkActButtons("root");
   openModal("weekShiftActionModal");
+}
+function renderWkActButtons(stage){
+  if(!wkActCtx) return;
+  const box=$("wkActButtons");
+  if(wkActCtx.kind==='once'){
+    box.innerHTML=`<button class="btn" onclick="wkActEditOnce()">✏️ ערוך משמרת</button>
+      <button class="btn danger" onclick="wkActDeleteOnce()">🗑️ מחק משמרת</button>`;
+    return;
+  }
+  if(stage==="edit"){
+    box.innerHTML=`<div class="wk-action-question">איזה חלק לערוך?</div>
+      <button class="btn" onclick="wkActEditOccurrence()">רק ביום ${fmtIsoShort(wkActCtx.date)}</button>
+      <button class="btn line" onclick="wkActEditSeries()">את כל המשמרת הקבועה</button>
+      <button class="btn line wk-action-back" onclick="renderWkActButtons('root')">→ חזרה</button>`;
+    return;
+  }
+  if(stage==="remove"){
+    box.innerHTML=`<div class="wk-action-question">מה ברצונך לבטל?</div>
+      <button class="btn danger" onclick="wkActCancelDay()">רק ביום ${fmtIsoShort(wkActCtx.date)}</button>
+      <button class="btn danger" onclick="wkActDeleteSeries()">את כל המשמרת הקבועה</button>
+      <button class="btn line wk-action-back" onclick="renderWkActButtons('root')">→ חזרה</button>`;
+    return;
+  }
+  box.innerHTML=`<button class="btn" onclick="renderWkActButtons('edit')">✏️ ערוך משמרת</button>
+    <button class="btn line" onclick="renderWkActButtons('remove')">🚫 בטל / מחק משמרת</button>`;
 }
 function wkActEditOnce(){ if(!wkActCtx) return; closeModal("weekShiftActionModal"); openEditOnetime(wkActCtx.id); }
 function wkActDeleteOnce(){ if(!wkActCtx) return; closeModal("weekShiftActionModal"); deleteOnetime(wkActCtx.id); }
@@ -5154,7 +5259,7 @@ function renderScheduleDetail(empId){
     const cc=Object.keys(r.cancelledDates||{}).length;
     html+=`<div class="sched-row recurring">
       <div class="info"><div class="t1">ימים: ${days||'—'}</div>
-      <div class="t2">${r.startTime}–${r.endTime}${cc?(' · '+cc+' מופעים בוטלו'):''}</div></div>
+      <div class="t2">${timeRangeHtml(r.startTime,r.endTime)}${cc?(' · '+cc+' מופעים בוטלו'):''}</div></div>
       <button class="btn line sm" onclick="openEditRecurring('${r.id}')">ערוך</button>
       <button class="btn line sm" onclick="openCancelOccurrence('${r.id}')">בטל מופע</button>
       <button class="btn danger sm" onclick="deleteRecurring('${r.id}')">מחק</button>
@@ -5167,7 +5272,7 @@ function renderScheduleDetail(empId){
   else onceList.forEach(o=>{
     html+=`<div class="sched-row">
       <div class="info"><div class="t1">${fmtIsoShort(o.date)}</div>
-      <div class="t2">${o.startTime}–${o.endTime}</div></div>
+      <div class="t2">${timeRangeHtml(o.startTime,o.endTime)}</div></div>
       <button class="btn line sm" onclick="openEditOnetime('${o.id}')">ערוך</button>
       <button class="btn danger sm" onclick="deleteOnetime('${o.id}')">מחק</button>
     </div>`;
@@ -5180,7 +5285,7 @@ function renderScheduleDetail(empId){
   else html+=upcoming.map(u=>`<div class="up-row">
       <span class="dot2 ${u.type==='once'?'once':''}"></span>
       <span style="flex:1">${fmtIsoShort(u.date)}</span>
-      <span class="meta">${u.startTime}–${u.endTime}</span>
+      <span class="meta">${timeRangeHtml(u.startTime,u.endTime)}</span>
       <span class="meta">${u.type==='once'?'חד-פעמית':'קבועה'}</span>
     </div>`).join("");
 
@@ -5234,6 +5339,18 @@ function setShiftType(type){
   $("typeOnetime").classList.toggle("on", type==="onetime");
   $("recurringFields").classList.toggle("hidden", type!=="recurring");
   $("onetimeFields").classList.toggle("hidden", type!=="onetime");
+  const help=$("shiftTypeHelp");
+  if(help) help.textContent=type==="recurring"
+    ? "המשמרת תחזור בכל שבוע בימים שתבחר."
+    : "המשמרת תתווסף לתאריך אחד בלבד.";
+  updateShiftSaveLabel();
+}
+function updateShiftSaveLabel(){
+  const btn=$("shiftSaveBtn"); if(!btn) return;
+  if(shiftModalMode==="editRecurring") btn.textContent="עדכן את כל המשמרת הקבועה";
+  else if(shiftModalMode==="editOccurrence") btn.textContent="עדכן רק את היום הזה";
+  else if(shiftModalMode==="editOnetime") btn.textContent="עדכן משמרת";
+  else btn.textContent="הוסף משמרת";
 }
 function clearShiftModal(){
   const nr=$("notifyChangeRow"); if(nr){ nr.style.display="none"; $("notifyChangeCb").checked=false; }
@@ -5244,41 +5361,48 @@ function clearShiftModal(){
 function openAddShift(){
   const empId=schedSubEmpId;
   if(!empId){ toast("בחר עובד קודם"); return; }
-  shiftModalMode="add"; editingPlanId=null;
+  shiftModalMode="add"; editingPlanId=null; shiftModalEmployeeId=empId;
   $("shiftModalTitle").textContent="הוספת משמרת";
   $("shiftModalWho").textContent=employees[empId].name;
+  $("shiftEmployeeField").classList.add("hidden");
   $("shiftTypeSeg").classList.remove("hidden");
-  clearShiftModal(); setShiftType("recurring");
+  clearShiftModal(); setShiftType("recurring"); updateShiftSaveLabel();
   openModal("shiftModal");
 }
 function openEditRecurring(id){
   const r=recurring[id]; if(!r) return;
-  shiftModalMode="editRecurring"; editingPlanId=id;
+  shiftModalMode="editRecurring"; editingPlanId=id; shiftModalEmployeeId=r.employeeId;
   $("shiftModalTitle").textContent="עריכת משמרת קבועה";
   $("shiftModalWho").textContent=employees[r.employeeId]?employees[r.employeeId].name:"";
+  $("shiftEmployeeField").classList.add("hidden");
   $("shiftTypeSeg").classList.add("hidden");
   clearShiftModal(); setShiftType("recurring");
   (r.daysOfWeek||[]).forEach(d=>{ const cb=$("dayPicker").querySelector('input[value="'+d+'"]'); if(cb) cb.checked=true; });
   $("shiftStart").value=r.startTime; $("shiftEnd").value=r.endTime;
   const _nr=$("notifyChangeRow"); if(_nr) _nr.style.display="flex";
+  updateShiftSaveLabel();
   openModal("shiftModal");
 }
 function openEditOnetime(id){
   const o=oneTime[id]; if(!o) return;
-  shiftModalMode="editOnetime"; editingPlanId=id;
+  shiftModalMode="editOnetime"; editingPlanId=id; shiftModalEmployeeId=o.employeeId;
   $("shiftModalTitle").textContent="עריכת משמרת חד-פעמית";
   $("shiftModalWho").textContent=employees[o.employeeId]?employees[o.employeeId].name:"";
+  $("shiftEmployeeField").classList.add("hidden");
   $("shiftTypeSeg").classList.add("hidden");
   clearShiftModal(); setShiftType("onetime");
   $("shiftDate").value=o.date; $("shiftStart").value=o.startTime; $("shiftEnd").value=o.endTime;
   const _nr=$("notifyChangeRow"); if(_nr) _nr.style.display="flex";
+  updateShiftSaveLabel();
   openModal("shiftModal");
 }
 function saveShift(){
   const start=$("shiftStart").value, end=$("shiftEnd").value;
   if(!start || !end){ toast("יש למלא שעות"); return; }
   if(end<=start){ toast("שעת הסיום חייבת להיות אחרי ההתחלה"); return; }
-  const empId=schedSubEmpId;
+  const empId=shiftModalEmployeeId;
+  if(!empId || !employees[empId]){ toast("בחר עובד"); return; }
+  if(shiftModalMode==="add" && !$("shiftEmployeeField").classList.contains("hidden") && employees[empId].active===false){ toast("העובד אינו פעיל"); return; }
 
   if(shiftModalType==="recurring"){
     const days=[...$("dayPicker").querySelectorAll("input:checked")].map(c=>parseInt(c.value));
@@ -5302,7 +5426,7 @@ function saveShift(){
     if(!date){ toast("בחר תאריך"); return; }
     if(shiftModalMode==="editOccurrence" && occEditRecurringId && occEditDate){
       const r=recurring[occEditRecurringId];
-      const empId2=r?r.employeeId:schedSubEmpId;
+      const empId2=r?r.employeeId:shiftModalEmployeeId;
       const changedDate=occEditDate; // שומרים לפני איפוס המודאל כדי שהתראת השינוי תקבל תאריך תפוגה
       const summaryOcc = "המשמרת של "+fmtIsoShort(changedDate)+" השתנתה — שעות: "+r.startTime+"–"+r.endTime+" ← "+start+"–"+end;
       db.ref("recurringShifts/"+occEditRecurringId+"/cancelledDates/"+changedDate).set(true);
@@ -5340,7 +5464,7 @@ async function deleteOnetime(id){
 function openCancelOccurrence(id){
   cancelTargetId=id;
   const r=recurring[id]; if(!r) return;
-  $("cancelWho").textContent=(employees[r.employeeId]?employees[r.employeeId].name:"")+" · "+r.startTime+"–"+r.endTime;
+  $("cancelWho").textContent=(employees[r.employeeId]?employees[r.employeeId].name:"")+" · "+timeRangeText(r.startTime,r.endTime);
   renderCancelList();
   openModal("cancelModal");
 }
@@ -5349,17 +5473,24 @@ function renderCancelList(){
   const occ=recurringOccurrences(r, 6, true).slice(0,16);
   const box=$("cancelList");
   if(occ.length===0){ box.innerHTML='<div class="empty">אין מופעים קרובים.</div>'; return; }
-  box.innerHTML=occ.map(o=>`<div class="cancel-item ${o.cancelled?'off':''}">
-      <span class="d">${fmtIsoShort(o.date)}${o.cancelled?' · בוטל':''}</span>
-      <div style="display:flex;gap:6px">
-        ${o.cancelled?'':`<button class="btn line sm" onclick="editOccurrence('${o.date}')">✏️ ערוך</button>`}
-        <button class="btn ${o.cancelled?'line':'danger'} sm" onclick="toggleCancelDate('${o.date}')">${o.cancelled?'שחזר':'בטל'}</button>
-      </div>
-    </div>`).join("");
+  box.innerHTML=occ.map(o=>{
+    const replaced=o.cancelled && Object.values(oneTime).some(x=>x && x.employeeId===r.employeeId && x.date===o.date);
+    return `<div class="cancel-item ${o.cancelled?'off':''}">
+        <span class="d">${fmtIsoShort(o.date)}${replaced?' · הוחלפה במשמרת חד-פעמית':(o.cancelled?' · בוטלה':'')}</span>
+        <div style="display:flex;gap:6px">
+          ${o.cancelled?'':`<button class="btn line sm" onclick="editOccurrence('${o.date}')">✏️ ערוך</button>`}
+          ${replaced?'':`<button class="btn ${o.cancelled?'line':'danger'} sm" onclick="toggleCancelDate('${o.date}')">${o.cancelled?'שחזר':'בטל'}</button>`}
+        </div>
+      </div>`;
+  }).join("");
 }
 function toggleCancelDate(dateIso){
   const r=recurring[cancelTargetId]; if(!r) return;
   const isCancelled=(r.cancelledDates||{})[dateIso];
+  if(isCancelled && Object.values(oneTime).some(o=>o && o.employeeId===r.employeeId && o.date===dateIso)){
+    toast("יש משמרת חד-פעמית ביום הזה — לא שוחזר כדי למנוע כפילות");
+    renderCancelList(); return;
+  }
   const ref=db.ref("recurringShifts/"+cancelTargetId+"/cancelledDates/"+dateIso);
   const op = isCancelled ? ref.remove() : ref.set(true);
   op.then(()=>renderCancelList());
@@ -5368,15 +5499,17 @@ function toggleCancelDate(dateIso){
 function editOccurrence(dateIso){
   const r=recurring[cancelTargetId]; if(!r) return;
   occEditRecurringId=cancelTargetId; occEditDate=dateIso;
-  shiftModalMode="editOccurrence"; editingPlanId=null;
+  shiftModalMode="editOccurrence"; editingPlanId=null; shiftModalEmployeeId=r.employeeId;
   $("shiftModalTitle").textContent="עריכת מופע בודד";
   $("shiftModalWho").textContent=(employees[r.employeeId]?employees[r.employeeId].name:"")+" · "+fmtIsoShort(dateIso);
+  $("shiftEmployeeField").classList.add("hidden");
   $("shiftTypeSeg").classList.add("hidden");
   clearShiftModal(); setShiftType("onetime");
   $("shiftDate").value=dateIso; $("shiftStart").value=r.startTime; $("shiftEnd").value=r.endTime;
   $("shiftDate").setAttribute("readonly","readonly");
   closeModal("cancelModal");
   const _nr=$("notifyChangeRow"); if(_nr) _nr.style.display="flex";
+  updateShiftSaveLabel();
   openModal("shiftModal");
 }
 
