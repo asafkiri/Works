@@ -287,6 +287,87 @@
   .wk-action-back{margin-top:3px}
   .shift-type-help{font-size:12.5px;color:var(--muted);line-height:1.45;margin:-8px 2px 14px}
 
+  /* ---------- שורת חג/שבת בתוך יום בסידור ---------- */
+  .wk-day-luach{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 13px;background:var(--primary-soft);border-bottom:1px solid var(--line);font-size:11.5px;font-weight:800;color:var(--primary-d)}
+  .wk-day-luach.rest{background:#eef0fb;color:#3a3f8f}
+  .wk-day-luach.fast{background:var(--danger-bg);color:var(--danger)}
+  .wk-day-luach .lz{display:inline-flex;align-items:center;gap:3px;background:rgba(255,255,255,.72);border-radius:999px;padding:2px 7px;font-variant-numeric:tabular-nums}
+  .wk-late-warn{display:flex;gap:7px;align-items:flex-start;margin:8px 0 2px;padding:9px 11px;border-radius:11px;background:var(--live-bg);border:1px solid var(--live-line);color:var(--live-d);font-size:12px;font-weight:700;line-height:1.5}
+
+  /* ---------- לוח שנה עברי ---------- */
+  .lu-controls{margin-bottom:12px}
+  .lu-label-heb{display:block;font-size:11.5px;font-weight:700;color:var(--muted);margin-top:2px}
+  .lu-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+  .lu-dow{text-align:center;font-size:11px;font-weight:800;color:var(--muted);padding:2px 0 4px}
+  .lu-cell{appearance:none;font-family:inherit;text-align:center;cursor:pointer;background:#fff;color:var(--ink);
+    border:1px solid var(--line);border-radius:11px;padding:5px 2px 6px;min-height:62px;
+    display:flex;flex-direction:column;align-items:center;gap:1px;overflow:hidden;-webkit-tap-highlight-color:transparent}
+  .lu-cell:active{background:var(--paper)}
+  .lu-cell:focus-visible{outline:3px solid var(--primary-ring);outline-offset:1px}
+  .lu-cell.blank{background:transparent;border-color:transparent;cursor:default;min-height:0}
+  .lu-greg{font-size:15px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums}
+  .lu-heb{font-size:9.5px;font-weight:700;color:var(--muted);line-height:1.1}
+  /* שם קצר בתא: נשבר רק אחרי מקף או רווח, ולא באמצע מילה, כדי שיישאר קריא */
+  .lu-ev{font-size:8.5px;font-weight:800;line-height:1.15;margin-top:1px;max-width:100%;
+    display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+    word-break:normal;overflow-wrap:normal}
+  .lu-cell.shabbat{background:#f7f7fc;border-color:#e2e3f2}
+  .lu-cell.shabbat .lu-greg{color:#3a3f8f}
+  .lu-cell.yomtov{background:var(--primary-soft);border-color:#c8e0db}
+  .lu-cell.yomtov .lu-greg,.lu-cell.yomtov .lu-ev{color:var(--primary-d)}
+  .lu-cell.chm{background:#f0f7f5;border-color:#d8e9e5}
+  .lu-cell.chm .lu-ev{color:var(--primary-d)}
+  .lu-cell.fast{background:var(--danger-bg);border-color:var(--danger-line)}
+  .lu-cell.fast .lu-greg,.lu-cell.fast .lu-ev{color:var(--danger)}
+  .lu-cell.minor .lu-ev{color:var(--ink-soft)}
+  .lu-cell.today{border-color:var(--primary);box-shadow:0 0 0 2px var(--primary-ring)}
+  .lu-cell.sel{border-color:var(--ink);box-shadow:0 0 0 2px rgba(29,35,48,.14)}
+  .lu-cell.has-shift::after{content:"";width:5px;height:5px;border-radius:50%;background:var(--live);margin-top:1px;flex:0 0 auto}
+
+  .lu-day{margin-top:14px;border:1px solid var(--line);border-radius:14px;background:#fff;box-shadow:var(--shadow-sm);overflow:hidden}
+  .lu-day-head{padding:11px 13px;background:var(--paper);border-bottom:1px solid var(--line)}
+  .lu-day-date{font-weight:800;font-size:15px}
+  .lu-day-heb{font-size:12.5px;color:var(--muted);font-weight:700;margin-top:2px}
+  .lu-day-body{padding:11px 13px 13px}
+  .lu-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+  .lu-chip{font-size:11.5px;font-weight:800;border-radius:999px;padding:4px 10px;background:var(--paper);border:1px solid var(--line);color:var(--ink-soft)}
+  .lu-chip.yomtov{background:var(--primary-soft);border-color:#c8e0db;color:var(--primary-d)}
+  .lu-chip.chm{background:#f0f7f5;border-color:#d8e9e5;color:var(--primary-d)}
+  .lu-chip.fast{background:var(--danger-bg);border-color:var(--danger-line);color:var(--danger)}
+  .lu-chip.shabbat{background:#f7f7fc;border-color:#e2e3f2;color:#3a3f8f}
+  .lu-times{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:7px}
+  .lu-time{background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:8px 10px}
+  .lu-time.key{background:var(--primary-soft);border-color:#c8e0db}
+  .lu-time-k{font-size:11px;font-weight:800;color:var(--muted);display:block}
+  .lu-time.key .lu-time-k{color:var(--primary-d)}
+  .lu-time-v{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;display:block;margin-top:1px}
+  .lu-sub-note{font-size:11.5px;color:var(--muted);line-height:1.5;margin-top:9px}
+  .lu-shifts{margin-top:12px;border-top:1px dashed var(--line);padding-top:10px}
+  .lu-shift-row{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:6px 0;font-size:13.5px}
+  .lu-shift-row + .lu-shift-row{border-top:1px dashed var(--line)}
+  .lu-shift-row .nm{font-weight:800;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lu-shift-row .tm{font-variant-numeric:tabular-nums;color:var(--ink-soft);font-weight:650;white-space:nowrap}
+  .lu-list-row{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px dashed var(--line)}
+  .lu-list-row:last-child{border-bottom:0}
+  .lu-list-main{min-width:0}
+  .lu-list-name{font-weight:800;font-size:14px}
+  .lu-list-when{font-size:11.5px;color:var(--muted);font-weight:700;margin-top:2px;font-variant-numeric:tabular-nums}
+  .lu-list-times{text-align:left;font-size:11.5px;font-weight:800;color:var(--primary-d);white-space:nowrap;font-variant-numeric:tabular-nums;line-height:1.6}
+  .lu-legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;font-size:11px;color:var(--muted);font-weight:700}
+  .lu-legend span{display:inline-flex;align-items:center;gap:4px}
+  .lu-legend i{width:10px;height:10px;border-radius:3px;display:inline-block;border:1px solid var(--line-2)}
+  @media(max-width:400px){
+    .lu-grid{gap:3px}
+    .lu-cell{min-height:58px;border-radius:9px;padding:4px 1px 5px}
+    .lu-greg{font-size:14px}
+    .lu-ev{font-size:8px}
+  }
+  /* מסך צר במיוחד: מנצלים גם את הריפוד הצדי של התא כדי שהשם לא ייחתך */
+  @media(max-width:344px){
+    .lu-cell{padding:4px 0 5px}
+    .lu-ev{font-size:7.6px;letter-spacing:-.2px}
+  }
+
   @media(max-width:560px){
     .topbar{padding:calc(10px + env(safe-area-inset-top, 0px)) max(13px,env(safe-area-inset-right, 0px)) 10px max(13px,env(safe-area-inset-left, 0px)) !important}
     #schedWeek .screen-head{margin-bottom:12px}
@@ -516,6 +597,8 @@
   .up-item .ui-main{flex:1;min-width:0}
   .up-item .ui-date{font-weight:800;font-size:14.5px}
   .up-item .ui-time{font-size:13px;color:var(--muted);margin-top:2px}
+  .up-item .ui-luach{font-size:11.5px;font-weight:800;color:var(--primary-d);margin-top:4px;line-height:1.45}
+  .up-item .ui-luach.late{color:var(--live-d)}
   .up-badge{font-size:11px;font-weight:800;border-radius:999px;padding:3px 9px;flex:0 0 auto}
   .up-badge.rec{background:var(--primary-soft);color:var(--primary-d)}
   .up-badge.once{background:#fff;color:var(--live-d);border:1px solid var(--live-line)}
@@ -749,7 +832,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v72</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v73</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -774,7 +857,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v72</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v73</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -831,6 +914,11 @@
         <button class="folder" onclick="openFolder('schedule')">
           <span class="f-ico">📅</span>
           <span class="f-txt"><span class="f-title">סידור עבודה</span><span class="f-sub">תכנון משמרות קדימה</span></span>
+          <span class="f-arr">→</span>
+        </button>
+        <button class="folder" onclick="openFolder('luach')">
+          <span class="f-ico">🕯️</span>
+          <span class="f-txt"><span class="f-title">לוח שנה ומועדים</span><span class="f-sub" id="luachFolderSub">חגים, כניסת שבת וצאתה</span></span>
           <span class="f-arr">→</span>
         </button>
         <button class="folder" id="hakafaFolderBtn" onclick="openFolder('hakafa')">
@@ -1044,6 +1132,15 @@
 
     </div>
 
+    <!-- מסך: לוח שנה ומועדים -->
+    <div id="screen-luach" class="screen hidden">
+      <div class="screen-head"><button class="back-btn" onclick="backToHome()">→ חזרה</button><h1 class="screen-title">🕯️ לוח שנה ומועדים</h1></div>
+      <div class="card">
+        <p class="sub">לוח עברי מלא עם חגים, מועדים, צומות וזמני כניסת שבת וצאתה. הזמנים מחושבים במכשיר — בלי אינטרנט ובלי המתנה. לחיצה על יום מציגה את הזמנים שלו ואת המשמרות שתוכננו בו.</p>
+        <div id="luachBody"></div>
+      </div>
+    </div>
+
     <!-- מסך: הגדרות -->
     <div id="screen-settings" class="screen hidden">
       <!-- תצוגה ראשית של ההגדרות -->
@@ -1110,6 +1207,49 @@
             </div>
             <div class="modal-actions" style="margin-top:8px">
               <button class="btn" onclick="saveClosingGrace()">שמור</button>
+            </div>
+          </div>
+        </details>
+
+        <details class="grace-card">
+          <summary>🕯️ לוח שנה וזמני שבת</summary>
+          <div class="grace-body">
+            <p class="sub" id="luachSettingsNow">—</p>
+            <p class="sub">כניסת שבת מחושבת כמספר הדקות שנבחר לפני השקיעה, ויציאתה בצאת הכוכבים. ברירת המחדל — 20 דקות וצאת הכוכבים ב-8.5° — היא הנהוגה ברוב הארץ ותואמת ללוח של Hebcal. ההגדרה נשמרת במכשיר הזה בלבד.</p>
+            <label class="fld" for="lsCity">שם היישוב</label>
+            <input type="text" id="lsCity" autocomplete="off" placeholder="קריית גת">
+            <div class="row" style="margin-top:10px">
+              <div>
+                <label class="fld" for="lsLat">קו רוחב</label>
+                <input type="number" id="lsLat" inputmode="decimal" step="0.00001" min="-90" max="90">
+              </div>
+              <div>
+                <label class="fld" for="lsLon">קו אורך</label>
+                <input type="number" id="lsLon" inputmode="decimal" step="0.00001" min="-180" max="180">
+              </div>
+            </div>
+            <div class="row" style="margin-top:10px">
+              <div>
+                <label class="fld" for="lsCandles">דקות לפני השקיעה</label>
+                <select id="lsCandles">
+                  <option value="18">18 דקות</option>
+                  <option value="20">20 דקות · מומלץ</option>
+                  <option value="30">30 דקות</option>
+                  <option value="40">40 דקות · ירושלים</option>
+                </select>
+              </div>
+              <div>
+                <label class="fld" for="lsHavdalah">צאת הכוכבים</label>
+                <select id="lsHavdalah">
+                  <option value="7.083">מוקדם (7.083°)</option>
+                  <option value="8.5">3 כוכבים (8.5°) · מומלץ</option>
+                  <option value="16.1">רבנו תם (16.1°)</option>
+                </select>
+              </div>
+            </div>
+            <div class="modal-actions" style="margin-top:12px">
+              <button class="btn line" onclick="resetLuachSettings()">חזרה לברירת המחדל</button>
+              <button class="btn" onclick="saveLuachSettings()">שמור</button>
             </div>
           </div>
         </details>
@@ -1252,6 +1392,11 @@
           <span class="f-txt"><span class="f-title">המשמרות הקרובות שלי</span><span class="f-sub" id="empUpcomingSub">מתי אתה עובד בהמשך</span></span>
           <span class="f-arr">→</span>
         </button>
+        <button class="folder lg" onclick="openEmpNav('luach')">
+          <span class="f-ico">🕯️</span>
+          <span class="f-txt"><span class="f-title">לוח שנה ומועדים</span><span class="f-sub" id="empLuachSub">חגים וזמני כניסת שבת</span></span>
+          <span class="f-arr">→</span>
+        </button>
         <button class="folder lg" id="notesFolderBtn" onclick="openEmpNav('notes')">
           <span class="f-ico">💬</span>
           <span class="f-txt"><span class="f-title">הערות מהמנהל <span id="notesDot" class="note-dot hidden">חדש</span></span><span class="f-sub" id="notesFolderSub">משוב על המשמרות שלך</span></span>
@@ -1305,6 +1450,15 @@
       <div class="card">
         <p class="sub">המשמרות שלך ל-7 הימים הקרובים (קבועות וחד-פעמיות). חד-פעמיות מסומנות בצבע.</p>
         <div id="empUpcomingBody"></div>
+      </div>
+    </div>
+
+    <!-- לוח שנה ומועדים -->
+    <div id="empLuach" class="hidden">
+      <div class="screen-head"><button class="back-btn" onclick="empNavHome()">→ חזרה</button><h1 class="screen-title">🕯️ לוח שנה ומועדים</h1></div>
+      <div class="card">
+        <p class="sub">חגים, מועדים וזמני כניסת שבת וצאתה. לחיצה על יום מציגה את הזמנים שלו ואת המשמרות שלך בו.</p>
+        <div id="empLuachBody"></div>
       </div>
     </div>
 
@@ -1714,7 +1868,8 @@
     </div>
   </div>
 </div>
-<script src="store-gifts.js?v=72"></script>
+<script src="store-gifts.js?v=73"></script>
+<script src="luach.js?v=73"></script>
 <script>
 /* ============================================================
    1. הגדרות
@@ -2292,7 +2447,7 @@ function chooseDevice(m){
 }
 
 /* ---------- ניווט תיקיות בקונסולה ---------- */
-const CONSOLE_SCREENS=["overview","employees","pay","schedule","settings","hakafa","forms","payslips"];
+const CONSOLE_SCREENS=["overview","employees","pay","schedule","luach","settings","hakafa","forms","payslips"];
 function openFolder(name){
   consoleFolder=name;
   if(name==="pay"){ payView="list"; paySubEmpId=null; }
@@ -2301,10 +2456,11 @@ function openFolder(name){
     weekStart=startOfWeek(new Date()); weekPastExpanded=false;
   }
   if(name==="employees"){ empView="list"; empSubId=null; }
-  if(name==="settings"){ const m=$("settings-main"), t=$("settings-tax"); if(m) m.classList.remove("hidden"); if(t) t.classList.add("hidden"); renderOpeningGrace(); renderClosingGrace(); }
+  if(name==="settings"){ const m=$("settings-main"), t=$("settings-tax"); if(m) m.classList.remove("hidden"); if(t) t.classList.add("hidden"); renderOpeningGrace(); renderClosingGrace(); renderLuachSettings(); }
   if(name==="hakafa"){ hkConsoleView="list"; hkConsoleEmpId=null; }
   if(name==="forms"){ formsConsoleView="list"; formsConsoleEmpId=null; }
   if(name==="payslips"){ payslipsConsoleView="list"; payslipsConsoleEmpId=null; }
+  if(name==="luach"){ luachGoToday(); }
   if(name==="overview" && TS){ db.ref("config/empNotesSeenAt").set(TS); }
   applyConsoleNav();
   renderConsole();
@@ -2636,7 +2792,7 @@ function renderActive(){
 /* ============================================================
    7ב. דשבורד עובד (קריאה בלבד) - תיקיות
    ============================================================ */
-let empNav="home";       // 'home' | 'pay' | 'paymonth' | 'upcoming' | 'notes'
+let empNav="home";       // 'home' | 'pay' | 'paymonth' | 'upcoming' | 'luach' | 'notes'
 let empNavMonth=null;    // מפתח החודש בתצוגת פירוט חודש
 let myTakings={};        // הקפה: רשומות העובד הנוכחי (נטען ב-enterEmployeeMode)
 let allTakings={};       // הקפה: כל הרשומות (נטען רק אצל המנהל)
@@ -2650,7 +2806,7 @@ let empSignFormId=null;  // הטופס שנמצא בחתימה כרגע
 let sigCtx=null, sigDrawing=false, sigHasInk=false, sigLast=null; // לוח החתימה
 
 function applyEmpDashNav(){
-  const map={home:"empHome",pay:"empPay",paymonth:"empPayMonth",upcoming:"empUpcoming",notes:"empNotes",hakafa:"empHakafa",forms:"empForms",payslips:"empPayslips"};
+  const map={home:"empHome",pay:"empPay",paymonth:"empPayMonth",upcoming:"empUpcoming",luach:"empLuach",notes:"empNotes",hakafa:"empHakafa",forms:"empForms",payslips:"empPayslips"};
   Object.keys(map).forEach(k=>{ const el=$(map[k]); if(el) el.classList.toggle("hidden", empNav!==k); });
 }
 function empNavHome(){ empNav="home"; renderEmployeeDashboard(); try{window.scrollTo(0,0);}catch(e){} }
@@ -2658,6 +2814,7 @@ function openEmpNav(name){
   empNav=name;
   if(name==="notes" && currentEmpId){ db.ref("employees/"+currentEmpId+"/notesSeenAt").set(TS); }
   if(name==="forms"){ empFormView="list"; empSignFormId=null; }
+  if(name==="luach"){ luachGoToday(); }
   renderEmployeeDashboard();
   try{window.scrollTo(0,0);}catch(e){}
 }
@@ -3514,10 +3671,15 @@ function renderEmployeeDashboard(){
       <div class="ui-main">
         <div class="ui-date">${fmtIsoShort(u.date)}</div>
         <div class="ui-time">${timeRangeHtml(u.startTime,u.endTime)}</div>
+        ${luachShiftNoteHtml(u.date, u.endTime)}
       </div>
       <span class="up-badge ${once?'once':'rec'}">${once?'חד-פעמית':'קבועה'}</span>
     </div>`;
   }).join("") : '<div class="empty">אין משמרות ב-7 הימים הקרובים.</div>';
+
+  // --- לוח שנה ומועדים ---
+  renderLuach();
+  renderLuachFolderSub();
 
   // --- הערות מנהל: מ-3 המשמרות האחרונות שיש בהן משוב ---
   const notes=Object.keys(shifts).map(id=>({id,...shifts[id]}))
@@ -4043,6 +4205,8 @@ function renderConsole(){
   renderHakafaBadge();
   renderFormsConsole();
   renderPayslipsConsole();
+  renderLuach();
+  renderLuachFolderSub();
 }
 
 // חיווי "כמה במשמרת עכשיו" על אריח "סקירה" בתפריט הבית
@@ -5376,7 +5540,8 @@ function renderSchedWeek(){
         </span>
         <span class="wk-day-count">${activeShifts.length} ${activeShifts.length===1?'משמרת':'משמרות'}</span>
       </div>
-      <div class="wk-day-body">${rows}</div>
+      ${luachDayStripHtml(iso)}
+      <div class="wk-day-body">${rows}${luachWeekLateWarning(iso, activeShifts)}</div>
     </div>`;
     if(isCurrentWeek && isPast) pastCards.push(card); else visibleCards.push(card);
   }
@@ -5400,6 +5565,451 @@ function restoreWeekCancelled(recurringId,dateIso){
   if(hasOneTime){ toast("יש משמרת חד-פעמית ביום הזה — לא שוחזר כדי למנוע כפילות"); return; }
   db.ref("recurringShifts/"+recurringId+"/cancelledDates/"+dateIso).remove()
     .then(()=>toast("המשמרת שוחזרה ✓")).catch(()=>toast("השחזור נכשל"));
+}
+
+/* ============================================================
+   10ב. לוח שנה עברי, מועדים וזמני שבת
+   הכל מחושב במכשיר ב-luach.js. הגדרת המקום נשמרת במכשיר בלבד,
+   כדי שהלוח יעבוד בלי לגעת בחוקי האבטחה של Firebase.
+   ============================================================ */
+const LUACH_PLACE_KEY="luachPlace";
+let luachY=null, luachM=null;   // החודש האזרחי המוצג
+let luachSelIso=null;           // היום שנבחר בלוח
+let luachPlaceCache=null;
+
+function luachReady(){ return typeof Luach!=="undefined" && Luach && typeof Luach.month==="function"; }
+
+function luachPlace(){
+  if(luachPlaceCache) return luachPlaceCache;
+  let saved=null;
+  try{ const raw=localStorage.getItem(LUACH_PLACE_KEY); if(raw) saved=JSON.parse(raw); }catch(e){}
+  luachPlaceCache=Luach.normalizePlace(saved);
+  return luachPlaceCache;
+}
+function luachSetPlace(place){
+  luachPlaceCache=null;
+  luachHomeSubCache=null;
+  try{
+    if(place) localStorage.setItem(LUACH_PLACE_KEY, JSON.stringify(place));
+    else localStorage.removeItem(LUACH_PLACE_KEY);
+  }catch(e){}
+}
+function luachTodayIso(){ return luachReady() ? Luach.todayIso(luachPlace()) : isoDate(new Date()); }
+
+function luachGoToday(){
+  if(!luachReady()) return;
+  const iso=luachTodayIso(), p=iso.split("-").map(Number);
+  luachY=p[0]; luachM=p[1]; luachSelIso=iso;
+}
+function luachShiftMonth(delta){
+  let y=luachY, m=luachM+delta;
+  while(m<1){ m+=12; y--; }
+  while(m>12){ m-=12; y++; }
+  luachY=y; luachM=m;
+  const prefix=y+"-"+pad(m)+"-";
+  if(!luachSelIso || luachSelIso.slice(0,8)!==prefix) luachSelIso=prefix+"01";
+  renderLuach();
+}
+function luachPrevMonth(){ luachShiftMonth(-1); }
+function luachNextMonth(){ luachShiftMonth(1); }
+function luachThisMonth(){ luachGoToday(); renderLuach(); }
+function luachPick(iso){ luachSelIso=iso; renderLuach(); }
+
+// בתא של הלוח יש מקום לשם אחד. המנוע מדרג את המועדים, והקטן שבהם מנצח.
+function luachTopEvent(d){
+  let best=null;
+  (d.events||[]).forEach(ev=>{
+    if(ev.rank==null) return;
+    if(!best || ev.rank<best.rank) best=ev;
+  });
+  return best;
+}
+function luachName(text){
+  // כרום אינו שובר שורה אחרי מקף עברי, ולכן מוסיפים נקודת שבירה מפורשת —
+  // בלעדיה "ויקהל־פקודי" נחתך בתא צר של הלוח.
+  return esc(text).split(Luach.PAIR_SEPARATOR).join(Luach.PAIR_SEPARATOR+"<wbr>");
+}
+function luachDayTone(d){
+  if(d.isYomTov) return "yomtov";
+  if(d.isCholHamoed) return "chm";
+  const top=luachTopEvent(d);
+  if(top && top.type==="fast") return "fast";
+  if(d.isShabbat) return "shabbat";
+  if(top) return "minor";
+  return "";
+}
+function luachChipTone(type){
+  if(type==="yomtov") return "yomtov";
+  if(type==="cholhamoed") return "chm";
+  if(type==="fast") return "fast";
+  if(type==="specialShabbat") return "shabbat";
+  return "";
+}
+
+// שמות הכניסה והיציאה תלויים במה שנכנס: שבת, חג, או שניהם יחד.
+function luachHasEvent(d, key){
+  return (d.events||[]).some(ev=>ev.key===key);
+}
+function luachRestLabels(d){
+  const next=Luach.dayOfRd(d.rd+1, luachPlace());
+  const startLabel = luachHasEvent(next,"yom_kippur") ? "כניסת יום כיפור"
+    : next.isShabbat && next.isYomTov ? "כניסת שבת וחג"
+    : next.isYomTov ? "כניסת החג" : "כניסת שבת";
+  const endLabel = luachHasEvent(d,"yom_kippur") ? "צאת הצום"
+    : d.isShabbat && d.isYomTov ? "יציאת שבת והחג"
+    : d.isYomTov ? "יציאת החג" : "יציאת שבת";
+  return { start:startLabel, end:endLabel };
+}
+
+function luachDayTitle(d){
+  const g=d.iso.split("-");
+  return "יום "+HE_DAYS_LONG[d.dow]+", "+`<span class="date-isolate">${parseInt(g[2],10)}/${parseInt(g[1],10)}/${g[0]}</span>`;
+}
+
+// כל השמות של יום אחד, לקורא מסך ולכפתור בלוח.
+function luachDayAria(d){
+  const parts=["יום "+HE_DAYS_LONG[d.dow]+" "+parseInt(d.iso.slice(8),10)+" ב"+HEB_MONTHS[parseInt(d.iso.slice(5,7),10)-1], d.hebrew.label];
+  (d.events||[]).forEach(ev=>parts.push(ev.name));
+  if(d.isShabbat && d.parsha) parts.push("פרשת "+d.parsha);
+  return parts.join(", ");
+}
+
+function luachGridHtml(){
+  const place=luachPlace();
+  const mo=Luach.month(luachY, luachM, place);
+  if(!mo) return '<div class="empty">לא נמצא חודש להצגה.</div>';
+  const today=luachTodayIso();
+  const isThisMonth=today.slice(0,7)===luachY+"-"+pad(luachM);
+
+  let cells="";
+  mo.weeks.forEach(week=>week.forEach(d=>{
+    if(!d){ cells+='<div class="lu-cell blank" aria-hidden="true"></div>'; return; }
+    const top=luachTopEvent(d);
+    const label=top ? top.short : (d.isShabbat && d.parsha ? d.parsha : "");
+    const cls=[luachDayTone(d)];
+    if(d.iso===today) cls.push("today");
+    if(d.iso===luachSelIso) cls.push("sel");
+    if(shiftsForDate(d.iso).some(s=>!s.cancelled)) cls.push("has-shift");
+    cells+=`<button type="button" class="lu-cell ${cls.filter(Boolean).join(" ")}" onclick="luachPick('${d.iso}')"`
+      +` aria-label="${esc(luachDayAria(d))}"${d.iso===luachSelIso?' aria-current="date"':''}>`
+      +`<span class="lu-greg">${parseInt(d.iso.slice(8),10)}</span>`
+      +`<span class="lu-heb">${esc(d.hebrew.dayLabel)}</span>`
+      +(label?`<span class="lu-ev">${luachName(label)}</span>`:"")
+      +`</button>`;
+  }));
+
+  return `<div class="lu-controls">
+    <div class="wk-nav">
+      <button class="btn line sm" onclick="luachPrevMonth()" aria-label="הצג חודש קודם">חודש קודם</button>
+      <div class="wk-label">${isThisMonth?'<span class="wk-current">החודש</span>':''}${esc(mo.label)}<span class="lu-label-heb">${esc(mo.hebrewSpan)}</span></div>
+      <button class="btn line sm" onclick="luachNextMonth()" aria-label="הצג חודש הבא">חודש הבא</button>
+    </div>
+    <div class="wk-toolbar">
+      ${isThisMonth?"":'<button class="btn line sm" onclick="luachThisMonth()">חזרה לחודש הנוכחי</button>'}
+    </div>
+  </div>
+  <div class="lu-grid">
+    ${HE_DAYS_SHORT.map(n=>`<div class="lu-dow">${n}</div>`).join("")}
+    ${cells}
+  </div>
+  <div class="lu-legend">
+    <span><i style="background:var(--primary-soft);border-color:#c8e0db"></i> חג</span>
+    <span><i style="background:#f0f7f5;border-color:#d8e9e5"></i> חול המועד</span>
+    <span><i style="background:var(--danger-bg);border-color:var(--danger-line)"></i> צום</span>
+    <span><i style="background:#f7f7fc;border-color:#e2e3f2"></i> שבת</span>
+    <span><i style="background:var(--live);border:0;border-radius:50%"></i> יש משמרת בסידור</span>
+  </div>`;
+}
+
+function luachTimeBox(label, ms, key){
+  return `<div class="lu-time${key?" key":""}"><span class="lu-time-k">${esc(label)}</span><span class="lu-time-v">${Luach.fmtTime(ms, luachPlace())}</span></div>`;
+}
+
+function luachDayCardHtml(){
+  const place=luachPlace();
+  const d=Luach.day(luachSelIso, place);
+  if(!d) return "";
+
+  const chips=[];
+  if(d.isShabbat) chips.push(`<span class="lu-chip shabbat">שבת${d.parsha?" · פרשת "+luachName(d.parsha):""}</span>`);
+  (d.events||[]).forEach(ev=>chips.push(`<span class="lu-chip ${luachChipTone(ev.type)}">${esc(ev.name)}</span>`));
+  if(d.omer) chips.push(`<span class="lu-chip">${d.omer} לעומר</span>`);
+  if(!chips.length) chips.push('<span class="lu-chip">יום חול</span>');
+
+  const labels=luachRestLabels(d);
+  const times=[];
+  if(d.zmanim.candlesMs!=null) times.push(luachTimeBox(labels.start, d.zmanim.candlesMs, true));
+  if(d.zmanim.havdalahMs!=null) times.push(luachTimeBox(labels.end, d.zmanim.havdalahMs, true));
+  times.push(luachTimeBox("זריחה", d.zmanim.sunriseMs));
+  times.push(luachTimeBox("שקיעה", d.zmanim.sunsetMs));
+  times.push(luachTimeBox("צאת הכוכבים", d.zmanim.tzeitMs));
+
+  const shifts=shiftsForDate(d.iso);
+  const active=shifts.filter(s=>!s.cancelled);
+  const mine=currentRole==="employee";
+  let shiftsHtml="";
+  if(active.length){
+    shiftsHtml=`<div class="lu-shifts">
+      <div class="section-title">${mine?"המשמרות שלך ביום הזה":"משמרות בסידור ביום הזה"}</div>
+      ${active.map(s=>`<div class="lu-shift-row"><span class="nm">${mine?"משמרת":esc(s.name)}</span><span class="tm">${timeRangeHtml(s.startTime,s.endTime)}</span></div>`).join("")}
+      ${luachWeekLateWarning(d.iso, active)}
+    </div>`;
+  } else if(!mine || Object.keys(recurring).length || Object.keys(oneTime).length){
+    shiftsHtml=`<div class="lu-shifts"><div class="wk-empty">${mine?"אין לך משמרת ביום הזה":"אין משמרות בסידור ביום הזה"}</div></div>`;
+  }
+
+  const note=d.zmanim.candlesMs!=null
+    ? `${esc(labels.start)} מחושבת ${place.candleMinutes} דקות לפני השקיעה בשעה ${Luach.fmtTime(d.zmanim.sunsetMs, place)}.`
+    : "";
+
+  return `<div class="lu-day">
+    <div class="lu-day-head">
+      <div class="lu-day-date">${luachDayTitle(d)}</div>
+      <div class="lu-day-heb">${esc(d.hebrew.label)}</div>
+    </div>
+    <div class="lu-day-body">
+      <div class="lu-chips">${chips.join("")}</div>
+      <div class="lu-times">${times.join("")}</div>
+      ${note?`<div class="lu-sub-note">${note} הזמנים לפי ${esc(place.name)}.</div>`:""}
+      ${shiftsHtml}
+    </div>
+  </div>`;
+}
+
+// משמרת שנמשכת אחרי כניסת השבת או החג — חיווי בלבד; ההחלטה בידי המנהל.
+function luachWeekLateWarning(iso, active){
+  if(!luachReady() || !active || !active.length) return "";
+  const place=luachPlace();
+  const d=Luach.day(iso, place);
+  if(!d || d.zmanim.candlesMs==null) return "";
+  const candleMin=hhmmToMin(Luach.hhmm(d.zmanim.candlesMs, place));
+  const late=active.filter(s=>hhmmToMin(s.endTime)>candleMin);
+  if(!late.length) return "";
+  const labels=luachRestLabels(d);
+  const who=late.map(s=>esc(s.name)+" "+timeRangeText(s.startTime,s.endTime)).join(", ");
+  return `<div class="wk-late-warn"><span>🕯️</span><span>${late.length===1?"משמרת שנמשכת":"משמרות שנמשכות"} אחרי ${esc(labels.start)} ב-${Luach.fmtTime(d.zmanim.candlesMs, place)}: ${who}</span></div>`;
+}
+
+// בלוק מנוחה רצוף: שבת, חג, או שבת וחג יחד — עם זמן הכניסה והיציאה שלו.
+function luachRestBlock(startRd){
+  const place=luachPlace();
+  let last=startRd;
+  while(Luach.dayOfRd(last+1, place).isRest) last++;
+  const names=[];
+  for(let rd=startRd; rd<=last; rd++){
+    const d=Luach.dayOfRd(rd, place);
+    (d.events||[]).forEach(ev=>{ if(ev.type==="yomtov" && names.indexOf(ev.name)===-1) names.push(ev.name); });
+    if(d.isShabbat){
+      const n="שבת"+(d.parsha?" פרשת "+d.parsha:"");
+      if(names.indexOf(n)===-1) names.push(n);
+    }
+  }
+  const before=Luach.dayOfRd(startRd-1, place);
+  const lastDay=Luach.dayOfRd(last, place);
+  return {
+    startRd: startRd, lastRd: last, entryRd: startRd-1,
+    name: names.join(" · "),
+    entryMs: before.zmanim.candlesMs, entryLabel: luachRestLabels(before).start,
+    exitMs: lastDay.zmanim.havdalahMs, exitLabel: luachRestLabels(lastDay).end
+  };
+}
+
+function luachDayShort(rd){
+  const p=Luach.isoOfRd(rd).split("-");
+  return "יום "+HE_DAYS_SHORT[Luach.dowOfRd(rd)]+" "
+    +`<span class="date-isolate">${parseInt(p[2],10)}/${parseInt(p[1],10)}</span>`;
+}
+function luachWhenText(fromRd, toRd){
+  return fromRd===toRd ? luachDayShort(fromRd) : luachDayShort(fromRd)+" – "+luachDayShort(toRd);
+}
+function luachListRow(name, fromRd, toRd, times){
+  return `<div class="lu-list-row">
+    <div class="lu-list-main">
+      <div class="lu-list-name">${luachName(name)}</div>
+      <div class="lu-list-when">${luachWhenText(fromRd, toRd)}</div>
+    </div>
+    <div class="lu-list-times">${times.join("<br>")}</div>
+  </div>`;
+}
+
+function luachUpcomingHtml(daysAhead){
+  const place=luachPlace();
+  const startRd=Luach.rdOfIso(luachTodayIso());
+  const endRd=startRd+daysAhead;
+  const rows=[];
+  let rd=startRd;
+  while(rd<endRd){
+    const d=Luach.dayOfRd(rd, place);
+    if(d.isRest){
+      const b=luachRestBlock(rd);
+      const times=[];
+      if(b.entryMs!=null) times.push(esc(b.entryLabel)+" "+Luach.fmtTime(b.entryMs, place));
+      if(b.exitMs!=null) times.push(esc(b.exitLabel)+" "+Luach.fmtTime(b.exitMs, place));
+      rows.push(luachListRow(b.name, b.entryMs!=null?b.entryRd:b.startRd, b.lastRd, times));
+      rd=b.lastRd+1;
+      continue;
+    }
+    const top=luachTopEvent(d);
+    if(!top || top.type==="roshchodesh" || top.type==="specialShabbat"){ rd++; continue; }
+    // ימים רצופים של אותו מועד — חול המועד, חנוכה — מתקבצים לשורה אחת עם טווח
+    let last=rd;
+    while(last+1<endRd){
+      const next=Luach.dayOfRd(last+1, place);
+      if(next.isRest) break;
+      const nextTop=luachTopEvent(next);
+      if(!nextTop || nextTop.group!==top.group) break;
+      last++;
+    }
+    // ערב שנכנס לשבת או לחג מוצג בשורת החג עצמו, כדי לא להציג את אותו זמן פעמיים
+    const nextIsRest=Luach.dayOfRd(last+1, place).isRest;
+    if(top.type==="erev" && nextIsRest){ rd=last+1; continue; }
+    const times=[];
+    if(d.isFast) times.push("הצום יוצא ב-"+Luach.fmtTime(d.zmanim.tzeitMs, place));
+    else if(d.zmanim.candlesMs!=null && !nextIsRest) times.push(esc(luachRestLabels(d).start)+" "+Luach.fmtTime(d.zmanim.candlesMs, place));
+    rows.push(luachListRow(top.groupName||top.name, rd, last, times));
+    rd=last+1;
+  }
+  if(!rows.length) return "";
+  return `<div class="card" style="margin-top:16px">
+    <h2>שבתות ומועדים קרובים</h2>
+    <p class="sub">החודשיים הקרובים, עם זמני הכניסה והיציאה לפי ${esc(place.name)}.</p>
+    ${rows.join("")}
+  </div>`;
+}
+
+function renderLuach(){
+  const forEmployee = currentRole==="employee";
+  // מצייר רק כשהמסך באמת פתוח: renderConsole רץ על כל עדכון מ-Firebase
+  if(forEmployee ? empNav!=="luach" : consoleFolder!=="luach") return;
+  const host = forEmployee ? $("empLuachBody") : $("luachBody");
+  if(!host) return;
+  if(!luachReady()){
+    host.innerHTML='<div class="empty">קובץ הלוח (luach.js) לא נטען. ודא שהוא הועלה לאותה תיקייה של index.html.</div>';
+    return;
+  }
+  if(luachY==null || luachM==null) luachGoToday();
+  host.innerHTML = luachGridHtml() + luachDayCardHtml() + luachUpcomingHtml(62);
+}
+
+// חיווי על אריח הבית: מתי נכנסת השבת או החג הקרוב.
+// נשמר במטמון ליום ולמקום, כי renderConsole רץ על כל עדכון מ-Firebase.
+let luachHomeSubCache=null;
+function luachHomeSubText(){
+  if(!luachReady()) return null;
+  const place=luachPlace();
+  const startRd=Luach.rdOfIso(luachTodayIso());
+  const cacheKey=startRd+"|"+place.name+"|"+place.lat+"|"+place.lon+"|"+place.candleMinutes+"|"+place.havdalahDegrees;
+  if(luachHomeSubCache && luachHomeSubCache.key===cacheKey) return luachHomeSubCache.text;
+  for(let rd=startRd; rd<startRd+30; rd++){
+    if(!Luach.dayOfRd(rd, place).isRest) continue;
+    const b=luachRestBlock(rd);
+    const bits=[];
+    if(b.entryMs!=null) bits.push(b.entryLabel+" "+Luach.hhmm(b.entryMs, place));
+    if(b.exitMs!=null) bits.push("יציאה "+Luach.hhmm(b.exitMs, place));
+    const text=b.name+(bits.length?" · "+bits.join(" · "):"");
+    luachHomeSubCache={ key:cacheKey, text:text };
+    return text;
+  }
+  return null;
+}
+function renderLuachFolderSub(){
+  const text=luachHomeSubText();
+  ["luachFolderSub","empLuachSub"].forEach(id=>{
+    const el=$(id);
+    if(el && text) el.textContent=text;
+  });
+}
+
+/* ---------- שילוב הלוח בסידור ובמשמרות ---------- */
+
+// שורת החג/שבת שמופיעה מעל המשמרות של יום בסידור השבועי.
+function luachDayStripHtml(iso){
+  if(!luachReady()) return "";
+  const place=luachPlace();
+  const d=Luach.day(iso, place);
+  if(!d) return "";
+  const names=[];
+  if(d.isShabbat) names.push("שבת"+(d.parsha?" פרשת "+d.parsha:""));
+  (d.events||[]).forEach(ev=>{
+    if(ev.type==="roshchodesh" && names.length) return;   // ראש חודש נדחה מפני מועד גדול ממנו
+    if(ev.type==="specialShabbat") return;                // שם השבת המיוחדת מופיע בלוח עצמו
+    names.push(ev.name);
+  });
+  const labels=luachRestLabels(d);
+  const times=[];
+  if(d.zmanim.candlesMs!=null) times.push(`<span class="lz">🕯️ ${esc(labels.start)} ${Luach.fmtTime(d.zmanim.candlesMs, place)}</span>`);
+  if(d.zmanim.havdalahMs!=null) times.push(`<span class="lz">✨ ${esc(labels.end)} ${Luach.fmtTime(d.zmanim.havdalahMs, place)}</span>`);
+  if(!names.length && !times.length) return "";
+  const tone=d.isFast ? "fast" : (d.isShabbat || d.isYomTov) ? "rest" : "";
+  return `<div class="wk-day-luach ${tone}">${names.length?`<span>${luachName(names.slice(0,3).join(" · "))}</span>`:""}${times.join("")}</div>`;
+}
+
+// חיווי קצר ליום של משמרת: איזה מועד הוא, ואם המשמרת נמשכת אחרי כניסת השבת.
+function luachShiftNoteHtml(iso, endTime){
+  if(!luachReady()) return "";
+  const place=luachPlace();
+  const d=Luach.day(iso, place);
+  if(!d) return "";
+  const bits=[];
+  if(d.isShabbat) bits.push("שבת");
+  (d.events||[]).forEach(ev=>{
+    if(ev.type==="roshchodesh" || ev.type==="specialShabbat") return;
+    bits.push(ev.name);
+  });
+  let late=false;
+  if(d.zmanim.candlesMs!=null){
+    const labels=luachRestLabels(d);
+    const candleMin=hhmmToMin(Luach.hhmm(d.zmanim.candlesMs, place));
+    late = endTime!=null && hhmmToMin(endTime)>candleMin;
+    bits.push(labels.start+" "+Luach.hhmm(d.zmanim.candlesMs, place));
+  }
+  if(!bits.length) return "";
+  // מדגישים משמרת שחלה בשבת או בחג, או שנמשכת אחרי כניסתם
+  return `<div class="ui-luach${(late || d.isRest)?" late":""}">🕯️ ${esc(bits.slice(0,3).join(" · "))}${late?" — המשמרת נמשכת אחרי הכניסה":""}</div>`;
+}
+
+/* ---------- הגדרות הלוח (נשמרות במכשיר) ---------- */
+function renderLuachSettings(){
+  if(!luachReady()) return;
+  const p=luachPlace();
+  const now=$("luachSettingsNow");
+  if(now){
+    const sub=luachHomeSubText();
+    now.textContent="הזמנים מחושבים לפי "+p.name+"."+(sub?" הקרוב: "+sub:"");
+  }
+  const set=(id,val)=>{ const el=$(id); if(el) el.value=val; };
+  set("lsCity", p.name);
+  set("lsLat", p.lat);
+  set("lsLon", p.lon);
+  set("lsCandles", String(p.candleMinutes));
+  set("lsHavdalah", String(p.havdalahDegrees));
+}
+function saveLuachSettings(){
+  if(!luachReady()) return;
+  const name=($("lsCity").value||"").trim();
+  const lat=parseFloat($("lsLat").value), lon=parseFloat($("lsLon").value);
+  if(!name){ toast("הזן שם יישוב"); return; }
+  if(!isFinite(lat) || lat<-90 || lat>90){ toast("קו רוחב לא תקין"); return; }
+  if(!isFinite(lon) || lon<-180 || lon>180){ toast("קו אורך לא תקין"); return; }
+  luachSetPlace({
+    name: name, lat: lat, lon: lon, tz: Luach.DEFAULT_PLACE.tz,
+    candleMinutes: parseInt($("lsCandles").value,10),
+    havdalahDegrees: parseFloat($("lsHavdalah").value)
+  });
+  renderLuachSettings();
+  renderLuachFolderSub();
+  renderLuach();
+  toast("הזמנים עודכנו ✓");
+}
+async function resetLuachSettings(){
+  if(!luachReady()) return;
+  const ok=await uiConfirm("להחזיר את הלוח לברירת המחדל — "+Luach.DEFAULT_PLACE.name+", "+Luach.DEFAULT_PLACE.candleMinutes+" דקות לפני השקיעה?",{okText:"החזר"});
+  if(!ok) return;
+  luachSetPlace(null);
+  renderLuachSettings();
+  renderLuachFolderSub();
+  renderLuach();
+  toast("הוחזר לברירת המחדל ✓");
 }
 
 /* ---------- הוספה / עריכה / מחיקה מתוך הסידור השבועי ---------- */
