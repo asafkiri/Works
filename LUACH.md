@@ -2,18 +2,20 @@
 
 A full Hebrew calendar lives in the app: holidays, festivals, fasts, Rosh Chodesh, the weekly Torah portion, the Omer count, and candle-lighting and havdalah times. Everything is computed on the device by `luach.js`. There are no network calls, no API keys and no waiting — the calendar opens instantly, offline included, and no cloud plan needs upgrading for it.
 
-Managers reach it from **לוח שנה ומועדים** on the console home; employees from the folder of the same name on their dashboard. Both see the same month grid, and the home tile carries the next Shabbat's or festival's entry and exit times so the common question is answered without opening anything.
+The calendar screen is the manager's, reached from **לוח שנה ומועדים** on the console home, and its home tile carries the next Shabbat's or festival's entry and exit times so the common question is answered without opening anything. Employees do not get the screen — what reaches them is only what touches their own shifts: the festival each shift falls on, the entry and exit times around it, and a work week that runs from motzei Shabbat to motzei Shabbat.
 
 ## What the calendar shows
 
 - **Month grid.** Gregorian day, Hebrew date in gematria, and the day's headline — the festival, chol hamoed, fast, erev, Chanukah candle, Rosh Chodesh, or, on an otherwise ordinary Shabbat, the week's Torah portion. Festivals, chol hamoed, fasts and Shabbat each have their own tint, and a dot marks a day that has a shift in the schedule.
-- **Day panel.** Tap a day for its Hebrew date, every event on it, the Torah portion, the Omer count, sunrise, sunset, nightfall, the entry and exit times, and the shifts planned for that day — all employees for a manager, only their own for an employee.
+- **Day panel.** Tap a day for its Hebrew date, every event on it, the Torah portion, the Omer count, sunrise, sunset, nightfall, the entry and exit times, and every employee's shifts planned for that day.
 - **שבתות ומועדים קרובים.** The next two months as one list: each Shabbat and festival with the day it starts, the day it ends, and its entry and exit times. Consecutive days of one festival (chol hamoed, Chanukah) are a single row with a date range, and an erev that leads straight into a festival is folded into that festival's row instead of repeating its time.
 
 ## In the schedule and in the shift lists
 
 - The weekly schedule marks each day with its festival or Shabbat and the entry/exit times, above that day's shifts.
-- When a planned shift runs past candle-lighting, the day says so and names the shifts. It is information, not a block: the manager decides. The same note appears on the employee's upcoming-shifts list, together with the festival the day falls on.
+- When a planned shift runs past candle-lighting, the day says so and names the shifts. It is information, not a block: the manager decides. The same note appears on the employee's own shift list, together with the festival the day falls on.
+- **The employee's work week runs from motzei Shabbat to motzei Shabbat**, the way a store's schedule is actually posted, and the screen says so. The week opens at one Saturday's havdalah and closes with the next Saturday, that Saturday's own motzei-Shabbat shifts included; a shift starting after havdalah belongs to the week that is opening, so the Saturday that opens a week counts only from its exit time onwards. When that Saturday is a festival whose rest continues into Sunday there is no havdalah on it, and no shift on it is counted. Days already past are dimmed and today is ringed, so the week reads at a glance.
+- A shift that starts after havdalah is labelled מוצאי שבת — or מוצאי החג, מוצאי שבת וחג, מוצאי יום כיפור — with the exit time, in the ordinary colour. The attention colour is kept for a shift that genuinely overlaps the rest: one running past candle-lighting, one starting before havdalah, and one on a day of rest with no exit at all because the rest continues into the next day.
 
 ## How the times are computed
 
