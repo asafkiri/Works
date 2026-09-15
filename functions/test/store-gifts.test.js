@@ -281,7 +281,7 @@ test("a deleted gift disappears from the history of both roles", () => {
   assert.equal(ctx.giftHistoryHtml("e1"), "");
 });
 
-test("an employee sees the gift only while a balance is left; the manager always does", () => {
+test("the gift balance is shown only while there is one; the employee loses the history too", () => {
   const ctx = appContext(), at = Date.UTC(2026, 8, 1);
   ctx.currentRole = "employee"; ctx.currentEmpId = "e1";
   ctx.myPayments = { g: grant(4000, at) }; ctx.myTakings = {};
@@ -294,11 +294,16 @@ test("an employee sees the gift only while a balance is left; the manager always
   assert.equal(ctx.giftHistoryHtml("e1"), "");
   ctx.myPayments = {}; ctx.myTakings = {};
   assert.doesNotMatch(ctx.giftSummaryHtml("e1"), /מתנה/);
+  // The manager loses the spent balance tile too, but keeps the history.
   ctx.currentRole = "manager"; ctx.currentEmpId = null;
   ctx.allPayments.e1 = { g: grant(4000, at) }; ctx.allTakings.e1 = { a: taking(40, at + 10) };
+  assert.equal(ctx.giftVisibleFor("e1"), false);
+  assert.doesNotMatch(ctx.giftSummaryHtml("e1"), /יתרת מתנה/);
+  assert.match(ctx.giftSummaryHtml("e1"), /hk-balances one/);
+  assert.match(ctx.giftHistoryHtml("e1"), /מתנה התקבלה/);
+  ctx.allTakings.e1 = { a: taking(10, at + 10) };
   assert.equal(ctx.giftVisibleFor("e1"), true);
   assert.match(ctx.giftSummaryHtml("e1"), /יתרת מתנה/);
-  assert.match(ctx.giftHistoryHtml("e1"), /מתנה התקבלה/);
 });
 
 // The real manager action, with the database and the dialogs stubbed.

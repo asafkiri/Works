@@ -541,8 +541,11 @@
   .hk-balance small{display:block;font-size:12.5px;line-height:1.55}
   .gift-help{font-size:14px;line-height:1.65;margin:0 0 14px;color:var(--ink-soft)}
   .btn.gift-btn{background:#6d28d9;border-color:#6d28d9;color:#fff;min-height:46px}
-  .gift-history{border:1px solid #ddd6fe;border-radius:13px;margin:14px 0;background:#fff;overflow:hidden}
-  .gift-history summary{padding:14px;font-weight:800;color:#5b21b6;cursor:pointer;min-height:46px}
+  .gift-bar{display:flex;flex-wrap:wrap;align-items:flex-start;gap:8px;margin:0 0 12px}
+  .gift-bar>.btn{flex:0 0 auto}
+  .gift-bar>.gift-history{flex:1 1 160px;margin:0}
+  .gift-history{border:1px solid var(--line);border-radius:12px;margin:14px 0;background:#fff;overflow:hidden}
+  .gift-history summary{padding:11px 13px;font-weight:700;font-size:13.5px;color:var(--ink-soft);cursor:pointer}
   .gift-history-body{padding:0 12px 8px}
   .gift-history-row{display:flex;justify-content:space-between;align-items:start;gap:12px;padding:12px 0;border-top:1px solid var(--line);font-size:14px;line-height:1.5}
   .gift-history-row>div:first-child{min-width:0;overflow-wrap:anywhere}
@@ -746,7 +749,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v71</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v72</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -771,7 +774,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v71</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v72</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -1134,7 +1137,7 @@
       <!-- רשימת עובדים -->
       <div id="hkConsoleList">
         <div class="card">
-          <p class="sub">בחר עובד לצפייה בקניות, לתיקון או להענקת מתנה. רק החלק שלא כוסה במתנה נרשם כהקפה לחיוב.</p>
+          <p class="sub">בחר עובד לצפייה בקניות ולתיקון.</p>
           <div id="hkEmpFolders"></div>
         </div>
       </div>
@@ -1144,8 +1147,11 @@
         <div class="screen-head"><button class="back-btn" onclick="hkBackToList()">→ חזרה לרשימה</button><h1 class="screen-title" id="hkDetailTitle">🧾</h1></div>
         <div class="card">
           <div id="hkGiftSummary"></div>
-          <button class="btn gift-btn" onclick="openGiftModal(hkConsoleEmpId)">🎁 הוסף מתנה</button>
-          <details class="gift-history" id="hkGiftHistoryDetails"><summary>היסטוריית מתנות ושימושים</summary><div class="gift-history-body" id="hkGiftHistory"></div></details>
+          <!-- מתנות הן פעולה נדירה: שורת פעולות משנית, לא כפתור ראשי -->
+          <div class="gift-bar">
+            <button class="btn line sm" onclick="openGiftModal(hkConsoleEmpId)">🎁 הוסף מתנה</button>
+            <details class="gift-history" id="hkGiftHistoryDetails"><summary>היסטוריית מתנות</summary><div class="gift-history-body" id="hkGiftHistory"></div></details>
+          </div>
           <div id="hkDetailBody"></div>
         </div>
       </div>
@@ -1708,7 +1714,7 @@
     </div>
   </div>
 </div>
-<script src="store-gifts.js?v=71"></script>
+<script src="store-gifts.js?v=72"></script>
 <script>
 /* ============================================================
    1. הגדרות
@@ -2809,12 +2815,13 @@ function giftLedgerFor(empId){
 function giftMoney(cents){
   return (cents/100).toLocaleString("he-IL", {minimumFractionDigits:cents%100?2:0,maximumFractionDigits:2});
 }
-// מתנות מוצגות לעובד רק כשיש לו יתרה פעילה; המנהל רואה אותן תמיד
+// מתנה היא פעולה נדירה: היתרה מוצגת רק כשיש מתנה פעילה. אצל המנהל נשארת
+// תמיד שורת פעולות משנית (הוספת מתנה והיסטוריה), גם כשאין יתרה.
 function giftVisibleFor(empId){
-  return hakafaDataReady() && (currentRole!=="employee" || giftLedgerFor(empId).balanceCents>0);
+  return hakafaDataReady() && giftLedgerFor(empId).balanceCents>0;
 }
 function giftSummaryHtml(empId){
-  if(!hakafaDataReady()) return `<p class="sub">${currentRole==="employee"?'טוען…':'טוען את ההקפה ואת יתרת המתנה…'}</p>`;
+  if(!hakafaDataReady()) return '<p class="sub">טוען…</p>';
   const ledger=giftLedgerFor(empId);
   const charge=takingsSumFor(empId,currentMonthKey());
   const chargeTile=`<div class="hk-balance"><div class="hk-balance-label">הקפה לחיוב החודש</div><strong class="hk-balance-value">₪${giftMoney(StoreGifts.cents(charge))}</strong><small>${monthLabel(currentMonthKey())} · לחיוב מהשכר</small></div>`;
@@ -2826,7 +2833,7 @@ function giftSummaryHtml(empId){
 }
 function giftHistoryHtml(empId){
   if(!hakafaDataReady()) return '<p class="sub">טוען…</p>';
-  if(!giftVisibleFor(empId)) return '';
+  if(currentRole==="employee" && !giftVisibleFor(empId)) return '';
   const history=giftLedgerFor(empId).history;
   if(!history.length) return '<p class="sub">עדיין לא ניתנו מתנות. כשיש מתנה, ההענקה והשימושים יופיעו כאן.</p>';
   const titles={grant:'🎁 מתנה התקבלה', refund:'↩ הוחזר למתנה', use:'שימוש במתנה'};
@@ -3401,7 +3408,7 @@ function renderHakafaConsole(){
     $("hkEmpFolders").innerHTML = rows.length ? rows.map(r=>`
       <button class="folder${r.curOver?' over-limit':(r.newCount>0?' alert':'')}" onclick="openHkEmp('${r.empId}')">
         <span class="f-ico">🧾</span>
-        <span class="f-txt"><span class="f-title">${esc(r.name)} ${r.curOver?'<span class="limit-dot">⚠️ עבר 25%</span>':''}${r.newCount>0?`<span class="note-dot">${r.newCount} חדש</span>`:''}</span><span class="f-sub">לחיוב החודש: ₪${giftMoney(StoreGifts.cents(r.sum))}<br>🎁 יתרת מתנה: ₪${giftMoney(r.gift)}</span></span>
+        <span class="f-txt"><span class="f-title">${esc(r.name)} ${r.curOver?'<span class="limit-dot">⚠️ עבר 25%</span>':''}${r.newCount>0?`<span class="note-dot">${r.newCount} חדש</span>`:''}</span><span class="f-sub">לחיוב החודש: ₪${giftMoney(StoreGifts.cents(r.sum))}${r.gift>0?`<br>🎁 יתרת מתנה: ₪${giftMoney(r.gift)}`:''}</span></span>
         <span class="f-arr">→</span>
       </button>`).join("") : '<div class="empty">יש להוסיף עובד כדי לרשום הקפה או להעניק מתנה.</div>';
   } else {
@@ -3425,7 +3432,7 @@ function renderHakafaConsole(){
         ${limitBanner}
         ${rows}
       </div>`;
-    }).join("") : '<div class="empty">עדיין אין קניות להצגה. אפשר להעניק מתנה גם לפני הקנייה הראשונה.</div>';
+    }).join("") : '<div class="empty">עדיין אין קניות להצגה.</div>';
   }
 }
 
