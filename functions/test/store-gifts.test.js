@@ -112,7 +112,7 @@ test("correction transaction rejects a stale edit and is independent of Firebase
   assert.equal(gifts.reviseTaking(deleted, old, "r2", "עריכה", 4000, 40, false), undefined);
 });
 
-test("an untouched gift can be cancelled; it drops the balance and leaves debts alone", () => {
+test("an untouched gift can be deleted; it drops the balance and leaves debts alone", () => {
   const g = grant(10000, 20);
   const r = gifts.compute({ old: taking(300, 10) }, { g });
   assert.equal(r.grants.g.removable, true);
@@ -123,13 +123,26 @@ test("an untouched gift can be cancelled; it drops the balance and leaves debts 
   assert.equal(after.usedCents, 0);
   assert.equal(after.items.old.chargeCents, 30000);
   assert.equal(after.items.later.chargeCents, 5000);
-  assert.equal(after.grants.g.canceled, true);
-  assert.equal(after.grants.g.removable, false);
-  assert.equal(after.history[0].type, "cancel");
-  assert.equal(after.history[0].amountCents, 10000);
+  // The grant leaves the ledger entirely: no row, no amount, no trace.
+  assert.deepEqual(after.history, []);
+  assert.equal(after.grants.g, undefined);
 });
 
-test("a gift already used, even in part, is not offered for cancellation", () => {
+test("a deleted gift leaves no row and no stale balance behind it in the history", () => {
+  const payments = { a: gifts.cancelGrant(grant(10000, 10), 10000, 30), b: grant(5000, 20) };
+  const r = gifts.compute({ p: taking(20, 40) }, payments);
+  assert.equal(r.balanceCents, 3000);
+  assert.equal(r.grantedCents, 5000);
+  assert.equal(r.grants.a, undefined);
+  assert.equal(r.history.length, 2);
+  assert.ok(!r.history.some(h => h.id === "a"));
+  const granted = r.history.find(h => h.type === "grant");
+  assert.equal(granted.amountCents, 5000);
+  assert.equal(granted.balanceCents, 5000);
+  assert.equal(r.items.p.giftCents, 2000);
+});
+
+test("a gift already used, even in part, is not offered for deletion", () => {
   const partial = gifts.compute({ a: taking(1, 20) }, { g: grant(10000, 10) });
   assert.equal(partial.grants.g.removable, false);
   const refunded = gifts.reviseTaking(taking(1, 20), taking(1, 20), "r1", "קנייה", 0, 30, true);
@@ -137,7 +150,7 @@ test("a gift already used, even in part, is not offered for cancellation", () =>
   assert.equal(gifts.compute({}, { g: grant(10000, 10) }).grants.g.removable, true);
 });
 
-test("a purchase racing the cancellation keeps its cover and the cancellation lapses", () => {
+test("a purchase racing the deletion keeps its cover and the deletion lapses", () => {
   const g = gifts.cancelGrant(grant(10000, 10), 10000, 30);
   const r = gifts.compute({ a: taking(100, 20), same: taking(60, 30) }, { g });
   assert.equal(r.items.a.giftCents, 10000);
@@ -147,10 +160,10 @@ test("a purchase racing the cancellation keeps its cover and the cancellation la
   assert.equal(r.grants.g.canceled, false);
   assert.equal(r.grants.g.canceledAt, 30);
   assert.equal(r.grants.g.removable, false);
-  assert.ok(!r.history.some(h => h.type === "cancel"));
+  assert.equal(r.history.filter(h => h.type === "grant").length, 1);
 });
 
-test("cancelling one gift never spends another grant's unused credit", () => {
+test("deleting one gift never spends another grant's unused credit", () => {
   const payments = { a1: grant(10000, 10), b2: grant(10000, 20) };
   const purchases = { p: taking(100, 30) };
   const both = gifts.compute(purchases, payments);
@@ -169,7 +182,7 @@ test("cancelling one gift never spends another grant's unused credit", () => {
   assert.equal(none.grants.b2.canceled, false);
 });
 
-test("the cancellation transaction rejects a repeat, a changed amount and a payment", () => {
+test("the deletion transaction rejects a repeat, a changed amount and a payment", () => {
   const g = grant(10000, 10);
   const canceled = gifts.cancelGrant(g, 10000, 20);
   assert.equal(canceled.canceledAt, 20);
@@ -217,7 +230,7 @@ function appContext() {
     payShiftsFor: () => [{ clockIn: Date.UTC(2026, 8, 1, 8), clockOut: Date.UTC(2026, 8, 1, 16) }],
   };
   vm.createContext(ctx);
-  for (const name of ["giftLedgerFor", "giftMoney", "giftHistoryHtml", "takingsListFor", "takingsSumFor", "paymentsListFor", "paymentsSumFor", "payBalanceSnapshot", "payReportData", "accountantReportHtml"]) {
+  for (const name of ["giftLedgerFor", "giftMoney", "giftVisibleFor", "giftSummaryHtml", "giftHistoryHtml", "takingsListFor", "takingsSumFor", "paymentsListFor", "paymentsSumFor", "payBalanceSnapshot", "payReportData", "accountantReportHtml"]) {
     vm.runInContext(sourceFunction(name), ctx);
   }
   return ctx;
@@ -244,20 +257,48 @@ test("real payroll, employee balance and accountant export include only uncovere
   assert.equal(ctx.payBalanceSnapshot("e1", "2026-09").balance, -25.25);
 });
 
-test("the real gift history offers cancellation only to a manager, only while unused", () => {
+test("the real gift history offers deletion only to a manager, only while unused", () => {
   const ctx = appContext(), at = Date.UTC(2026, 8, 1);
   ctx.allPayments.e1 = { fresh: grant(10000, at) };
   assert.match(ctx.giftHistoryHtml("e1"), /delStoreGift\('e1','fresh'\)/);
   ctx.allTakings.e1 = { a: taking(1, at + 10) };
   assert.doesNotMatch(ctx.giftHistoryHtml("e1"), /delStoreGift/);
-  ctx.allPayments.e1 = { fresh: gifts.cancelGrant(grant(10000, at), 10000, at + 5) };
-  ctx.allTakings.e1 = { a: taking(1, at + 10) };
-  const canceled = ctx.giftHistoryHtml("e1");
-  assert.match(canceled, /המתנה בוטלה/);
-  assert.doesNotMatch(canceled, /delStoreGift/);
   ctx.currentRole = "employee"; ctx.currentEmpId = "e1";
   ctx.myPayments = { fresh: grant(10000, at) }; ctx.myTakings = {};
   assert.doesNotMatch(ctx.giftHistoryHtml("e1"), /delStoreGift/);
+});
+
+test("a deleted gift disappears from the history of both roles", () => {
+  const ctx = appContext(), at = Date.UTC(2026, 8, 1);
+  ctx.allPayments.e1 = { gone: gifts.cancelGrant(grant(10000, at), 10000, at + 5) };
+  ctx.allTakings.e1 = { a: taking(1, at + 10) };
+  const managerView = ctx.giftHistoryHtml("e1");
+  assert.doesNotMatch(managerView, /ראש השנה|delStoreGift|100/);
+  assert.match(managerView, /עדיין לא ניתנו מתנות/);
+  assert.doesNotMatch(ctx.giftSummaryHtml("e1"), /₪100/);
+  ctx.currentRole = "employee"; ctx.currentEmpId = "e1";
+  ctx.myPayments = ctx.allPayments.e1; ctx.myTakings = ctx.allTakings.e1;
+  assert.equal(ctx.giftHistoryHtml("e1"), "");
+});
+
+test("an employee sees the gift only while a balance is left; the manager always does", () => {
+  const ctx = appContext(), at = Date.UTC(2026, 8, 1);
+  ctx.currentRole = "employee"; ctx.currentEmpId = "e1";
+  ctx.myPayments = { g: grant(4000, at) }; ctx.myTakings = {};
+  assert.equal(ctx.giftVisibleFor("e1"), true);
+  assert.match(ctx.giftSummaryHtml("e1"), /יתרת מתנה/);
+  assert.match(ctx.giftHistoryHtml("e1"), /מתנה התקבלה/);
+  ctx.myTakings = { a: taking(40, at + 10) };
+  assert.equal(ctx.giftVisibleFor("e1"), false);
+  assert.doesNotMatch(ctx.giftSummaryHtml("e1"), /מתנה/);
+  assert.equal(ctx.giftHistoryHtml("e1"), "");
+  ctx.myPayments = {}; ctx.myTakings = {};
+  assert.doesNotMatch(ctx.giftSummaryHtml("e1"), /מתנה/);
+  ctx.currentRole = "manager"; ctx.currentEmpId = null;
+  ctx.allPayments.e1 = { g: grant(4000, at) }; ctx.allTakings.e1 = { a: taking(40, at + 10) };
+  assert.equal(ctx.giftVisibleFor("e1"), true);
+  assert.match(ctx.giftSummaryHtml("e1"), /יתרת מתנה/);
+  assert.match(ctx.giftHistoryHtml("e1"), /מתנה התקבלה/);
 });
 
 // The real manager action, with the database and the dialogs stubbed.
@@ -279,7 +320,7 @@ function cancelContext(at) {
   return ctx;
 }
 
-test("the manager's cancel action stamps the grant and the balance drops to zero", async () => {
+test("the manager's delete action stamps the grant, zeroes the balance and clears the history", async () => {
   const at = Date.UTC(2026, 8, 1), ctx = cancelContext(at);
   ctx.allPayments.e1 = { fresh: grant(10000, at) };
   await ctx.delStoreGift("e1", "fresh");
@@ -287,13 +328,14 @@ test("the manager's cancel action stamps the grant and the balance drops to zero
   assert.equal(ctx.writes[0].path, "payments/e1/fresh");
   assert.deepEqual(ctx.writes[0].next.canceledAt, { ".sv": "timestamp" });
   assert.equal(ctx.writes[0].next.giftCents, 10000);
-  assert.match(ctx.toasts.join(" "), /בוטלה/);
+  assert.match(ctx.toasts.join(" "), /נמחקה/);
   const after = ctx.giftLedgerFor("e1");
   assert.equal(after.balanceCents, 0);
-  assert.equal(after.grants.fresh.canceled, true);
+  assert.equal(after.grants.fresh, undefined);
+  assert.deepEqual(after.history, []);
 });
 
-test("the cancel action refuses a used gift, a declined dialog and a purchase made during it", async () => {
+test("the delete action refuses a used gift, a declined dialog and a purchase made during it", async () => {
   const at = Date.UTC(2026, 8, 1);
   const used = cancelContext(at);
   used.allPayments.e1 = { g: grant(10000, at) };
