@@ -5658,7 +5658,10 @@ function luachRestLabels(d){
   const endLabel = luachHasEvent(d,"yom_kippur") ? "צאת הצום"
     : d.isShabbat && d.isYomTov ? "יציאת שבת והחג"
     : d.isYomTov ? "יציאת החג" : "יציאת שבת";
-  return { start:startLabel, end:endLabel };
+  const afterLabel = luachHasEvent(d,"yom_kippur") ? "מוצאי יום כיפור"
+    : d.isShabbat && d.isYomTov ? "מוצאי שבת וחג"
+    : d.isYomTov ? "מוצאי החג" : "מוצאי שבת";
+  return { start:startLabel, end:endLabel, after:afterLabel };
 }
 
 function luachDayTitle(d){
@@ -5957,22 +5960,34 @@ function luachShiftNoteHtml(iso, startTime, endTime){
   const place=luachPlace();
   const d=Luach.day(iso, place);
   if(!d) return "";
+  const labels=luachRestLabels(d);
+  const startMin=startTime==null ? null : hhmmToMin(startTime);
+
+  // משמרת שמתחילה אחרי שהשבת או החג יצאו היא משמרת מוצאי חג רגילה לגמרי,
+  // גם אם היום האזרחי עצמו הוא שבת. אין סיבה שתיצבע כמו אזהרה.
+  const exitMin = d.zmanim.havdalahMs==null ? null : hhmmToMin(Luach.hhmm(d.zmanim.havdalahMs, place));
+  if(d.isRest && exitMin!=null && startMin!=null && startMin>=exitMin){
+    return `<div class="ui-luach">🕯️ ${esc(labels.after)} · יציאה ${Luach.fmtTime(d.zmanim.havdalahMs, place)}</div>`;
+  }
+
   const bits=[];
   if(d.isShabbat) bits.push("שבת");
   (d.events||[]).forEach(ev=>{
     if(ev.type==="roshchodesh" || ev.type==="specialShabbat") return;
     bits.push(ev.name);
   });
-  let late=false;
+  // אזהרה רק כשהמשמרת באמת חופפת את זמן המנוחה: נמשכת אחרי הכניסה, או חלה בתוכו
+  let overlapsRest=d.isRest, tail="";
   if(d.zmanim.candlesMs!=null){
-    const labels=luachRestLabels(d);
     const candleMin=hhmmToMin(Luach.hhmm(d.zmanim.candlesMs, place));
-    late = endTime!=null && luachEndsAfter(startTime, endTime, candleMin);
-    bits.push(labels.start+" "+Luach.hhmm(d.zmanim.candlesMs, place));
+    if(endTime!=null && luachEndsAfter(startTime, endTime, candleMin)){
+      overlapsRest=true;
+      tail=" — המשמרת נמשכת אחרי הכניסה";
+    }
+    bits.push(labels.start+" "+Luach.fmtTime(d.zmanim.candlesMs, place));
   }
   if(!bits.length) return "";
-  // מדגישים משמרת שחלה בשבת או בחג, או שנמשכת אחרי כניסתם
-  return `<div class="ui-luach${(late || d.isRest)?" late":""}">🕯️ ${esc(bits.slice(0,3).join(" · "))}${late?" — המשמרת נמשכת אחרי הכניסה":""}</div>`;
+  return `<div class="ui-luach${overlapsRest?" late":""}">🕯️ ${esc(bits.slice(0,3).join(" · "))}${tail}</div>`;
 }
 
 /* ---------- הגדרות הלוח (נשמרות במכשיר) ---------- */
