@@ -4,6 +4,8 @@
  * Replay server-timestamped events instead of decrementing a client-side balance:
  * concurrent purchases cannot spend the same gift twice. Corrections refund at
  * correction time, so neither a new grant nor a refund pays an older debt.
+ * A mistaken grant is cancelled by a timestamped event on the grant itself,
+ * never by deleting it: a purchase that already drew on it keeps its cover.
  */
 (function (root, factory) {
   const api = factory();
@@ -35,12 +37,19 @@
   }
 
   function compute(takings, payments) {
-    const events = [], items = {}, history = [];
+    const events = [], items = {}, history = [], grants = {}, live = new Map();
     let balanceCents = 0, grantedCents = 0;
+    // Lowest balance seen since each live grant: while it stays at or above the
+    // granted amount, that gift is provably still untouched and can be cancelled.
+    const trackLow = () => live.forEach(state => {
+      if (balanceCents < state.lowCents) state.lowCents = balanceCents;
+    });
     Object.entries(payments || {}).forEach(([id, entry]) => {
       if (!isGift(entry) || !validTime(entry.createdAt) ||
           !Number.isSafeInteger(entry.giftCents) || entry.giftCents <= 0) return;
       events.push({ id, at: entry.createdAt, order: 1, type: "grant", entry });
+      if (validTime(entry.canceledAt) && entry.canceledAt >= entry.createdAt)
+        events.push({ id: id + "/cancel", grantId: id, at: entry.canceledAt, order: 3, type: "cancel" });
     });
     Object.entries(takings || {}).forEach(([id, entry]) => {
       if (!entry || !validTime(entry.createdAt)) return;
@@ -56,16 +65,36 @@
     });
     // Purchases at the exact grant timestamp stay debts: never apply a gift
     // retroactively. Firebase push IDs break ties consistently on every device.
+    // A cancellation is last at its timestamp, so a purchase racing it wins.
     events.sort((a, b) => a.at - b.at || a.order - b.order || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
     events.forEach(event => {
       if (event.type === "grant") {
         balanceCents += event.entry.giftCents;
         grantedCents += event.entry.giftCents;
+        grants[event.id] = { id: event.id, at: event.at, giftCents: event.entry.giftCents,
+          name: event.entry.note || "מתנה לחג", canceledAt: null, canceled: false, removable: false };
+        live.set(event.id, { grantId: event.id, giftCents: event.entry.giftCents, lowCents: balanceCents });
         history.push({ id: event.id, type: "grant", at: event.at,
           name: event.entry.note || "מתנה לחג", amountCents: event.entry.giftCents, balanceCents });
+      } else if (event.type === "cancel") {
+        const state = live.get(event.grantId);
+        if (!state) return;
+        live.delete(event.grantId);
+        const grant = grants[event.grantId];
+        grant.canceledAt = event.at;
+        // Money the employee already spent is not taken back, and the credit of
+        // another grant is never removed in its place: the cancellation lapses.
+        if (state.lowCents < state.giftCents) return;
+        grant.canceled = true;
+        balanceCents -= state.giftCents;
+        grantedCents -= state.giftCents;
+        trackLow();
+        history.push({ id: event.id, type: "cancel", at: event.at,
+          name: grant.name, amountCents: state.giftCents, balanceCents });
       } else if (event.type === "purchase") {
         const giftCents = Math.min(balanceCents, event.priceCents);
         balanceCents -= giftCents;
+        trackLow();
         items[event.id] = { ...event.entry, id: event.id, priceCents: event.priceCents,
           giftCents, chargeCents: event.priceCents - giftCents };
         if (giftCents) history.push({ id: event.id, type: "use", at: event.at,
@@ -90,7 +119,15 @@
         item.priceCents = event.priceCents;
       }
     });
-    return { items, history: history.reverse(), balanceCents, grantedCents,
+    live.forEach(state => { grants[state.grantId].removable = state.lowCents >= state.giftCents; });
+    history.forEach(row => {
+      if (row.type !== "grant") return;
+      const grant = grants[row.id];
+      row.removable = grant.removable;
+      row.canceledAt = grant.canceledAt;
+      row.canceled = grant.canceled;
+    });
+    return { items, grants, history: history.reverse(), balanceCents, grantedCents,
       usedCents: grantedCents - balanceCents };
   }
 
@@ -115,5 +152,14 @@
       ...(deleted ? { deletedAt: timestamp } : {}) };
   }
 
-  return { cents, parseAmount, isGift, compute, reviseTaking };
+  // Called inside a transaction on the grant entry. The grant is kept and stamped
+  // with its cancellation time; compute() decides whether that cancellation can
+  // still take effect, so a purchase saved in the meantime is never re-charged.
+  function cancelGrant(current, giftCents, timestamp) {
+    if (!isGift(current) || current.canceledAt || !validTime(current.createdAt) ||
+        !Number.isSafeInteger(current.giftCents) || current.giftCents !== giftCents) return;
+    return { ...current, canceledAt: timestamp };
+  }
+
+  return { cents, parseAmount, isGift, compute, reviseTaking, cancelGrant };
 });
