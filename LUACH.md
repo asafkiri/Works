@@ -1,0 +1,48 @@
+# Hebrew calendar and Shabbat times (v73)
+
+A full Hebrew calendar lives in the app: holidays, festivals, fasts, Rosh Chodesh, the weekly Torah portion, the Omer count, and candle-lighting and havdalah times. Everything is computed on the device by `luach.js`. There are no network calls, no API keys and no waiting — the calendar opens instantly, offline included, and no cloud plan needs upgrading for it.
+
+Managers reach it from **לוח שנה ומועדים** on the console home; employees from the folder of the same name on their dashboard. Both see the same month grid, and the home tile carries the next Shabbat's or festival's entry and exit times so the common question is answered without opening anything.
+
+## What the calendar shows
+
+- **Month grid.** Gregorian day, Hebrew date in gematria, and the day's headline — the festival, chol hamoed, fast, erev, Chanukah candle, Rosh Chodesh, or, on an otherwise ordinary Shabbat, the week's Torah portion. Festivals, chol hamoed, fasts and Shabbat each have their own tint, and a dot marks a day that has a shift in the schedule.
+- **Day panel.** Tap a day for its Hebrew date, every event on it, the Torah portion, the Omer count, sunrise, sunset, nightfall, the entry and exit times, and the shifts planned for that day — all employees for a manager, only their own for an employee.
+- **שבתות ומועדים קרובים.** The next two months as one list: each Shabbat and festival with the day it starts, the day it ends, and its entry and exit times. Consecutive days of one festival (chol hamoed, Chanukah) are a single row with a date range, and an erev that leads straight into a festival is folded into that festival's row instead of repeating its time.
+
+## In the schedule and in the shift lists
+
+- The weekly schedule marks each day with its festival or Shabbat and the entry/exit times, above that day's shifts.
+- When a planned shift runs past candle-lighting, the day says so and names the shifts. It is information, not a block: the manager decides. The same note appears on the employee's upcoming-shifts list, together with the festival the day falls on.
+
+## How the times are computed
+
+Israel scheme — one day of yom tov. Kiryat Gat by default (31.60998, 34.76422, Asia/Jerusalem).
+
+- **Candle lighting** is 20 minutes before sunset, floored to the whole minute. 20 minutes is the practice in most of the country.
+- **Havdalah** is nightfall at 8.5° below the horizon, rounded to the nearest minute.
+- A festival that begins after Shabbat or after another festival day is lit at nightfall rather than before sunset, because it cannot be prepared for earlier. A festival day followed by Shabbat is lit before sunset as usual. Havdalah is emitted only when the next day is not itself a day of rest, so the second day of Rosh Hashana does not get a premature one.
+- Solar positions use the NOAA formulas, refined around the time found so the result settles to a fraction of a second. Times are formatted in Asia/Jerusalem explicitly, so a device set to another timezone still shows Israel's times.
+- **Settings → 🕯️ לוח שנה וזמני שבת** changes the town, its coordinates, the minutes before sunset (18/20/30/40) and the nightfall angle. This is stored on the device, not in Firebase, so the feature needs no change to the deployed database rules; an unset or invalid value falls back to the Kiryat Gat default, which is what every device shows until someone changes it.
+
+## What the calendar knows
+
+Erev Rosh Hashana and both days of Rosh Hashana, Tzom Gedaliah, Shabbat Shuva, erev and Yom Kippur, erev Sukkot, Sukkot, the five days of chol hamoed, Hoshana Raba, Shmini Atzeret/Simchat Torah, Rosh Chodesh (two days after a 30-day month, and Adar I/II in a leap year), Yitzhak Rabin Memorial Day, Sigd, the eight Chanukah candles and the eighth day, Asara B'Tevet, Tu BiShvat, Family Day, Purim Katan and Shushan Purim Katan, Ta'anit Esther, erev Purim, Purim and Shushan Purim, the special Shabbatot (Shekalim, Zachor, Parah, HaChodesh, HaGadol, Shirah, Chazon, Nachamu), Ta'anit Bechorot, erev Pesach, Pesach, chol hamoed Pesach, the seventh day of Pesach, Yom HaShoah, Yom HaZikaron, Yom HaAtzma'ut, Pesach Sheni, Lag BaOmer, Yom Yerushalayim, erev Shavuot, Shavuot, Tzom Tammuz, erev and Tish'a B'Av, and Tu B'Av — plus the 54 Torah portions with the combined pairs of each year type, and the Omer count.
+
+A fast that falls on Shabbat moves as the law requires: Tzom Gedaliah and Tzom Tammuz are postponed a day, Ta'anit Esther and Ta'anit Bechorot are brought forward to the Thursday, and Tish'a B'Av moves to the tenth of Av and is labelled נדחה. Yom HaShoah, Yom HaZikaron and Yom HaAtzma'ut follow the state rules, including the 5764 amendment that postpones Independence Day from a Monday. The state memorial days do not appear in years before they were established. Yom Kippur is both a festival and a fast; the day panel and the grid name it as the festival, while erev Pesach is named as the erev even though Ta'anit Bechorot falls on it.
+
+Deliberately not included: minor modern observances the app has no use for (Ben-Gurion Day, Herzl Day, Jabotinsky Day, Hebrew Language Day, Yom HaAliyah, Rosh Hashana LaBehemot, Chag HaBanot, Leil Selichot), Jerusalem's Purim Meshulash, and diaspora second days.
+
+## Files
+
+`luach.js` is a standalone UMD module — the browser global `Luach`, and `module.exports` under Node, so the tests run the same code the browser does. It has no dependencies. `index.html` loads it as `luach.js?v=73` and must be served from the same folder; if it is missing the calendar screen says so instead of failing silently. No third-party calendar library ships with the app, in part to keep the app free of any library's licence.
+
+`Luach.day(iso, place?)` returns a day: its Hebrew date and label, its events (each with `key`, `name`, `short`, `type`, `group` and a display `rank`), the Torah portion, the Omer count, the `isShabbat`/`isYomTov`/`isCholHamoed`/`isFast`/`isErev`/`isRest` flags, and `zmanim` with sunrise, sunset, nightfall, candle-lighting and havdalah as epoch milliseconds. `Luach.month(year, month)` returns the grid as weeks of seven, starting on Sunday. `Luach.hhmm(ms, place?)` formats a bare `HH:MM`; `Luach.fmtTime` wraps the same value in bidi isolates so a time never flips inside Hebrew text.
+
+## Verification
+
+`npm test --prefix functions` runs the calendar tests alongside the existing ones. They pin public anchors anyone can check against any calendar — Rosh Hashana's civil dates, the festivals and fasts, the postponed fasts, Chanukah's eight candles, the Omer, combined Torah portions, and Kiryat Gat's own times (18 Sept 2026: sunrise 06:26, sunset 18:43, candles 18:23; havdalah 19:18 the next evening) — and they assert the structure over centuries: every Hebrew year 1940–2140 has a legal length and never begins on a Sunday, Wednesday or Friday; the Hebrew date advances exactly one day per civil day from 2020 to 2060; date conversion round-trips over 1950–2150; every Shabbat from 2000 to 2100 either has a portion or is a festival; candle-lighting is always 20 minutes before sunset and every day of rest has its exit time, across twenty years; and the times stay Israel's even though the test runner's clock is UTC.
+
+The engine was additionally diffed, during development only, against `@hebcal/core` as an oracle over **73,414 days (1900–2100)**: Hebrew dates, the whole event set, the Israel Torah-reading cycle and the Omer matched with **zero differences**. Candle-lighting and havdalah matched across the century the oracle computes correctly, on all but five Fridays where this engine is one minute earlier — the stricter side. Sunrise, sunset and nightfall agree to under a second inside that century; outside March 2000 – February 2100 the oracle's own Julian-day conversion is a day out (`trunc(2 - a + a/4)` where `2 - a + floor(a/4)` is meant), which moves its solar times by up to a minute, and this engine, checked against an independently written NOAA implementation, is the one that stays correct. That oracle is a development tool only: it is not a dependency of the app and nothing ships with it.
+
+Mobile UI verification rendered the real markup, CSS and render output in Chromium at 320–430 px, in both roles: the month grid across every month of 2026–2032, the day panel, the upcoming list, the weekly schedule with its festival strip and past-candle-lighting notice, the employee's upcoming shifts, the home tiles and the settings card. No label is clipped and nothing new overflows horizontally. It does not write employee data or exercise production Firebase rules.
