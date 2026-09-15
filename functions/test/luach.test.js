@@ -415,3 +415,72 @@ test("כל מועד מופיע פעם אחת בכל שנה עברית, על פנ
   }
   once.forEach(key => assert.ok(counts[key] >= 59 && counts[key] <= 60, key + ": " + counts[key]));
 });
+
+/* ---------- החלטות מכוונות, מקובעות כדי שלא ייקראו בעתיד כבאג ----------
+ * הלוח מתאר יום אזרחי, ולא יום עברי שמתחיל בשקיעה. שלושה מקומות נגזרים מכך
+ * והם שונים במכוון מהאופן שבו לוחות שמודדים לפי היום העברי מסמנים אותם.
+ */
+
+test("ערב תשעה באב אינו יום צום, כי הצום מתחיל בשקיעה שבסופו", () => {
+  const erev = Luach.day("2027-08-11");          // ח׳ באב תשפ״ז, יום חול
+  assert.ok(hasKey("2027-08-11", "erev_tisha_bav"));
+  assert.equal(erev.isFast, false);
+  assert.equal(erev.isErev, true);
+  // הצום עצמו למחרת, והוא כן מסומן
+  assert.equal(Luach.day("2027-08-12").isFast, true);
+});
+
+test("ערב פורים ונר ראשון של חנוכה אינם ערב של יום מנוחה", () => {
+  // י״ג באדר הוא קודם כל תענית אסתר; ערב פורים נלווה לו ואינו הופך אותו לערב חג
+  const esther = Luach.day("2027-03-22");
+  assert.ok(hasKey("2027-03-22", "erev_purim"));
+  assert.equal(esther.isFast, true);
+  assert.equal(esther.isErev, false);
+  assert.equal(esther.kind, "fast");
+  // כ״ד בכסלו הוא יום חול שבערבו מדליקים נר ראשון
+  const chanukah = Luach.day("2026-12-04");
+  assert.ok(hasKey("2026-12-04", "chanukah_1"));
+  assert.equal(chanukah.isErev, false);
+  assert.equal(chanukah.kind, "regular");
+  // חנוכה אינה מוסיפה זמן הדלקה ללוח. ביום הזה יש כניסת שבת רק מפני שהוא שישי
+  assert.equal(chanukah.dow, 5);
+  assert.equal(Luach.day("2026-12-06").zmanim.candlesMs, null);   // נר שלישי, יום ראשון
+});
+
+test("יום טוב הוא בדיוק שמונת ימי החג של ישראל, ורק הם קובעים יום מנוחה", () => {
+  const expected = new Set(["rosh_hashana_1", "rosh_hashana_2", "yom_kippur", "sukkot_1",
+    "shmini_atzeret", "pesach_1", "pesach_7", "shavuot"]);
+  const found = new Set();
+  for (let rd = Luach.rdOfIso("2000-01-01"); rd <= Luach.rdOfIso("2100-12-31"); rd++) {
+    const d = Luach.dayOfRd(rd);
+    if (!d.isYomTov) continue;
+    d.events.forEach(ev => { if (ev.type === "yomtov") found.add(ev.key); });
+    assert.equal(d.isRest, true, d.iso);
+  }
+  assert.deepEqual([...found].sort(), [...expected].sort());
+  // חול המועד אינו יום מנוחה, ולכן ביום שאחריו אין הבדלה אלא המשך המועד
+  const chm = Luach.day("2026-09-28");
+  assert.equal(chm.isCholHamoed, true);
+  assert.equal(chm.isRest, false);
+});
+
+test("צאת הכוכבים שנופלת בדיוק על חצי דקה מתעגלת למעלה", () => {
+  // צאת הכוכבים 17:20:30 — היציאה נקבעת ל-17:21 ולא ל-17:20
+  assert.equal(Luach.hhmm(Luach.day("2026-11-14").zmanim.havdalahMs), "17:21");
+  assert.equal(Luach.hhmm(Luach.day("2024-12-28").zmanim.havdalahMs), "17:26");
+  assert.equal(Luach.hhmm(Luach.day("2029-05-20").zmanim.havdalahMs), "20:15");
+  // אותו כלל כשההדלקה עצמה היא בצאת הכוכבים: א׳ בתשרי תשפ״ו שחל ביום חמישי
+  assert.equal(Luach.hhmm(Luach.day("2065-10-01").zmanim.candlesMs), "19:02");
+});
+
+test("שבועות שחל ביום שישי נדלק לפני השקיעה, גם כשצאת הכוכבים היא בחצי דקה", () => {
+  ["1972-05-19", "2050-05-27"].forEach(iso => {
+    const d = Luach.day(iso);
+    assert.equal(d.dow, 5);
+    assert.ok(hasKey(iso, "shavuot"));
+    assert.equal(d.isRest, true);
+    assert.ok(d.zmanim.candlesMs < d.zmanim.sunsetMs, iso);
+    const gap = (d.zmanim.sunsetMs - d.zmanim.candlesMs) / 1000;
+    assert.ok(gap >= 20 * 60 && gap < 21 * 60, iso + " פער " + gap);
+  });
+});
