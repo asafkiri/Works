@@ -4,8 +4,8 @@
  * Replay server-timestamped events instead of decrementing a client-side balance:
  * concurrent purchases cannot spend the same gift twice. Corrections refund at
  * correction time, so neither a new grant nor a refund pays an older debt.
- * A mistaken grant is cancelled by a timestamped event on the grant itself,
- * never by deleting it: a purchase that already drew on it keeps its cover.
+ * A mistaken grant is deleted by a timestamped event on the grant itself, never
+ * by dropping the record: a purchase that already drew on it keeps its cover.
  */
 (function (root, factory) {
   const api = factory();
@@ -36,16 +36,16 @@
     return typeof value === "number" && Number.isFinite(value) && value > 0;
   }
 
-  function compute(takings, payments) {
-    const events = [], items = {}, history = [], grants = {}, live = new Map();
+  function replay(takings, payments, dropped) {
+    const events = [], items = {}, history = [], grants = {}, live = new Map(), deleted = new Set();
     let balanceCents = 0, grantedCents = 0;
     // Lowest balance seen since each live grant: while it stays at or above the
-    // granted amount, that gift is provably still untouched and can be cancelled.
+    // granted amount, that gift is provably still untouched and can be deleted.
     const trackLow = () => live.forEach(state => {
       if (balanceCents < state.lowCents) state.lowCents = balanceCents;
     });
     Object.entries(payments || {}).forEach(([id, entry]) => {
-      if (!isGift(entry) || !validTime(entry.createdAt) ||
+      if (!isGift(entry) || (dropped && dropped.has(id)) || !validTime(entry.createdAt) ||
           !Number.isSafeInteger(entry.giftCents) || entry.giftCents <= 0) return;
       events.push({ id, at: entry.createdAt, order: 1, type: "grant", entry });
       if (validTime(entry.canceledAt) && entry.canceledAt >= entry.createdAt)
@@ -83,14 +83,13 @@
         const grant = grants[event.grantId];
         grant.canceledAt = event.at;
         // Money the employee already spent is not taken back, and the credit of
-        // another grant is never removed in its place: the cancellation lapses.
+        // another grant is never removed in its place: the deletion lapses.
         if (state.lowCents < state.giftCents) return;
         grant.canceled = true;
+        deleted.add(event.grantId);
         balanceCents -= state.giftCents;
         grantedCents -= state.giftCents;
         trackLow();
-        history.push({ id: event.id, type: "cancel", at: event.at,
-          name: grant.name, amountCents: state.giftCents, balanceCents });
       } else if (event.type === "purchase") {
         const giftCents = Math.min(balanceCents, event.priceCents);
         balanceCents -= giftCents;
@@ -127,8 +126,16 @@
       row.canceledAt = grant.canceledAt;
       row.canceled = grant.canceled;
     });
-    return { items, grants, history: history.reverse(), balanceCents, grantedCents,
+    return { items, grants, deleted, history: history.reverse(), balanceCents, grantedCents,
       usedCents: grantedCents - balanceCents };
+  }
+
+  // A deleted grant leaves the ledger completely. It can only be deleted while
+  // provably unused, so replaying without it keeps every purchase split as it
+  // was and leaves no row, no amount and no trace in either role's history.
+  function compute(takings, payments) {
+    const first = replay(takings, payments, null);
+    return first.deleted.size ? replay(takings, payments, first.deleted) : first;
   }
 
   // Called inside a per-purchase Firebase transaction. Retain the original
@@ -152,8 +159,8 @@
       ...(deleted ? { deletedAt: timestamp } : {}) };
   }
 
-  // Called inside a transaction on the grant entry. The grant is kept and stamped
-  // with its cancellation time; compute() decides whether that cancellation can
+  // Called inside a transaction on the grant entry. The record is kept and
+  // stamped with its deletion time; compute() decides whether that deletion can
   // still take effect, so a purchase saved in the meantime is never re-charged.
   function cancelGrant(current, giftCents, timestamp) {
     if (!isGift(current) || current.canceledAt || !validTime(current.createdAt) ||

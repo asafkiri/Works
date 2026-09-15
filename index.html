@@ -533,6 +533,7 @@
   .hk-row .hk-price{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
   .hk-row .hk-acts{display:flex;gap:6px;flex:0 0 auto}
   .hk-balances{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:14px}
+  .hk-balances.one{grid-template-columns:minmax(0,1fr)}
   .hk-balance{padding:16px 13px;border-radius:15px;border:1px solid #fed7aa;background:#fff7ed;min-width:0}
   .hk-balance.gift{background:#f5f3ff;border-color:#ddd6fe;color:#5b21b6}
   .hk-balance-label{font-size:14px;font-weight:800;line-height:1.5}
@@ -745,7 +746,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v70</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v71</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -770,7 +771,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v70</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v71</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -1252,7 +1253,7 @@
         </button>
         <button class="folder lg" onclick="openEmpNav('hakafa')">
           <span class="f-ico">🧾</span>
-          <span class="f-txt"><span class="f-title">הקפה ומתנות</span><span class="f-sub" id="empHakafaSub">הקניות שלך והמתנות מהחנות</span></span>
+          <span class="f-txt"><span class="f-title" id="empHakafaFolderTitle">הקפה</span><span class="f-sub" id="empHakafaSub">הקניות שלך מהחנות</span></span>
           <span class="f-arr">→</span>
         </button>
         <button class="folder lg" id="formsEmpFolderBtn" onclick="openEmpNav('forms')">
@@ -1312,10 +1313,10 @@
 
     <!-- הקפה לעובדים -->
     <div id="empHakafa" class="hidden">
-      <div class="screen-head"><button class="back-btn" onclick="empNavHome()">→ חזרה</button><h1 class="screen-title">🧾 הקפה ומתנות</h1></div>
+      <div class="screen-head"><button class="back-btn" onclick="empNavHome()">→ חזרה</button><h1 class="screen-title" id="empHakafaTitle">🧾 הקפה</h1></div>
       <div class="card">
         <div id="empGiftSummary"></div>
-        <p class="sub">הזן את המחיר המלא של מה שלקחת. אם יש יתרת מתנה, היא תנוצל אוטומטית.</p>
+        <p class="sub" id="empHakafaFormSub">הזן את המחיר המלא של מה שלקחת.</p>
         <button class="btn" id="hakafaAddBtn" onclick="toggleHakafaForm(true)">➕ הוסף פריט</button>
         <div id="hakafaForm" class="hidden" style="margin-top:12px">
           <label class="fld" for="hakafaName">שם הפריט</label>
@@ -1329,7 +1330,7 @@
           </div>
         </div>
       </div>
-      <details class="gift-history" id="empGiftHistoryDetails"><summary>המתנות שקיבלת והשימושים בהן</summary><div class="gift-history-body" id="empGiftHistory"></div></details>
+      <details class="gift-history hidden" id="empGiftHistoryDetails"><summary>המתנות שקיבלת והשימושים בהן</summary><div class="gift-history-body" id="empGiftHistory"></div></details>
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
           <div><h2 style="margin:0;font-size:17px">הרשימה שלי</h2><span class="sub">שני חודשי הקניות האחרונים</span></div>
@@ -1707,7 +1708,7 @@
     </div>
   </div>
 </div>
-<script src="store-gifts.js?v=70"></script>
+<script src="store-gifts.js?v=71"></script>
 <script>
 /* ============================================================
    1. הגדרות
@@ -2808,26 +2809,33 @@ function giftLedgerFor(empId){
 function giftMoney(cents){
   return (cents/100).toLocaleString("he-IL", {minimumFractionDigits:cents%100?2:0,maximumFractionDigits:2});
 }
+// מתנות מוצגות לעובד רק כשיש לו יתרה פעילה; המנהל רואה אותן תמיד
+function giftVisibleFor(empId){
+  return hakafaDataReady() && (currentRole!=="employee" || giftLedgerFor(empId).balanceCents>0);
+}
 function giftSummaryHtml(empId){
-  if(!hakafaDataReady()) return '<p class="sub">טוען את ההקפה ואת יתרת המתנה…</p>';
+  if(!hakafaDataReady()) return `<p class="sub">${currentRole==="employee"?'טוען…':'טוען את ההקפה ואת יתרת המתנה…'}</p>`;
   const ledger=giftLedgerFor(empId);
   const charge=takingsSumFor(empId,currentMonthKey());
+  const chargeTile=`<div class="hk-balance"><div class="hk-balance-label">הקפה לחיוב החודש</div><strong class="hk-balance-value">₪${giftMoney(StoreGifts.cents(charge))}</strong><small>${monthLabel(currentMonthKey())} · לחיוב מהשכר</small></div>`;
+  if(!giftVisibleFor(empId)) return `<div class="hk-balances one">${chargeTile}</div>`;
   return `<div class="hk-balances">
-    <div class="hk-balance"><div class="hk-balance-label">הקפה לחיוב החודש</div><strong class="hk-balance-value">₪${giftMoney(StoreGifts.cents(charge))}</strong><small>${monthLabel(currentMonthKey())} · לחיוב מהשכר</small></div>
+    ${chargeTile}
     <div class="hk-balance gift"><div class="hk-balance-label">🎁 יתרת מתנה</div><strong class="hk-balance-value">₪${giftMoney(ledger.balanceCents)}</strong><small>לקניות בחנות · נשמרת גם לחודשים הבאים</small></div>
   </div><p class="gift-help">המתנה מיועדת לקניות חדשות בלבד. חוב קודם אינו משתנה.</p>`;
 }
 function giftHistoryHtml(empId){
   if(!hakafaDataReady()) return '<p class="sub">טוען…</p>';
+  if(!giftVisibleFor(empId)) return '';
   const history=giftLedgerFor(empId).history;
   if(!history.length) return '<p class="sub">עדיין לא ניתנו מתנות. כשיש מתנה, ההענקה והשימושים יופיעו כאן.</p>';
-  const titles={grant:'🎁 מתנה התקבלה', refund:'↩ הוחזר למתנה', cancel:'✖ המתנה בוטלה', use:'שימוש במתנה'};
+  const titles={grant:'🎁 מתנה התקבלה', refund:'↩ הוחזר למתנה', use:'שימוש במתנה'};
   return history.map(h=>{
-    // ביטול אפשרי רק כל עוד המתנה כולה לא נוצלה (מתנה שניתנה בטעות)
-    const canCancel = h.type==="grant" && h.removable && currentRole==="manager";
+    // מחיקה אפשרית רק כל עוד המתנה כולה לא נוצלה (מתנה שניתנה בטעות)
+    const canDelete = h.type==="grant" && h.removable && currentRole==="manager";
     const lapsed = h.type==="grant" && h.canceledAt && !h.canceled
-      ? '<small>בקשת הביטול לא נכנסה לתוקף — המתנה כבר נוצלה</small>' : '';
-    return `<div class="gift-history-row"><div><b>${titles[h.type]||'שימוש במתנה'}</b><div>${esc(h.name||'קנייה בחנות')}</div><small>${fmtDate(h.at)} · ${fmtTime(h.at)}</small>${lapsed}${canCancel?`<button class="btn line sm gift-cancel-btn" onclick="delStoreGift('${empId}','${h.id}')">🗑️ בטל מתנה</button>`:''}</div><div class="gift-history-amount">${h.type==="use"||h.type==="cancel"?'−':'+'}₪${giftMoney(h.amountCents)}<small>יתרה לאחר הפעולה: ₪${giftMoney(h.balanceCents)}</small></div></div>`;
+      ? '<small>בקשת המחיקה לא נכנסה לתוקף — המתנה כבר נוצלה</small>' : '';
+    return `<div class="gift-history-row"><div><b>${titles[h.type]||'שימוש במתנה'}</b><div>${esc(h.name||'קנייה בחנות')}</div><small>${fmtDate(h.at)} · ${fmtTime(h.at)}</small>${lapsed}${canDelete?`<button class="btn line sm gift-cancel-btn" onclick="delStoreGift('${empId}','${h.id}')">🗑️ מחק מתנה</button>`:''}</div><div class="gift-history-amount">${h.type==="use"?'−':'+'}₪${giftMoney(h.amountCents)}<small>יתרה לאחר הפעולה: ₪${giftMoney(h.balanceCents)}</small></div></div>`;
   }).join("");
 }
 function takingRowHtml(t, empId){
@@ -2892,27 +2900,27 @@ async function saveStoreGift(){
     renderGiftPreview();
   }
 }
-// ביטול מתנה שניתנה בטעות — רק כל עוד העובד לא התחיל לנצל אותה
+// מחיקת מתנה שניתנה בטעות — רק כל עוד העובד לא התחיל לנצל אותה
 async function delStoreGift(empId, giftId){
   if(currentRole!=="manager" || !hakafaDataReady() || giftSaving) return;
   const grant=giftLedgerFor(empId).grants[giftId];
-  if(!grant || !grant.removable){ toast("אפשר לבטל רק מתנה שטרם נוצלה"); return; }
-  const ok=await uiConfirm(`לבטל את המתנה של ₪${giftMoney(grant.giftCents)}? יתרת המתנה תרד בהתאם. קניות שכבר נרשמו והחוב הקיים לא ישתנו.`,
-    {okText:"בטל מתנה", danger:true, title:"ביטול מתנה"});
+  if(!grant || !grant.removable){ toast("אפשר למחוק רק מתנה שטרם נוצלה"); return; }
+  const ok=await uiConfirm(`למחוק את המתנה של ₪${giftMoney(grant.giftCents)}? היא תרד מיתרת המתנה ותיעלם מההיסטוריה. קניות שכבר נרשמו והחוב הקיים לא ישתנו.`,
+    {okText:"מחק מתנה", danger:true, title:"מחיקת מתנה"});
   if(!ok) return;
-  if(!dbConnected){ toast("יש להתחבר לפני ביטול מתנה"); return; }
+  if(!dbConnected){ toast("יש להתחבר לפני מחיקת מתנה"); return; }
   // בדיקה חוזרת אחרי האישור: ייתכן שבינתיים נרשמה קנייה שניצלה את המתנה
   const fresh=giftLedgerFor(empId).grants[giftId];
-  if(!fresh || !fresh.removable){ toast("המתנה כבר נוצלה — לא ניתן לבטל אותה"); return; }
+  if(!fresh || !fresh.removable){ toast("המתנה כבר נוצלה — לא ניתן למחוק אותה"); return; }
   try{
     const result=await db.ref("payments/"+empId+"/"+giftId)
       .transaction(current=>StoreGifts.cancelGrant(current,grant.giftCents,TS),undefined,false);
-    toast(result.committed?"המתנה בוטלה והיתרה עודכנה ✓":"המתנה כבר בוטלה או השתנתה במכשיר אחר");
-  }catch(err){ toast("הביטול לא נשמר — נסה שוב"); }
+    toast(result.committed?"המתנה נמחקה והיתרה עודכנה ✓":"המתנה כבר נמחקה או השתנתה במכשיר אחר");
+  }catch(err){ toast("המחיקה לא נשמרה — נסה שוב"); }
 }
 function renderHakafaPreview(){
   const el=$("hakafaPreview"); if(!el || !currentEmpId) return;
-  if(!hakafaDataReady()){ el.textContent="טוען את יתרת המתנה…"; return; }
+  if(!hakafaDataReady()){ el.textContent="טוען…"; return; }
   const amount=StoreGifts.parseAmount($("hakafaPrice").value);
   const balance=giftLedgerFor(currentEmpId).balanceCents;
   if(amount===null){ el.textContent=balance>0?`יש לך ₪${giftMoney(balance)} במתנה. הזן את המחיר המלא ונחשב מה יכוסה.`:'הזן את המחיר המלא של הקנייה.'; return; }
@@ -3525,11 +3533,20 @@ function renderEmployeeDashboard(){
 
   // --- הקפה לעובדים: רשימה לפי חודש (חודשיים אחרונים) ---
   const hkBody=$("empHakafaBody");
+  // כל מה שקשור למתנות מוצג לעובד רק כשיש לו יתרת מתנה פעילה
+  const giftShown=giftVisibleFor(currentEmpId);
   $("empGiftSummary").innerHTML=giftSummaryHtml(currentEmpId);
   $("empGiftHistory").innerHTML=giftHistoryHtml(currentEmpId);
-  $("empHakafaSub").textContent=hakafaDataReady() && giftLedgerFor(currentEmpId).balanceCents>0
+  const giftHist=$("empGiftHistoryDetails");
+  if(giftHist){ giftHist.classList.toggle("hidden", !giftShown); if(!giftShown) giftHist.open=false; }
+  $("empHakafaTitle").textContent=giftShown?"🧾 הקפה ומתנות":"🧾 הקפה";
+  $("empHakafaFolderTitle").textContent=giftShown?"הקפה ומתנות":"הקפה";
+  $("empHakafaFormSub").textContent=giftShown
+    ? "הזן את המחיר המלא של מה שלקחת. אם יש יתרת מתנה, היא תנוצל אוטומטית."
+    : "הזן את המחיר המלא של מה שלקחת.";
+  $("empHakafaSub").textContent=giftShown
     ? `🎁 יש לך ₪${giftMoney(giftLedgerFor(currentEmpId).balanceCents)} למימוש בחנות`
-    : "הקניות שלך והמתנות מהחנות";
+    : "הקניות שלך מהחנות";
   renderHakafaPreview();
   if(hkBody){
     const items=Object.values(giftLedgerFor(currentEmpId).items)
