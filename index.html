@@ -532,6 +532,36 @@
   .hk-row .hk-date{font-size:12.5px;color:var(--muted);margin-top:2px}
   .hk-row .hk-price{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
   .hk-row .hk-acts{display:flex;gap:6px;flex:0 0 auto}
+  .hk-balances{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:14px}
+  .hk-balance{padding:16px 13px;border-radius:15px;border:1px solid #fed7aa;background:#fff7ed;min-width:0}
+  .hk-balance.gift{background:#f5f3ff;border-color:#ddd6fe;color:#5b21b6}
+  .hk-balance-label{font-size:14px;font-weight:800;line-height:1.5}
+  .hk-balance-value{display:block;font-size:28px;font-weight:800;line-height:1.5;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+  .hk-balance small{display:block;font-size:12.5px;line-height:1.55}
+  .gift-help{font-size:14px;line-height:1.65;margin:0 0 14px;color:var(--ink-soft)}
+  .btn.gift-btn{background:#6d28d9;border-color:#6d28d9;color:#fff;min-height:46px}
+  .gift-history{border:1px solid #ddd6fe;border-radius:13px;margin:14px 0;background:#fff;overflow:hidden}
+  .gift-history summary{padding:14px;font-weight:800;color:#5b21b6;cursor:pointer;min-height:46px}
+  .gift-history-body{padding:0 12px 8px}
+  .gift-history-row{display:flex;justify-content:space-between;align-items:start;gap:12px;padding:12px 0;border-top:1px solid var(--line);font-size:14px;line-height:1.5}
+  .gift-history-row>div:first-child{min-width:0;overflow-wrap:anywhere}
+  .gift-history-row small{display:block;color:var(--muted);font-size:12px}
+  .gift-history-amount{white-space:nowrap;font-weight:800;font-variant-numeric:tabular-nums;color:#5b21b6}
+  .hk-row.hk-purchase{flex-wrap:wrap;padding:14px;gap:10px}
+  .hk-purchase .hk-name{font-size:16px;overflow-wrap:anywhere}
+  .hk-purchase .hk-price{font-size:17px}
+  .hk-split{flex-basis:100%;display:flex;flex-wrap:wrap;gap:7px;font-size:13px;line-height:1.55}
+  .hk-split span{padding:5px 9px;border-radius:8px;background:#fff7ed;color:#9a3412}
+  .hk-split .gift-part{background:#f5f3ff;color:#5b21b6}
+  .hk-purchase .hk-acts{flex-basis:100%;border-top:1px solid var(--line);padding-top:9px}
+  .hk-purchase .hk-acts button{min-height:42px;flex:1}
+  .hk-month-head{align-items:flex-start;gap:10px;flex-wrap:wrap}
+  .hk-month-totals{font-size:13px;font-weight:600;line-height:1.7}
+  .hk-live-preview{margin-top:12px;padding:13px;border:1px solid #ddd6fe;border-radius:12px;background:#f5f3ff;font-size:14px;line-height:1.7;color:#5b21b6}
+  .hk-live-preview strong{font-weight:800}
+  .gift-modal-note{background:#f5f3ff;border-radius:12px;padding:12px;color:#5b21b6;font-size:14px;line-height:1.6;margin:12px 0}
+  .gift-modal-error{color:#b91c1c;font-size:14px;line-height:1.5;margin-top:10px}
+  #giftModal .modal-actions .btn{min-height:48px}
 
   /* ---------- מסך הצלחה אחרי החתמה (טרמינל) ---------- */
   .success-screen{position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;padding:24px;
@@ -714,7 +744,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v68</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v69</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -739,7 +769,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v68</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v69</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -1097,12 +1127,12 @@
 
     <!-- מסך: הקפה לעובדים -->
     <div id="screen-hakafa" class="screen hidden">
-      <div class="screen-head"><button class="back-btn" onclick="backToHome()">→ חזרה</button><h1 class="screen-title">🧾 הקפה לעובדים</h1></div>
+      <div class="screen-head" id="hkMainHead"><button class="back-btn" onclick="backToHome()">→ חזרה</button><h1 class="screen-title">🧾 הקפה לעובדים</h1></div>
 
       <!-- רשימת עובדים -->
       <div id="hkConsoleList">
         <div class="card">
-          <p class="sub">מה שכל עובד רשם שלקח מהחנות. הסכומים יורדים מהשכר בדוח הפנימי. בחר עובד לצפייה ולתיקון.</p>
+          <p class="sub">בחר עובד לצפייה בקניות, לתיקון או להענקת מתנה. רק החלק שלא כוסה במתנה נרשם כהקפה לחיוב.</p>
           <div id="hkEmpFolders"></div>
         </div>
       </div>
@@ -1111,6 +1141,9 @@
       <div id="hkConsoleDetail" class="hidden">
         <div class="screen-head"><button class="back-btn" onclick="hkBackToList()">→ חזרה לרשימה</button><h1 class="screen-title" id="hkDetailTitle">🧾</h1></div>
         <div class="card">
+          <div id="hkGiftSummary"></div>
+          <button class="btn gift-btn" onclick="openGiftModal(hkConsoleEmpId)">🎁 הוסף מתנה</button>
+          <details class="gift-history" id="hkGiftHistoryDetails"><summary>היסטוריית מתנות ושימושים</summary><div class="gift-history-body" id="hkGiftHistory"></div></details>
           <div id="hkDetailBody"></div>
         </div>
       </div>
@@ -1218,7 +1251,7 @@
         </button>
         <button class="folder lg" onclick="openEmpNav('hakafa')">
           <span class="f-ico">🧾</span>
-          <span class="f-txt"><span class="f-title">הקפה</span><span class="f-sub">מה שלקחת מהחנות</span></span>
+          <span class="f-txt"><span class="f-title">הקפה ומתנות</span><span class="f-sub" id="empHakafaSub">הקניות שלך והמתנות מהחנות</span></span>
           <span class="f-arr">→</span>
         </button>
         <button class="folder lg" id="formsEmpFolderBtn" onclick="openEmpNav('forms')">
@@ -1278,24 +1311,27 @@
 
     <!-- הקפה לעובדים -->
     <div id="empHakafa" class="hidden">
-      <div class="screen-head"><button class="back-btn" onclick="empNavHome()">→ חזרה</button><h1 class="screen-title">🧾 הקפה</h1></div>
+      <div class="screen-head"><button class="back-btn" onclick="empNavHome()">→ חזרה</button><h1 class="screen-title">🧾 הקפה ומתנות</h1></div>
       <div class="card">
-        <p class="sub">רשום כאן מה שלקחת מהחנות (חטיף, משהו לבית). הסכומים יורדו מהשכר. מוצגים החודשיים האחרונים.</p>
+        <div id="empGiftSummary"></div>
+        <p class="sub">הזן את המחיר המלא של מה שלקחת. אם יש יתרת מתנה, היא תנוצל אוטומטית.</p>
         <button class="btn" id="hakafaAddBtn" onclick="toggleHakafaForm(true)">➕ הוסף פריט</button>
         <div id="hakafaForm" class="hidden" style="margin-top:12px">
-          <label class="fld">שם הפריט</label>
+          <label class="fld" for="hakafaName">שם הפריט</label>
           <input id="hakafaName" type="text" placeholder="לדוגמה: קפה, חטיף, חלב" autocomplete="off">
-          <label class="fld" style="margin-top:10px">מחיר (₪)</label>
-          <input id="hakafaPrice" type="number" inputmode="decimal" placeholder="0" min="0" step="0.5">
+          <label class="fld" for="hakafaPrice" style="margin-top:10px">מחיר מלא (₪)</label>
+          <input id="hakafaPrice" type="number" inputmode="decimal" placeholder="0" min="0" step="0.01" oninput="renderHakafaPreview()">
+          <div id="hakafaPreview" class="hk-live-preview" aria-live="polite"></div>
           <div style="display:flex;gap:8px;margin-top:12px">
-            <button class="btn line" style="flex:1" onclick="toggleHakafaForm(false)">ביטול</button>
-            <button class="btn" style="flex:1" onclick="addHakafa()">הוסף לרשימה</button>
+            <button class="btn line" id="hakafaCancelBtn" style="flex:1" onclick="toggleHakafaForm(false)">ביטול</button>
+            <button class="btn" id="hakafaSaveBtn" style="flex:1" onclick="addHakafa()">שמור קנייה</button>
           </div>
         </div>
       </div>
+      <details class="gift-history" id="empGiftHistoryDetails"><summary>המתנות שקיבלת והשימושים בהן</summary><div class="gift-history-body" id="empGiftHistory"></div></details>
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <h2 style="margin:0;font-size:17px">הרשימה שלי</h2>
+          <div><h2 style="margin:0;font-size:17px">הרשימה שלי</h2><span class="sub">שני חודשי הקניות האחרונים</span></div>
           <button class="btn line sm" onclick="hakafaFixInfo()">תיקון</button>
         </div>
         <div id="empHakafaBody"></div>
@@ -1652,6 +1688,25 @@
 
 <div id="toast" class="toast"></div>
 
+<!-- מתנה היא יתרה לקניות בחנות בלבד; אינה תשלום שכר. -->
+<div id="giftModal" class="modal-bg" role="dialog" aria-modal="true" aria-labelledby="giftModalTitle">
+  <div class="modal">
+    <h3 id="giftModalTitle">🎁 הוסף מתנה</h3>
+    <p class="who" id="giftModalWho"></p>
+    <label class="fld" for="giftAmount">סכום המתנה (₪)</label>
+    <input id="giftAmount" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="לדוגמה: 100" oninput="renderGiftPreview()">
+    <label class="fld" for="giftNote" style="margin-top:12px">לכבוד מה?</label>
+    <input id="giftNote" type="text" maxlength="120" placeholder="לדוגמה: מתנה לראש השנה" autocomplete="off">
+    <div class="gift-modal-note">לקניות חדשות בחנות בלבד. החוב הקיים אינו משתנה, והמתנה אינה נרשמת כתשלום שכר או כניכוי בדוח ההקפות לרואה החשבון.</div>
+    <div id="giftPreview" class="gift-help" aria-live="polite"></div>
+    <div id="giftError" class="gift-modal-error" role="alert"></div>
+    <div class="modal-actions">
+      <button class="btn line" id="giftCancelBtn" onclick="closeGiftModal()">ביטול</button>
+      <button class="btn gift-btn" id="giftSaveBtn" onclick="saveStoreGift()">הענק מתנה</button>
+    </div>
+  </div>
+</div>
+<script src="store-gifts.js?v=69"></script>
 <script>
 /* ============================================================
    1. הגדרות
@@ -2046,9 +2101,9 @@ function enterEmployeeMode(user){
     }
     currentRole="employee"; currentEmpId=id; empMonthKey=null; empNav="home";
     // הקפה: מאזינים לרשומות של העובד הנוכחי בלבד
-    db.ref("takings/"+id).on("value", snap=>{ myTakings = snap.val()||{}; if(currentRole==="employee") renderEmployeeDashboard(); });
+    db.ref("takings/"+id).on("value", snap=>{ myTakings = snap.val()||{}; hakafaDataLoaded=true; if(currentRole==="employee") renderEmployeeDashboard(); });
     db.ref("secure/rates/"+id).on("value", snap=>{ myRate = snap.val(); if(currentRole==="employee") renderEmployeeDashboard(); });
-    db.ref("payments/"+id).on("value", snap=>{ myPayments = snap.val()||{}; if(currentRole==="employee") renderEmployeeDashboard(); });
+    db.ref("payments/"+id).on("value", snap=>{ myPayments = snap.val()||{}; giftDataLoaded=true; if(currentRole==="employee") renderEmployeeDashboard(); });
     db.ref("forms/"+id).on("value", snap=>{ myForms = snap.val()||{}; if(currentRole==="employee") renderEmployeeDashboard(); });
     db.ref("payslips/"+id).on("value", snap=>{ myPayslips = snap.val()||{}; if(currentRole==="employee") renderEmployeeDashboard(); });
     // פרטיות: מוודאים שהמיפוי חשבון→עובד קיים (נדרש לחוקי האבטחה), ורק אז
@@ -2130,8 +2185,8 @@ function startDataListeners(){
     });
     db.ref("secure/rates").on("value", snap=>{ secureRates = snap.val()||{}; renderActive(); });
     db.ref("secure/clockPins").on("value", snap=>{ secureClockPins = snap.val()||{}; renderActive(); });
-    db.ref("takings").on("value", snap=>{ allTakings = snap.val()||{}; renderActive(); });
-    db.ref("payments").on("value", snap=>{ allPayments = snap.val()||{}; renderActive(); });
+    db.ref("takings").on("value", snap=>{ allTakings = snap.val()||{}; hakafaDataLoaded=true; renderActive(); });
+    db.ref("payments").on("value", snap=>{ allPayments = snap.val()||{}; giftDataLoaded=true; renderActive(); renderGiftPreview(); });
     db.ref("forms").on("value", snap=>{ allForms = snap.val()||{}; renderActive(); });
     db.ref("payslips").on("value", snap=>{ allPayslips = snap.val()||{}; renderActive(); });
     db.ref("config/empNotesSeenAt").on("value", snap=>{ empNotesSeenAt = snap.val()||0; renderActive(); });
@@ -2579,6 +2634,9 @@ let myTakings={};        // הקפה: רשומות העובד הנוכחי (נט
 let allTakings={};       // הקפה: כל הרשומות (נטען רק אצל המנהל)
 let myPayments={};       // מקדמות/תשלומים: של העובד הנוכחי (נטען ב-enterEmployeeMode)
 let allPayments={};      // מקדמות/תשלומים: כל הרשומות (נטען רק אצל המנהל)
+let hakafaDataLoaded=false, giftDataLoaded=false;
+let hakafaSaving=false, giftSaving=false, giftModalEmpId=null;
+const giftLedgerCache=new Map();
 let empFormView="list";  // תצוגת טפסים אצל העובד: 'list' | 'sign'
 let empSignFormId=null;  // הטופס שנמצא בחתימה כרגע
 let sigCtx=null, sigDrawing=false, sigHasInk=false, sigLast=null; // לוח החתימה
@@ -2735,38 +2793,154 @@ async function submitSignature(){
 }
 
 /* ---------- הקפה לעובדים (צד העובד) ---------- */
+function hakafaDataReady(){ return hakafaDataLoaded && giftDataLoaded; }
+function giftLedgerFor(empId){
+  const own=currentRole==="employee" && empId===currentEmpId;
+  const takings=own?myTakings:(allTakings[empId]||null);
+  const payments=own?myPayments:(allPayments[empId]||null);
+  const cached=giftLedgerCache.get(empId);
+  if(cached && cached.takings===takings && cached.payments===payments) return cached.ledger;
+  const ledger=StoreGifts.compute(takings, payments);
+  giftLedgerCache.set(empId,{takings,payments,ledger});
+  return ledger;
+}
+function giftMoney(cents){
+  return (cents/100).toLocaleString("he-IL", {minimumFractionDigits:cents%100?2:0,maximumFractionDigits:2});
+}
+function giftSummaryHtml(empId){
+  if(!hakafaDataReady()) return '<p class="sub">טוען את ההקפה ואת יתרת המתנה…</p>';
+  const ledger=giftLedgerFor(empId);
+  const charge=takingsSumFor(empId,currentMonthKey());
+  return `<div class="hk-balances">
+    <div class="hk-balance"><div class="hk-balance-label">הקפה לחיוב החודש</div><strong class="hk-balance-value">₪${giftMoney(StoreGifts.cents(charge))}</strong><small>${monthLabel(currentMonthKey())} · לחיוב מהשכר</small></div>
+    <div class="hk-balance gift"><div class="hk-balance-label">🎁 יתרת מתנה</div><strong class="hk-balance-value">₪${giftMoney(ledger.balanceCents)}</strong><small>לקניות בחנות · נשמרת גם לחודשים הבאים</small></div>
+  </div><p class="gift-help">המתנה מיועדת לקניות חדשות בלבד. חוב קודם אינו משתנה.</p>`;
+}
+function giftHistoryHtml(empId){
+  if(!hakafaDataReady()) return '<p class="sub">טוען…</p>';
+  const history=giftLedgerFor(empId).history;
+  if(!history.length) return '<p class="sub">עדיין לא ניתנו מתנות. כשיש מתנה, ההענקה והשימושים יופיעו כאן.</p>';
+  return history.map(h=>`<div class="gift-history-row"><div><b>${h.type==="grant"?'🎁 מתנה התקבלה':h.type==="refund"?'↩ הוחזר למתנה':'שימוש במתנה'}</b><div>${esc(h.name||'קנייה בחנות')}</div><small>${fmtDate(h.at)} · ${fmtTime(h.at)}</small></div><div class="gift-history-amount">${h.type==="use"?'−':'+'}₪${giftMoney(h.amountCents)}<small>יתרה לאחר הפעולה: ₪${giftMoney(h.balanceCents)}</small></div></div>`).join("");
+}
+function takingRowHtml(t, empId){
+  return `<div class="hk-row hk-purchase"><div class="hk-main"><div class="hk-name">${esc(t.name||'קנייה בחנות')}</div><div class="hk-date">${fmtDate(t.createdAt)} · ${fmtTime(t.createdAt)}</div></div><div class="hk-price">₪${giftMoney(t.priceCents)}</div>
+    <div class="hk-split">${t.giftCents>0?`<span class="gift-part">🎁 מהמתנה: ₪${giftMoney(t.giftCents)}</span>`:''}<span>${t.chargeCents>0?`לחיוב מהשכר: ₪${giftMoney(t.chargeCents)}`:'ללא חיוב מהשכר'}</span></div>
+    ${empId?`<div class="hk-acts"><button class="btn line sm" onclick="editHakafa('${empId}','${t.id}')">✏️ עריכה</button><button class="btn line sm" onclick="delHakafa('${empId}','${t.id}')">🗑️ מחיקה</button></div>`:''}</div>`;
+}
+function takingMonthTotalsHtml(list){
+  const sum=list.reduce((a,t)=>a+t.chargeCents,0);
+  const gift=list.reduce((a,t)=>a+t.giftCents,0);
+  return `<span class="hk-month-totals">לחיוב: ₪${giftMoney(sum)}${gift?` · מהמתנה: ₪${giftMoney(gift)}`:''}</span>`;
+}
+function openGiftModal(empId){
+  if(currentRole!=="manager" || !employees[empId] || giftSaving) return;
+  if(!hakafaDataReady()){ toast("הנתונים עדיין נטענים — נסה בעוד רגע"); return; }
+  giftModalEmpId=empId;
+  $("giftModalWho").textContent="עבור "+employees[empId].name;
+  $("giftAmount").value="";
+  $("giftNote").value="מתנה לחג";
+  $("giftError").textContent="";
+  renderGiftPreview();
+  openModal("giftModal");
+  setTimeout(()=>$("giftAmount").focus(),50);
+}
+function closeGiftModal(){
+  if(giftSaving) return;
+  closeModal("giftModal");
+  giftModalEmpId=null;
+}
+function renderGiftPreview(){
+  if(!giftModalEmpId) return;
+  const amount=StoreGifts.parseAmount($("giftAmount").value);
+  const balance=giftLedgerFor(giftModalEmpId).balanceCents;
+  $("giftPreview").textContent=amount>0
+    ? `יתרת המתנה תעלה מ־₪${giftMoney(balance)} ל־₪${giftMoney(balance+amount)}. החוב הקיים יישאר כפי שהוא.`
+    : `יתרת המתנה עכשיו: ₪${giftMoney(balance)}`;
+  $("giftSaveBtn").textContent=giftSaving?'שומר…':amount>0?`הענק מתנה של ₪${giftMoney(amount)}`:'הענק מתנה';
+}
+async function saveStoreGift(){
+  if(giftSaving || currentRole!=="manager" || !giftModalEmpId || !employees[giftModalEmpId]) return;
+  const amount=StoreGifts.parseAmount($("giftAmount").value);
+  const note=$("giftNote").value.trim()||"מתנה לחג";
+  if(amount===null || amount<=0){ $("giftError").textContent="יש להזין סכום גדול מאפס, עם עד שתי ספרות אחרי הנקודה."; return; }
+  if(!dbConnected || !hakafaDataReady()){ $("giftError").textContent="יש להמתין לחיבור ולסיום טעינת הנתונים לפני הענקת מתנה."; return; }
+  const empId=giftModalEmpId;
+  giftSaving=true;
+  ["giftSaveBtn","giftCancelBtn","giftAmount","giftNote"].forEach(id=>$(id).disabled=true);
+  $("giftError").textContent="";
+  renderGiftPreview();
+  try{
+    // Reuse the manager-owned financial ledger and its existing permissions.
+    // amount stays zero for old clients; all current payroll readers also
+    // explicitly exclude this kind. Gift money lives only in giftCents.
+    await db.ref("payments/"+empId).push().set({kind:"store_gift",amount:0,giftCents:amount,note:note.slice(0,120),monthKey:currentMonthKey(),createdAt:TS});
+    closeModal("giftModal"); giftModalEmpId=null;
+    toast(`🎁 ניתנה מתנה של ₪${giftMoney(amount)}`);
+  }catch(err){
+    $("giftError").textContent="המתנה לא נשמרה. בדוק את החיבור ונסה שוב.";
+  }finally{
+    giftSaving=false;
+    ["giftSaveBtn","giftCancelBtn","giftAmount","giftNote"].forEach(id=>$(id).disabled=false);
+    renderGiftPreview();
+  }
+}
+function renderHakafaPreview(){
+  const el=$("hakafaPreview"); if(!el || !currentEmpId) return;
+  if(!hakafaDataReady()){ el.textContent="טוען את יתרת המתנה…"; return; }
+  const amount=StoreGifts.parseAmount($("hakafaPrice").value);
+  const balance=giftLedgerFor(currentEmpId).balanceCents;
+  if(amount===null){ el.textContent=balance>0?`יש לך ₪${giftMoney(balance)} במתנה. הזן את המחיר המלא ונחשב מה יכוסה.`:'הזן את המחיר המלא של הקנייה.'; return; }
+  const used=Math.min(balance,amount), charge=amount-used;
+  el.innerHTML=`${used>0?`🎁 מהמתנה: <strong>₪${giftMoney(used)}</strong><br>`:''}לחיוב מהשכר: <strong>₪${giftMoney(charge)}</strong>${balance>0?`<br>יישאר במתנה: ₪${giftMoney(balance-used)}`:''}<br><small>החישוב הסופי מתעדכן לפי סדר שמירת הקניות.</small>`;
+}
 function toggleHakafaForm(show){
+  if(hakafaSaving) return;
   const f=$("hakafaForm"), b=$("hakafaAddBtn");
   if(!f) return;
   f.classList.toggle("hidden", !show);
   if(b) b.classList.toggle("hidden", show);
   if(show){
     $("hakafaName").value=""; $("hakafaPrice").value="";
+    renderHakafaPreview();
     setTimeout(()=>{ try{ $("hakafaName").focus(); }catch(e){} }, 50);
   }
 }
-function addHakafa(){
+async function addHakafa(){
+  if(hakafaSaving || currentRole!=="employee") return;
   const name=($("hakafaName").value||"").trim();
-  const price=parseFloat($("hakafaPrice").value);
+  const amount=StoreGifts.parseAmount($("hakafaPrice").value);
   if(!name){ toast("רשום שם פריט"); return; }
-  if(isNaN(price) || price<0){ toast("רשום מחיר תקין"); return; }
+  if(amount===null){ toast("רשום מחיר תקין עם עד שתי ספרות אחרי הנקודה"); return; }
   if(!currentEmpId) return;
-  db.ref("takings/"+currentEmpId).push().set({ name:name, price:price, createdAt:TS })
-    .then(()=>{ toast("נוסף ✓"); toggleHakafaForm(false); })
-    .catch(()=>{ toast("ההוספה נכשלה — נסה שוב"); });
+  if(!dbConnected || !hakafaDataReady()){ toast("יש להמתין לחיבור ולסיום טעינת הנתונים"); return; }
+  const empId=currentEmpId, ref=db.ref("takings/"+empId).push();
+  hakafaSaving=true;
+  ["hakafaSaveBtn","hakafaCancelBtn","hakafaName","hakafaPrice"].forEach(id=>$(id).disabled=true);
+  $("hakafaSaveBtn").textContent="שומר…";
+  try{
+    await ref.set({name,price:amount/100,createdAt:TS});
+    hakafaSaving=false;
+    toggleHakafaForm(false);
+    const saved=giftLedgerFor(empId).items[ref.key];
+    toast(saved && saved.giftCents>0?`נשמר ✓ מהמתנה ₪${giftMoney(saved.giftCents)} · לחיוב ₪${giftMoney(saved.chargeCents)}`:"הקנייה נשמרה ✓");
+  }catch(err){ toast("ההוספה נכשלה — הפרטים נשמרו בטופס, נסה שוב"); }
+  finally{
+    hakafaSaving=false;
+    ["hakafaSaveBtn","hakafaCancelBtn","hakafaName","hakafaPrice"].forEach(id=>$(id).disabled=false);
+    $("hakafaSaveBtn").textContent="שמור קנייה";
+  }
 }
 function hakafaFixInfo(){
   uiAlert("לתיקון או מחיקה של רשומה, פנה למנהל.", "תיקון רשומה");
 }
 // רשומות הקפה של עובד לחודש מסוים (מקור הנתונים לפי התפקיד)
 function takingsListFor(empId, monthKey){
-  let src = (currentRole==="employee" && empId===currentEmpId) ? (myTakings||{}) : ((allTakings && allTakings[empId])||{});
-  return Object.keys(src).map(id=>({id,...src[id]}))
-    .filter(t=> t && t.createdAt && monthKeyOf(t.createdAt)===monthKey)
+  return Object.values(giftLedgerFor(empId).items)
+    .filter(t=> !t.deletedAt && monthKeyOf(t.createdAt)===monthKey)
     .sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
 }
 function takingsSumFor(empId, monthKey){
-  return takingsListFor(empId, monthKey).reduce((a,t)=>a+(Number(t.price)||0),0);
+  return takingsListFor(empId, monthKey).reduce((a,t)=>a+t.chargeCents,0)/100;
 }
 // ברוטו של עובד לחודש מסוים (כולל שעות נוספות וניכוי הפסקות) — לבדיקת תקרת 25% בהקפה
 function empGrossForMonth(empId, monthKey){
@@ -2784,7 +2958,7 @@ function hakafaLimitInfo(empId, monthKey){
 function paymentsListFor(empId, monthKey){
   let src = (currentRole==="employee" && empId===currentEmpId) ? (myPayments||{}) : ((allPayments && allPayments[empId])||{});
   return Object.keys(src).map(id=>({id,...src[id]}))
-    .filter(p=> p && (p.monthKey===monthKey || (!p.monthKey && p.createdAt && monthKeyOf(p.createdAt)===monthKey)))
+    .filter(p=> p && !StoreGifts.isGift(p) && (p.monthKey===monthKey || (!p.monthKey && p.createdAt && monthKeyOf(p.createdAt)===monthKey)))
     .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
 }
 function paymentsSumFor(empId, monthKey){
@@ -2801,6 +2975,7 @@ async function addPayment(empId, monthKey){
     .then(()=>toast("נרשם ✓")).catch(()=>toast("השמירה נכשלה"));
 }
 async function delPayment(empId, paymentId){
+  if(StoreGifts.isGift((allPayments[empId]||{})[paymentId])) return;
   const ok=await uiConfirm("למחוק את התשלום הזה? הפעולה אינה ניתנת לביטול.", {okText:"מחק", danger:true, title:"מחיקת תשלום"});
   if(!ok) return;
   db.ref("payments/"+empId+"/"+paymentId).remove().then(()=>toast("נמחק ✓")).catch(()=>toast("המחיקה נכשלה"));
@@ -2851,7 +3026,7 @@ const CONSENT_FORMS = {
   payslip_consent: { title:CONSENT_PAYSLIP_TITLE, body:CONSENT_PAYSLIP_BODY, short:"הסכמה לתלוש אונליין" }
 };
 
-function openHkEmp(empId){ hkConsoleEmpId=empId; hkConsoleView="detail"; if(TS) db.ref("config/takingsSeenAt/"+empId).set(TS); renderHakafaConsole(); try{window.scrollTo(0,0);}catch(e){} }
+function openHkEmp(empId){ hkConsoleEmpId=empId; hkConsoleView="detail"; $("hkGiftHistoryDetails").open=false; if(TS) db.ref("config/takingsSeenAt/"+empId).set(TS); renderHakafaConsole(); try{window.scrollTo(0,0);}catch(e){} }
 function hkBackToList(){ hkConsoleView="list"; hkConsoleEmpId=null; renderHakafaConsole(); try{window.scrollTo(0,0);}catch(e){} }
 
 /* ---------- טפסים לעובדים: צד המנהל ---------- */
@@ -3101,20 +3276,34 @@ function renderPayslipsConsole(){
 }
 
 async function delHakafa(empId, takingId){
-  const ok=await uiConfirm("למחוק את הרשומה הזו? הפעולה אינה ניתנת לביטול.", {okText:"מחק", danger:true, title:"מחיקת רשומה"});
+  if(currentRole!=="manager" || !hakafaDataReady()) return;
+  const t=(allTakings[empId]||{})[takingId]; if(!t || t.deletedAt) return;
+  const split=giftLedgerFor(empId).items[takingId];
+  const refund=split&&split.giftCents>0?`\n₪${giftMoney(split.giftCents)} יוחזרו ליתרת המתנה לקניות הבאות. החזר המתנה לא יקזז חובות אחרים.`:"";
+  const ok=await uiConfirm("למחוק את הקנייה הזו? החיוב שלה יבוטל."+refund, {okText:"מחק קנייה", danger:true, title:"מחיקת קנייה"});
   if(!ok) return;
-  db.ref("takings/"+empId+"/"+takingId).remove().then(()=>toast("נמחק ✓")).catch(()=>toast("המחיקה נכשלה"));
+  await saveTakingCorrection(empId,takingId,t,t.name,0,true);
 }
 async function editHakafa(empId, takingId){
-  const t=(allTakings[empId]||{})[takingId]; if(!t) return;
+  if(currentRole!=="manager" || !hakafaDataReady()) return;
+  const t=(allTakings[empId]||{})[takingId]; if(!t || t.deletedAt) return;
   const name=await uiPrompt({title:"עריכת רשומה", label:"שם הפריט", value:t.name||""});
   if(name===null) return;
   if(!name.trim()){ toast("שם לא תקין"); return; }
-  const priceStr=await uiPrompt({title:"עריכת רשומה", label:"מחיר (₪)", value:String(t.price!=null?t.price:0)});
+  const priceStr=await uiPrompt({title:"עריכת רשומה", label:"מחיר מלא (₪)", value:String(t.price!=null?t.price:0),inputmode:"decimal"});
   if(priceStr===null) return;
-  const price=parseFloat(priceStr);
-  if(isNaN(price)||price<0){ toast("מחיר לא תקין"); return; }
-  db.ref("takings/"+empId+"/"+takingId).update({name:name.trim(), price:price}).then(()=>toast("עודכן ✓")).catch(()=>toast("העדכון נכשל"));
+  const priceCents=StoreGifts.parseAmount(priceStr);
+  if(priceCents===null){ toast("מחיר לא תקין"); return; }
+  await saveTakingCorrection(empId,takingId,t,name.trim(),priceCents,false);
+}
+async function saveTakingCorrection(empId,takingId,expected,name,priceCents,deleted){
+  if(currentRole!=="manager" || !dbConnected){ toast("יש להתחבר לפני תיקון קנייה"); return; }
+  const ref=db.ref("takings/"+empId+"/"+takingId);
+  const revisionId=ref.child("giftRevisions").push().key;
+  try{
+    const result=await ref.transaction(current=>StoreGifts.reviseTaking(current,expected,revisionId,name,priceCents,TS,deleted),undefined,false);
+    toast(result.committed?(deleted?"הקנייה נמחקה והיתרות עודכנו ✓":"הקנייה והיתרות עודכנו ✓"):"הרשומה השתנתה במכשיר אחר. פתח אותה שוב כדי לתקן.");
+  }catch(err){ toast("השינוי לא נשמר — נסה שוב"); }
 }
 
 // מספר רשומות חדשות (שנוספו אחרי הצפייה האחרונה של המנהל בכל עובד)
@@ -3123,14 +3312,14 @@ function takingsNewCount(){
   Object.keys(allTakings||{}).forEach(empId=>{
     const seen=takingsSeen[empId]||0;
     const m=allTakings[empId]||{};
-    Object.keys(m).forEach(id=>{ const t=m[id]; if(t && (t.createdAt||0) > seen) n++; });
+    Object.keys(m).forEach(id=>{ const t=m[id]; if(t && !t.deletedAt && (t.createdAt||0) > seen) n++; });
   });
   return n;
 }
 function empNewTakingsCount(empId){
   const seen=takingsSeen[empId]||0;
   const m=allTakings[empId]||{};
-  return Object.keys(m).filter(id=>{ const t=m[id]; return t && (t.createdAt||0) > seen; }).length;
+  return Object.keys(m).filter(id=>{ const t=m[id]; return t && !t.deletedAt && (t.createdAt||0) > seen; }).length;
 }
 function empHasNewTakings(empId){ return empNewTakingsCount(empId) > 0; }
 
@@ -3162,49 +3351,47 @@ function renderHakafaConsole(){
   if(!listEl || !detEl) return;
   listEl.classList.toggle("hidden", hkConsoleView!=="list");
   detEl.classList.toggle("hidden", hkConsoleView!=="detail");
+  $("hkMainHead").classList.toggle("hidden", hkConsoleView!=="list");
   const cutoff = Date.now() - 366*24*60*60*1000;
 
   if(hkConsoleView==="list"){
-    const rows = Object.keys(allTakings||{}).map(empId=>{
-      const m=allTakings[empId]||{};
-      const items=Object.keys(m).map(id=>m[id]).filter(t=> t && t.createdAt && t.createdAt>=cutoff);
-      const sum=items.reduce((a,t)=>a+(Number(t.price)||0),0);
+    const empIds=new Set([...Object.keys(employees),...Object.keys(allTakings),...Object.keys(allPayments)]);
+    const rows = Array.from(empIds).map(empId=>{
+      const ledger=giftLedgerFor(empId);
+      const items=Object.values(ledger.items).filter(t=> !t.deletedAt && t.createdAt>=cutoff);
+      const sum=takingsSumFor(empId,currentMonthKey());
       const e=employees[empId];
-      return { empId, name: e?e.name:"(עובד שנמחק)", count:items.length, sum, newCount: empNewTakingsCount(empId), curOver: hakafaLimitInfo(empId, currentMonthKey()).over };
-    }).filter(r=> r.count>0)
+      return { empId, name: e?e.name:"(עובד שנמחק)", active:e&&e.active!==false, gift:ledger.balanceCents, count:items.length, sum, newCount: empNewTakingsCount(empId), curOver: hakafaLimitInfo(empId, currentMonthKey()).over };
+    }).filter(r=> r.active || r.count>0 || r.gift>0)
       .sort((a,b)=> ((b.curOver?1:0)-(a.curOver?1:0)) || ((b.newCount>0?1:0)-(a.newCount>0?1:0)) || (b.sum-a.sum));
     $("hkEmpFolders").innerHTML = rows.length ? rows.map(r=>`
       <button class="folder${r.curOver?' over-limit':(r.newCount>0?' alert':'')}" onclick="openHkEmp('${r.empId}')">
         <span class="f-ico">🧾</span>
-        <span class="f-txt"><span class="f-title">${esc(r.name)} ${r.curOver?'<span class="limit-dot">⚠️ עבר 25%</span>':''}${r.newCount>0?`<span class="note-dot">${r.newCount} חדש</span>`:''}</span><span class="f-sub">${r.count} פריטים · סה"כ ₪${r.sum.toFixed(0)}${r.curOver?' · עבר 25% מהשכר החודש':(r.newCount>0?' · יש חדש לבדיקה':'')}</span></span>
+        <span class="f-txt"><span class="f-title">${esc(r.name)} ${r.curOver?'<span class="limit-dot">⚠️ עבר 25%</span>':''}${r.newCount>0?`<span class="note-dot">${r.newCount} חדש</span>`:''}</span><span class="f-sub">לחיוב החודש: ₪${giftMoney(StoreGifts.cents(r.sum))}<br>🎁 יתרת מתנה: ₪${giftMoney(r.gift)}</span></span>
         <span class="f-arr">→</span>
-      </button>`).join("") : '<div class="empty">עדיין אין רשומות הקפה.</div>';
+      </button>`).join("") : '<div class="empty">יש להוסיף עובד כדי לרשום הקפה או להעניק מתנה.</div>';
   } else {
     const e=employees[hkConsoleEmpId];
     $("hkDetailTitle").textContent="🧾 "+(e?e.name:"עובד");
-    const m=allTakings[hkConsoleEmpId]||{};
-    const items=Object.keys(m).map(id=>({id,...m[id]}))
-      .filter(t=> t && t.createdAt && t.createdAt>=cutoff)
+    $("hkGiftSummary").innerHTML=giftSummaryHtml(hkConsoleEmpId);
+    $("hkGiftHistory").innerHTML=giftHistoryHtml(hkConsoleEmpId);
+    const items=Object.values(giftLedgerFor(hkConsoleEmpId).items)
+      .filter(t=> !t.deletedAt && t.createdAt>=cutoff)
       .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
     const byMonth={};
     items.forEach(t=>{ const k=monthKeyOf(t.createdAt); (byMonth[k]=byMonth[k]||[]).push(t); });
     const keys=Object.keys(byMonth).sort().reverse();
     $("hkDetailBody").innerHTML = keys.length ? keys.map(k=>{
       const list=byMonth[k];
-      const sum=list.reduce((a,t)=>a+(Number(t.price)||0),0);
-      const rows=list.map(t=>`<div class="hk-row">
-        <div class="hk-main"><div class="hk-name">${esc(t.name)}</div><div class="hk-date">${fmtDate(t.createdAt)}</div></div>
-        <div class="hk-price">₪${(Number(t.price)||0).toFixed(0)}</div>
-        <div class="hk-acts"><button class="btn line sm" onclick="editHakafa('${hkConsoleEmpId}','${t.id}')">✏️</button><button class="btn line sm" onclick="delHakafa('${hkConsoleEmpId}','${t.id}')">🗑️</button></div>
-      </div>`).join("");
+      const rows=list.map(t=>takingRowHtml(t,hkConsoleEmpId)).join("");
       const lim=hakafaLimitInfo(hkConsoleEmpId, k);
       const limitBanner = lim.over ? `<div class="hk-limit"><span class="hl-ico">⚠️</span><span>ההקפה החודש (₪${lim.sum.toFixed(0)}) עברה 25% מהשכר (₪${lim.limit.toFixed(0)}) — זה המקסימום שמותר לנכות מהשכר החודש לפי החוק. את היתרה יש לדחות לחודש הבא.</span></div>` : '';
       return `<div class="hk-month">
-        <div class="hk-month-head"><span>${monthLabel(k)}</span><span>סה"כ ₪${sum.toFixed(0)}</span></div>
+        <div class="hk-month-head"><span>${monthLabel(k)}</span>${takingMonthTotalsHtml(list)}</div>
         ${limitBanner}
         ${rows}
       </div>`;
-    }).join("") : '<div class="empty">אין רשומות לעובד זה.</div>';
+    }).join("") : '<div class="empty">עדיין אין קניות להצגה. אפשר להעניק מתנה גם לפני הקנייה הראשונה.</div>';
   }
 }
 
@@ -3312,9 +3499,15 @@ function renderEmployeeDashboard(){
 
   // --- הקפה לעובדים: רשימה לפי חודש (חודשיים אחרונים) ---
   const hkBody=$("empHakafaBody");
+  $("empGiftSummary").innerHTML=giftSummaryHtml(currentEmpId);
+  $("empGiftHistory").innerHTML=giftHistoryHtml(currentEmpId);
+  $("empHakafaSub").textContent=hakafaDataReady() && giftLedgerFor(currentEmpId).balanceCents>0
+    ? `🎁 יש לך ₪${giftMoney(giftLedgerFor(currentEmpId).balanceCents)} למימוש בחנות`
+    : "הקניות שלך והמתנות מהחנות";
+  renderHakafaPreview();
   if(hkBody){
-    const items=Object.keys(myTakings||{}).map(id=>({id,...myTakings[id]}))
-      .filter(t=> t && t.createdAt)
+    const items=Object.values(giftLedgerFor(currentEmpId).items)
+      .filter(t=> !t.deletedAt)
       .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
     const byMonth={};
     items.forEach(t=>{ const k=monthKeyOf(t.createdAt); (byMonth[k]=byMonth[k]||[]).push(t); });
@@ -3324,13 +3517,9 @@ function renderEmployeeDashboard(){
     } else {
       hkBody.innerHTML=monthKeys.map(k=>{
         const list=byMonth[k];
-        const sum=list.reduce((a,t)=>a+(Number(t.price)||0),0);
-        const rows=list.map(t=>`<div class="hk-row">
-          <div class="hk-main"><div class="hk-name">${esc(t.name)}</div><div class="hk-date">${fmtDate(t.createdAt)}</div></div>
-          <div class="hk-price">₪${(Number(t.price)||0).toFixed(0)}</div>
-        </div>`).join("");
+        const rows=list.map(t=>takingRowHtml(t)).join("");
         return `<div class="hk-month">
-          <div class="hk-month-head"><span>${monthLabel(k)}</span><span>סה"כ ₪${sum.toFixed(0)}</span></div>
+          <div class="hk-month-head"><span>${monthLabel(k)}</span>${takingMonthTotalsHtml(list)}</div>
           ${rows}
         </div>`;
       }).join("");
@@ -4297,10 +4486,11 @@ function monthsForEmp(empId){
   const paymentSrc=(currentRole==="employee"&&empId===currentEmpId) ? (myPayments||{}) : ((allPayments&&allPayments[empId])||{});
   const takingSrc=(currentRole==="employee"&&empId===currentEmpId) ? (myTakings||{}) : ((allTakings&&allTakings[empId])||{});
   Object.values(paymentSrc).forEach(p=>{
+    if(StoreGifts.isGift(p)) return;
     if(p&&p.monthKey) set[p.monthKey]=true;
     else if(p&&p.createdAt) set[monthKeyOf(p.createdAt)]=true;
   });
-  Object.values(takingSrc).forEach(t=>{ if(t&&t.createdAt) set[monthKeyOf(t.createdAt)]=true; });
+  Object.values(takingSrc).forEach(t=>{ if(t&&!t.deletedAt&&t.createdAt) set[monthKeyOf(t.createdAt)]=true; });
   set[currentMonthKey()]=true;
   return Object.keys(set).sort().reverse();
 }
@@ -4516,7 +4706,7 @@ function renderPayDetail(){
       ${cp.ot150H>0?`<div class="ps-row"><span>נוספות 150% (${fmtHours(cp.ot150H)})</span><span>₪${fmtPayMoney(cp.ot150H*rate*1.5)}</span></div>`:''}` : '';
 
   const payTkList=takingsListFor(paySubEmpId, paySelMonthKey);
-  const payTk=payTkList.reduce((a,t)=>a+(Number(t.price)||0),0);
+  const payTk=payTkList.reduce((a,t)=>a+t.chargeCents,0)/100;
   const payList = paymentsListFor(paySubEmpId, paySelMonthKey);
   const paidNow = payList.reduce((a,p)=>a+(Number(p.amount)||0),0);
   const leftToPay = totalPay - payTk - paidNow;
@@ -4598,6 +4788,7 @@ function renderPayDetail(){
 
 let payFullMonthBusy=false;
 async function payFullMonth(empId, monthKey){
+  if(!hakafaDataReady()){ toast("הנתונים עדיין נטענים — המתן לפני רישום תשלום"); return; }
   if(payFullMonthBusy) return; // מונע רישום כפול מלחיצה מהירה פעמיים
   payFullMonthBusy=true;
   try{
@@ -4622,6 +4813,7 @@ async function payFullMonth(empId, monthKey){
 
 // אוסף את נתוני הדוח לעובד/חודש הנבחרים (משותף לשני סוגי הדוחות)
 function payReportData(){
+  if(!hakafaDataReady()){ toast("הנתונים עדיין נטענים — המתן לפני הפקת הדוח"); return null; }
   const e=employees[paySubEmpId]; if(!e) return null;
   const rate=rateOf(paySubEmpId);
   const list=payShiftsFor(paySubEmpId, paySelMonthKey);
@@ -4639,7 +4831,7 @@ function payReportData(){
   const now=new Date();
   const genDate=pad(now.getDate())+"/"+pad(now.getMonth()+1)+"/"+now.getFullYear();
   const tkList=takingsListFor(paySubEmpId, paySelMonthKey);
-  const tkSum=tkList.reduce((a,t)=>a+(Number(t.price)||0),0);
+  const tkSum=tkList.reduce((a,t)=>a+t.chargeCents,0)/100;
   const payList=paymentsListFor(paySubEmpId, paySelMonthKey);
   const paidPay=payList.reduce((a,p)=>a+(Number(p.amount)||0),0);
   return { e, rate, rows, totalH, totalPay, paidPay, genDate, tkList, tkSum, payList, ot:cp };
@@ -4657,7 +4849,7 @@ function accountantReportHtml(D){
   </tr>`).join("");
   const debt = D.tkSum>0 ? `
     <div class="pr-tot" style="margin-top:18px">
-      <div><b>ניכוי משכר — חוב העובד למעסיק (מוצרים שנלקחו):</b> ₪${D.tkSum.toFixed(0)}</div>
+      <div><b>ניכוי משכר — חוב העובד למעסיק (מוצרים שנלקחו):</b> ₪${giftMoney(StoreGifts.cents(D.tkSum))}</div>
     </div>` : '';
   const adv = D.paidPay>0 ? `
     <div class="pr-tot" style="margin-top:12px">
