@@ -582,7 +582,8 @@
   .emp-hero .eh-sub{font-size:13px;opacity:.85}
   .emp-hero .eh-est{display:inline-block;margin-top:12px;font-size:11.5px;font-weight:700;background:rgba(255,255,255,.18);color:#fff;border-radius:999px;padding:5px 12px;line-height:1.45}
   .ls-head{font-weight:800;font-size:15px;margin-bottom:4px}
-  .ls-meta{font-size:13px;color:var(--muted);line-height:1.5}
+  .ls-meta{font-size:13px;color:var(--muted);line-height:1.6}
+  .ls-meta .ls-time{font-size:15.5px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums}
   .ls-mgr{margin-top:8px;background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:8px 10px;font-size:13px;color:#3730a3;line-height:1.5}
   .emp-next{display:flex;align-items:center;gap:10px;font-size:15.5px;font-weight:700}
   .emp-next .en-when{color:var(--primary)}
@@ -596,7 +597,11 @@
   .up-item.once{background:var(--live-bg);border-color:var(--live-line)}
   .up-item .ui-main{flex:1;min-width:0}
   .up-item .ui-date{font-weight:800;font-size:14.5px}
-  .up-item .ui-time{font-size:13px;color:var(--muted);margin-top:2px}
+  /* השעות הן מה שהעובד בא לראות, ולכן הן הדבר הבולט בשורה */
+  .up-item .ui-time{font-size:19px;font-weight:800;color:var(--ink);margin-top:3px;line-height:1.2;
+    font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+  .up-item.past{opacity:.5}
+  .up-item.today{border-color:var(--primary);box-shadow:0 0 0 2px var(--primary-ring)}
   .up-item .ui-luach{font-size:11.5px;font-weight:800;color:var(--primary-d);margin-top:4px;line-height:1.45}
   .up-item .ui-luach.late{color:var(--live-d)}
   .up-badge{font-size:11px;font-weight:800;border-radius:999px;padding:3px 9px;flex:0 0 auto}
@@ -1389,12 +1394,7 @@
         </button>
         <button class="folder lg" onclick="openEmpNav('upcoming')">
           <span class="f-ico">📅</span>
-          <span class="f-txt"><span class="f-title">המשמרות הקרובות שלי</span><span class="f-sub" id="empUpcomingSub">מתי אתה עובד בהמשך</span></span>
-          <span class="f-arr">→</span>
-        </button>
-        <button class="folder lg" onclick="openEmpNav('luach')">
-          <span class="f-ico">🕯️</span>
-          <span class="f-txt"><span class="f-title">לוח שנה ומועדים</span><span class="f-sub" id="empLuachSub">חגים וזמני כניסת שבת</span></span>
+          <span class="f-txt"><span class="f-title">הסידור שלי</span><span class="f-sub" id="empUpcomingSub">המשמרות שלך בשבוע הזה</span></span>
           <span class="f-arr">→</span>
         </button>
         <button class="folder lg" id="notesFolderBtn" onclick="openEmpNav('notes')">
@@ -1444,21 +1444,12 @@
       </div>
     </div>
 
-    <!-- משמרות קרובות -->
+    <!-- הסידור שלי: שבוע עבודה ממוצאי שבת עד מוצאי שבת -->
     <div id="empUpcoming" class="hidden">
-      <div class="screen-head"><button class="back-btn" onclick="empNavHome()">→ חזרה</button><h1 class="screen-title">📅 המשמרות הקרובות שלי</h1></div>
+      <div class="screen-head"><button class="back-btn" onclick="empNavHome()">→ חזרה</button><h1 class="screen-title">📅 הסידור שלי</h1></div>
       <div class="card">
-        <p class="sub">המשמרות שלך ל-7 הימים הקרובים (קבועות וחד-פעמיות). חד-פעמיות מסומנות בצבע.</p>
+        <p class="sub" id="empUpcomingIntro">—</p>
         <div id="empUpcomingBody"></div>
-      </div>
-    </div>
-
-    <!-- לוח שנה ומועדים -->
-    <div id="empLuach" class="hidden">
-      <div class="screen-head"><button class="back-btn" onclick="empNavHome()">→ חזרה</button><h1 class="screen-title">🕯️ לוח שנה ומועדים</h1></div>
-      <div class="card">
-        <p class="sub">חגים, מועדים וזמני כניסת שבת וצאתה. לחיצה על יום מציגה את הזמנים שלו ואת המשמרות שלך בו.</p>
-        <div id="empLuachBody"></div>
       </div>
     </div>
 
@@ -1493,7 +1484,7 @@
       <details class="gift-history hidden" id="empGiftHistoryDetails"><summary>המתנות שקיבלת והשימושים בהן</summary><div class="gift-history-body" id="empGiftHistory"></div></details>
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <div><h2 style="margin:0;font-size:17px">הרשימה שלי</h2><span class="sub">שני חודשי הקניות האחרונים</span></div>
+          <div><h2 style="margin:0;font-size:17px">הרשימה שלי</h2><span class="sub">החודש הזה ושני החודשים שלפניו</span></div>
           <button class="btn line sm" onclick="hakafaFixInfo()">תיקון</button>
         </div>
         <div id="empHakafaBody"></div>
@@ -2792,7 +2783,7 @@ function renderActive(){
 /* ============================================================
    7ב. דשבורד עובד (קריאה בלבד) - תיקיות
    ============================================================ */
-let empNav="home";       // 'home' | 'pay' | 'paymonth' | 'upcoming' | 'luach' | 'notes'
+let empNav="home";       // 'home' | 'pay' | 'paymonth' | 'upcoming' | 'notes'
 let empNavMonth=null;    // מפתח החודש בתצוגת פירוט חודש
 let myTakings={};        // הקפה: רשומות העובד הנוכחי (נטען ב-enterEmployeeMode)
 let allTakings={};       // הקפה: כל הרשומות (נטען רק אצל המנהל)
@@ -2806,7 +2797,7 @@ let empSignFormId=null;  // הטופס שנמצא בחתימה כרגע
 let sigCtx=null, sigDrawing=false, sigHasInk=false, sigLast=null; // לוח החתימה
 
 function applyEmpDashNav(){
-  const map={home:"empHome",pay:"empPay",paymonth:"empPayMonth",upcoming:"empUpcoming",luach:"empLuach",notes:"empNotes",hakafa:"empHakafa",forms:"empForms",payslips:"empPayslips"};
+  const map={home:"empHome",pay:"empPay",paymonth:"empPayMonth",upcoming:"empUpcoming",notes:"empNotes",hakafa:"empHakafa",forms:"empForms",payslips:"empPayslips"};
   Object.keys(map).forEach(k=>{ const el=$(map[k]); if(el) el.classList.toggle("hidden", empNav!==k); });
 }
 function empNavHome(){ empNav="home"; renderEmployeeDashboard(); try{window.scrollTo(0,0);}catch(e){} }
@@ -2814,7 +2805,6 @@ function openEmpNav(name){
   empNav=name;
   if(name==="notes" && currentEmpId){ db.ref("employees/"+currentEmpId+"/notesSeenAt").set(TS); }
   if(name==="forms"){ empFormView="list"; empSignFormId=null; }
-  if(name==="luach"){ luachGoToday(); }
   renderEmployeeDashboard();
   try{window.scrollTo(0,0);}catch(e){}
 }
@@ -2886,7 +2876,7 @@ function renderEmpLastShift(){
   const mgrFb=s.managerFeedback||"";
   box.innerHTML=`<div class="card">
     <div class="ls-head">המשמרת האחרונה שלך</div>
-    <div class="ls-meta">${fmtDate(s.clockIn)} · כניסה ${fmtTime(s.clockIn)} ← ${open?'במשמרת עכשיו':('יציאה '+fmtTime(s.clockOut))}</div>
+    <div class="ls-meta">${fmtDate(s.clockIn)} · כניסה <span class="ls-time">${fmtTime(s.clockIn)}</span> ← ${open?'במשמרת עכשיו':('יציאה <span class="ls-time">'+fmtTime(s.clockOut)+'</span>')}</div>
     ${mgrFb?`<div class="ls-mgr"><b>💬 משוב מהמנהל:</b> ${esc(mgrFb)}</div>`:''}
     <label class="fld" style="margin-top:10px">הערה למנהל על המשמרת</label>
     <textarea id="empShiftNoteInput" rows="3" placeholder="משהו שקרה במשמרת? בעיה בקופה? כתוב כאן והמנהל יראה...">${esc(note)}</textarea>
@@ -3662,24 +3652,30 @@ function renderEmployeeDashboard(){
     </button>`;
   }).join("") || '<div class="empty">אין נתונים עדיין.</div>';
 
-  // --- משמרות קרובות: רק 7 הימים הקרובים ---
-  const up=computeUpcomingForEmp(currentEmpId, 2, 7);
-  $("empUpcomingSub").textContent = up.length ? `${up.length} משמרות ב-7 הימים הקרובים` : "אין משמרות ב-7 הימים הקרובים";
+  // --- הסידור שלי: שבוע העבודה, ממוצאי שבת עד מוצאי שבת ---
+  const week=empWeekWindow();
+  const up=empWeekShifts();
+  const todayIso=isoDate(new Date());
+  $("empUpcomingSub").textContent = up.length
+    ? `${up.length} ${up.length===1?"משמרת":"משמרות"} בשבוע הזה`
+    : "אין לך משמרות בשבוע הזה";
+  const intro=$("empUpcomingIntro");
+  if(intro) intro.innerHTML = `שבוע העבודה רץ <b>ממוצאי שבת עד מוצאי שבת</b>. `
+    + `כאן כל המשמרות שלך בשבוע הזה — ממוצאי שבת ${empWeekDayHtml(week.startIso)} `
+    + `ועד מוצאי שבת ${empWeekDayHtml(week.endIso)}. חד-פעמיות מסומנות בצבע.`;
   $("empUpcomingBody").innerHTML = up.length ? up.map(u=>{
     const once=u.type==='once';
-    return `<div class="up-item ${once?'once':''}">
+    const isToday=u.date===todayIso;
+    const isPast=u.date<todayIso;
+    return `<div class="up-item ${once?'once':''} ${isToday?'today':''} ${isPast?'past':''}">
       <div class="ui-main">
-        <div class="ui-date">${fmtIsoShort(u.date)}</div>
+        <div class="ui-date">${isToday?'היום · ':''}${fmtIsoShort(u.date)}</div>
         <div class="ui-time">${timeRangeHtml(u.startTime,u.endTime)}</div>
         ${luachShiftNoteHtml(u.date, u.startTime, u.endTime)}
       </div>
       <span class="up-badge ${once?'once':'rec'}">${once?'חד-פעמית':'קבועה'}</span>
     </div>`;
-  }).join("") : '<div class="empty">אין משמרות ב-7 הימים הקרובים.</div>';
-
-  // --- לוח שנה ומועדים ---
-  renderLuach();
-  renderLuachFolderSub();
+  }).join("") : '<div class="empty">אין לך משמרות בשבוע הזה.</div>';
 
   // --- הערות מנהל: מ-3 המשמרות האחרונות שיש בהן משוב ---
   const notes=Object.keys(shifts).map(id=>({id,...shifts[id]}))
@@ -3700,7 +3696,7 @@ function renderEmployeeDashboard(){
   const nBtn=$("notesFolderBtn"); if(nBtn) nBtn.classList.toggle("alert", newNotes>0);
   const nSub=$("notesFolderSub"); if(nSub) nSub.textContent = newNotes>0 ? "יש הערה חדשה על המשמרת שלך — כנס לראות" : "משוב על המשמרות שלך";
 
-  // --- הקפה לעובדים: רשימה לפי חודש (חודשיים אחרונים) ---
+  // --- הקפה לעובדים: רשימה לפי חודש (החודש הזה ושני החודשים שלפניו) ---
   const hkBody=$("empHakafaBody");
   // כל מה שקשור למתנות מוצג לעובד רק כשיש לו יתרת מתנה פעילה
   const giftShown=giftVisibleFor(currentEmpId);
@@ -3723,7 +3719,9 @@ function renderEmployeeDashboard(){
       .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
     const byMonth={};
     items.forEach(t=>{ const k=monthKeyOf(t.createdAt); (byMonth[k]=byMonth[k]||[]).push(t); });
-    const monthKeys=Object.keys(byMonth).sort().reverse().slice(0,2);
+    // רק שלושת החודשים האחרונים. מה שמעבר לזה אינו מעניין את העובד
+    const recent=lastMonthKeys(3);
+    const monthKeys=Object.keys(byMonth).filter(k=>recent.includes(k)).sort().reverse();
     if(monthKeys.length===0){
       hkBody.innerHTML='<div class="empty">עדיין לא רשמת פריטים.</div>';
     } else {
@@ -5880,11 +5878,11 @@ function luachUpcomingHtml(daysAhead){
   </div>`;
 }
 
+// לוח השנה הוא מסך של המנהל. אצל העובד מוצג רק מה שנוגע למשמרות שלו.
 function renderLuach(){
-  const forEmployee = currentRole==="employee";
   // מצייר רק כשהמסך באמת פתוח: renderConsole רץ על כל עדכון מ-Firebase
-  if(forEmployee ? empNav!=="luach" : consoleFolder!=="luach") return;
-  const host = forEmployee ? $("empLuachBody") : $("luachBody");
+  if(consoleFolder!=="luach") return;
+  const host = $("luachBody");
   if(!host) return;
   if(!luachReady()){
     host.innerHTML='<div class="empty">קובץ הלוח (luach.js) לא נטען. ודא שהוא הועלה לאותה תיקייה של index.html.</div>';
@@ -5917,7 +5915,7 @@ function luachHomeSubText(){
 }
 function renderLuachFolderSub(){
   const text=luachHomeSubText();
-  ["luachFolderSub","empLuachSub"].forEach(id=>{
+  ["luachFolderSub"].forEach(id=>{
     const el=$(id);
     if(el && text) el.textContent=text;
   });
@@ -6182,6 +6180,57 @@ function recurringOccurrences(r, weeks, includeCancelled){
   const seen={};
   return out.filter(x=>{ if(seen[x.date]) return false; seen[x.date]=1; return true; })
             .sort((a,b)=>a.date.localeCompare(b.date));
+}
+
+/* ---------- שבוע העבודה של העובד: ממוצאי שבת עד מוצאי שבת ----------
+ * כך מסתדר סידור העבודה בחנות: השבוע נפתח בצאת השבת ונסגר בשבת שאחריה,
+ * כולל מוצאי השבת שלה. משמרת שמתחילה בשבת אחרי צאת השבת שייכת כבר לשבוע
+ * החדש, ולכן השבת הפותחת נכללת רק מהיציאה ואילך.
+ */
+function empWeekWindow(){
+  const today=new Date(); today.setHours(0,0,0,0);
+  let start=addDaysDate(today, -((today.getDay()+1)%7));   // השבת האחרונה, או היום אם היום שבת
+  if(start.getTime()===today.getTime()){
+    // בשבת עצמה: לפני צאת השבת אנחנו עוד בשבוע שנפתח בשבת שלפניה
+    const exit=empRestExitMs(isoDate(start));
+    if(exit==null || Date.now()<exit) start=addDaysDate(start,-7);
+  }
+  return { startIso: isoDate(start), endIso: isoDate(addDaysDate(start,7)) };
+}
+function empRestExitMs(iso){
+  if(!luachReady()) return null;
+  const d=Luach.day(iso, luachPlace());
+  return d ? d.zmanim.havdalahMs : null;
+}
+function empStartsAfterRestExit(iso, startTime){
+  const exit=empRestExitMs(iso);
+  if(exit==null) return false;
+  return hhmmToMin(startTime) >= hhmmToMin(Luach.hhmm(exit, luachPlace()));
+}
+function empWeekShifts(){
+  const w=empWeekWindow();
+  const out=[];
+  for(let d=parseIso(w.startIso); isoDate(d)<=w.endIso; d=addDaysDate(d,1)){
+    const iso=isoDate(d);
+    shiftsForDate(iso).forEach(sh=>{
+      if(sh.cancelled) return;
+      // השבת שפותחת את השבוע נכללת רק ממוצאי שבת ואילך
+      if(iso===w.startIso && !empStartsAfterRestExit(iso, sh.startTime)) return;
+      out.push({ date:iso, startTime:sh.startTime, endTime:sh.endTime, type:sh.type });
+    });
+  }
+  return out.sort((a,b)=> a.date===b.date ? a.startTime.localeCompare(b.startTime) : a.date.localeCompare(b.date));
+}
+function empWeekDayHtml(iso){
+  const d=parseIso(iso);
+  return `<span class="date-isolate">${pad(d.getDate())}/${pad(d.getMonth()+1)}</span>`;
+}
+
+// שלושת החודשים האחרונים, כולל החודש הנוכחי
+function lastMonthKeys(n){
+  const keys=[]; const now=new Date();
+  for(let i=0;i<n;i++) keys.push(monthKeyOf(new Date(now.getFullYear(), now.getMonth()-i, 1).getTime()));
+  return keys;
 }
 
 // איחוד קבועות + חד-פעמיות לתצוגת "המשמרות הקרובות"
