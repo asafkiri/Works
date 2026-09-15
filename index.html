@@ -3671,7 +3671,7 @@ function renderEmployeeDashboard(){
       <div class="ui-main">
         <div class="ui-date">${fmtIsoShort(u.date)}</div>
         <div class="ui-time">${timeRangeHtml(u.startTime,u.endTime)}</div>
-        ${luachShiftNoteHtml(u.date, u.endTime)}
+        ${luachShiftNoteHtml(u.date, u.startTime, u.endTime)}
       </div>
       <span class="up-badge ${once?'once':'rec'}">${once?'חד-פעמית':'קבועה'}</span>
     </div>`;
@@ -5783,7 +5783,7 @@ function luachWeekLateWarning(iso, active){
   const d=Luach.day(iso, place);
   if(!d || d.zmanim.candlesMs==null) return "";
   const candleMin=hhmmToMin(Luach.hhmm(d.zmanim.candlesMs, place));
-  const late=active.filter(s=>hhmmToMin(s.endTime)>candleMin);
+  const late=active.filter(s=>luachEndsAfter(s.startTime, s.endTime, candleMin));
   if(!late.length) return "";
   const labels=luachRestLabels(d);
   const who=late.map(s=>esc(s.name)+" "+timeRangeText(s.startTime,s.endTime)).join(", ");
@@ -5945,7 +5945,14 @@ function luachDayStripHtml(iso){
 }
 
 // חיווי קצר ליום של משמרת: איזה מועד הוא, ואם המשמרת נמשכת אחרי כניסת השבת.
-function luachShiftNoteHtml(iso, endTime){
+// האם המשמרת נמשכת אחרי הדקה הזאת. משמרת שנגמרת לפני שהתחילה עוברת חצות,
+// ולכן היא בוודאי נמשכת אחרי כניסת השבת.
+function luachEndsAfter(startTime, endTime, minute){
+  const endMin=hhmmToMin(endTime), startMin=hhmmToMin(startTime);
+  return endMin<=startMin ? true : endMin>minute;
+}
+
+function luachShiftNoteHtml(iso, startTime, endTime){
   if(!luachReady()) return "";
   const place=luachPlace();
   const d=Luach.day(iso, place);
@@ -5960,7 +5967,7 @@ function luachShiftNoteHtml(iso, endTime){
   if(d.zmanim.candlesMs!=null){
     const labels=luachRestLabels(d);
     const candleMin=hhmmToMin(Luach.hhmm(d.zmanim.candlesMs, place));
-    late = endTime!=null && hhmmToMin(endTime)>candleMin;
+    late = endTime!=null && luachEndsAfter(startTime, endTime, candleMin);
     bits.push(labels.start+" "+Luach.hhmm(d.zmanim.candlesMs, place));
   }
   if(!bits.length) return "";
