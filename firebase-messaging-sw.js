@@ -3,6 +3,20 @@
    Service Worker לקבלת התראות פוש כשהאפליקציה סגורה/ברקע.
    יושב באותה תיקייה של index.html בריפו (חובה — לא בתת-תיקייה).
    ============================================================ */
+// Handle only the local sound test. Register before Firebase's click listener.
+self.addEventListener("notificationclick", (event) => {
+  if(!event.notification.data || event.notification.data.worksSoundTest !== true) return;
+  event.stopImmediatePropagation();
+  event.notification.close();
+  event.waitUntil((async () => {
+    const scope = self.registration.scope;
+    const windows = await self.clients.matchAll({type:"window", includeUncontrolled:true});
+    const existing = windows.find(client => client.url.startsWith(scope));
+    if(existing) return existing.focus();
+    return self.clients.openWindow(scope);
+  })());
+});
+
 importScripts("https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js");
 importScripts("https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js");
 
