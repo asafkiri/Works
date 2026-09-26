@@ -230,6 +230,9 @@ exports.sendShiftReminders = onSchedule(
     retryCount: 0,
   },
   async () => {
+    // Once a store terminal opts in, scheduled reminders go only to that
+    // channel. Turning terminals off must not re-enable employee-phone alerts.
+    if ((await db.ref("shopNotificationRouting/mode").get()).val() === "shop-only") return;
     const startedAt = Date.now();
     const nowLocal = localClock(startedAt);
     const dates = [nowLocal.date, addIsoDays(nowLocal.date, -1)];
@@ -491,3 +494,6 @@ exports.sendPushTest = onCall(
     return { successCount: result.successCount };
   },
 );
+
+// initializeApp above runs before these handlers obtain Admin SDK services.
+Object.assign(exports, require("./shop-notifications"));

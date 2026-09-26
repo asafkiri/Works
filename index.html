@@ -837,7 +837,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v75</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v76</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -862,7 +862,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v75</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v76</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -1862,6 +1862,7 @@
 </div>
 <script src="store-gifts.js?v=73"></script>
 <script src="luach.js?v=73"></script>
+<script src="shop-notifications-client.js?v=76"></script>
 <script>
 /* ============================================================
    1. הגדרות
@@ -2190,7 +2191,10 @@ function authErrText(err){
   return "שגיאה בהתחברות. נסה שוב.";
 }
 
-function doLogout(){ if(auth) auth.signOut(); }
+async function doLogout(){
+  if(window.ShopNotifications) await ShopNotifications.stop().catch(()=>{});
+  if(auth) auth.signOut();
+}
 
 /* ============================================================
    6. מאזין מצב התחברות + טעינת נתונים
@@ -2202,6 +2206,7 @@ if(auth){
       routeAfterLogin(user);
     } else {
       currentRole=null; currentEmpId=null;
+      if(window.ShopNotifications) ShopNotifications.stop().catch(()=>{});
       $("app").classList.add("hidden");
       $("empApp").classList.add("hidden");
       $("authScreen").classList.remove("hidden");
@@ -2226,6 +2231,7 @@ function routeAfterLogin(user){
       startDataListeners();
       applyDeviceMode();
     } else {
+      if(window.ShopNotifications) ShopNotifications.stop().catch(()=>{});
       enterEmployeeMode(user);
     }
   }).catch(()=> showErr("שגיאה בטעינה. נסה שוב."));
@@ -2423,6 +2429,7 @@ function applyDeviceMode(){
     if(sw) sw.classList.add("hidden");
     openModal("deviceModal");
   }
+  if(window.ShopNotifications) ShopNotifications.sync(true);
 }
 
 // בחירת מצב מהמודאל. מעבר ל"מנהל" מוגן ב-PIN אם הוגדר (כדי שבמכשיר חנות לא ייכנסו לקונסולה)
@@ -3809,12 +3816,12 @@ function renderEmployeeDashboard(){
   applyEmpDashNav();
 }
 
-// מחיקת משמרות חד-פעמיות שתאריכן עבר (תוכנית בלבד - בטוח למחוק)
+// שומרים גם את סידור אתמול לצורך תזכורות יציאה מאוחרות וחציית חצות.
 function cleanupPastOneTimes(){
-  const today=isoDate(new Date());
+  const cutoff=isoDate(addDaysDate(new Date(),-1));
   Object.keys(oneTime).forEach(id=>{
     const o=oneTime[id];
-    if(o && o.date && o.date < today){ db.ref("oneTimeShifts/"+id).remove(); }
+    if(o && o.date && o.date < cutoff){ db.ref("oneTimeShifts/"+id).remove(); }
   });
 }
 
@@ -6684,6 +6691,10 @@ if(messaging){
   messaging.onMessage(payload => {
     try{
       const d = (payload && payload.data) || {};
+      if(d.audience === "shop"){
+        if(window.ShopNotifications) ShopNotifications.receive(d).catch(()=>{});
+        return;
+      }
       if(d.kind === "in" || d.kind === "out"){
         if(currentRole === "employee"){
           openReminderChooser({ kind:d.kind, time:d.time||"", date:d.date||"", slot:d.slot||"" });
@@ -6730,11 +6741,12 @@ function maybeConsumeGoto(){
   }catch(e){}
 }
 
-/* ---------- בדיקת צליל במכשיר החנות: מקומית בלבד, ללא שינוי בנמענים ---------- */
+/* ---------- התראות במכשיר החנות ובדיקת צליל ---------- */
 let shopNotificationTestBusy = false;
 let shopNotificationTestMessage = "";
 let shopNotificationPreferenceBusy = false;
 let shopNotificationChoiceVersion = 0;
+let shopNotificationPanelOpen = false;
 
 // Device/account-local opt-in. A browser permission alone is never consent.
 function shopNotificationPreferenceKey(){
@@ -6774,10 +6786,14 @@ async function chooseShopNotifications(enabled){
         return;
       }
     }
-    // Persist before reporting success. Never write this choice to Firebase.
+    // This choice belongs to this device/account, not the manager's profile.
     localStorage.setItem(key, enabled ? "on" : "off");
     shopNotificationTestMessage = enabled ? "נשמר: עם התראות במכשיר הזה בלבד. כעת אפשר לבדוק את הצליל." : "נשמר: בלי התראות חנות במכשיר הזה.";
     if(!enabled) closeShopTestNotifications().catch(()=>{});
+    if(window.ShopNotifications){
+      const connected = enabled ? await ShopNotifications.sync(true) : await ShopNotifications.stop().catch(()=>false);
+      if(enabled && version === shopNotificationChoiceVersion) shopNotificationTestMessage = connected ? "התזכורות חוברו לטלפון הזה. ההחתמה בפועל עוצרת אותן." : ShopNotifications.getError();
+    }
   }catch(e){
     shopNotificationTestMessage = "הבחירה לא נשמרה. נסה שוב; אם הבעיה נמשכת, בדוק שהדפדפן מאפשר שמירת נתונים.";
   }finally{
@@ -6801,6 +6817,8 @@ function renderShopNotificationTest(){
   const supported = window.isSecureContext && ("Notification" in window) && ("serviceWorker" in navigator);
   const blocked = supported && Notification.permission === "denied";
   const enabled = shopNotificationsEnabled();
+  const serverState = window.ShopNotifications ? ShopNotifications.getState() : "off";
+  const status = !enabled ? "כבוי" : serverState === "active" ? "פעיל" : serverState === "pending" ? "מתחבר…" : "דרוש חיבור לשרת";
   const help = !supported
     ? "בדיקת התראות אינה זמינה כאן. פתח את האפליקציה המותקנת או את האתר ב־Chrome מעודכן."
     : blocked
@@ -6808,8 +6826,9 @@ function renderShopNotificationTest(){
       : !enabled
         ? "כרגע נבחר ״בלי התראות״. לבדיקת הצליל בטלפון החנות, בחר קודם ״עם התראות״."
         : "נציג התראת ניסיון בטלפון הזה בלבד, כדי לבדוק את הצליל ולפתוח את הגדרותיו.";
-  const html = `<div class="card rem-card">
-    <div class="rem-head">🔔 התראות בטלפון החנות</div>
+  const html = `<details class="card" style="padding:12px 14px;margin-bottom:8px" ${shopNotificationPanelOpen?'open':''}>
+    <summary style="cursor:pointer;font-size:13px;font-weight:600" onclick="shopNotificationPanelOpen=!this.parentElement.open">🔔 התראות חנות <span style="color:var(--muted);font-weight:400">· ${status}</span></summary>
+    <div style="margin-top:12px">
     <div class="rem-sub">מיועד רק לטלפון הקבוע של החנות. בחר ״עם התראות״ רק בטלפון הזה. הבחירה נשמרת במכשיר הזה בלבד ואינה מופעלת בטלפונים אחרים שמחוברים לחשבון המנהל.</div>
     <div role="group" aria-label="התראות חנות במכשיר הזה" style="display:flex;gap:8px;margin-top:12px">
       <button class="btn ${enabled?'':'line'}" style="flex:1" aria-pressed="${enabled}" onclick="chooseShopNotifications(true)" ${!supported || blocked || shopNotificationPreferenceBusy?'disabled':''}>${shopNotificationPreferenceBusy?'מפעיל…':'עם התראות'}</button>
@@ -6817,12 +6836,20 @@ function renderShopNotificationTest(){
     </div>
     <div class="rem-sub" style="margin-top:10px">${help}</div>
     ${enabled && supported && !blocked ? `<button class="btn line" style="width:100%;margin-top:12px" onclick="testShopNotification()" ${shopNotificationTestBusy || shopNotificationPreferenceBusy?'disabled':''}>${shopNotificationTestBusy?'מכין התראת בדיקה…':'בדיקת התראה וצליל'}</button>` : ''}
-    <div class="rem-sub" style="margin-top:10px">כרגע זמינה בדיקת צליל. העברת הודעות העובדים לטלפון החנות עדיין לא הופעלה.</div>
+    <div class="rem-sub" style="margin-top:10px">תזכורת לכניסה וליציאה לפי הסידור, כל 5 דקות כל עוד ההחתמה חסרה. התזכורת נעצרת כשההחתמה נרשמת; סגירת ההתראה לא עוצרת אותה.</div>
+    ${enabled && serverState !== 'active' ? `<button class="btn line sm" style="width:100%;margin-top:10px" onclick="ShopNotifications.sync(true)">חבר תזכורות מהשרת</button><div class="rem-sub" style="margin-top:8px">${esc(window.ShopNotifications ? ShopNotifications.getError() : 'יש לרענן את האפליקציה.')}</div>` : ''}
+    ${enabled && serverState === 'active' ? `<button class="btn line sm" style="width:100%;margin-top:10px" onclick="testShopServerNotification()">בדיקת הודעה מהשרת</button>` : ''}
     <div role="status" aria-live="polite" style="margin-top:10px;font-size:14px;line-height:1.6">${esc(shopNotificationTestMessage)}</div>
-  </div>`;
+    </div>
+  </details>`;
   if(terminalBox) terminalBox.innerHTML = html;
   const managerBox = $("mgrNotifCard");
   if(managerBox) managerBox.innerHTML = html;
+}
+
+async function testShopServerNotification(){
+  try{ await ShopNotifications.test(); toast("השרת שלח הודעת בדיקה לטלפון הזה"); }
+  catch(e){ shopNotificationTestMessage=e.message; renderShopNotificationTest(); }
 }
 
 async function testShopNotification(){
