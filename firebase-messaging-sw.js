@@ -1,11 +1,11 @@
 /* ============================================================
-   firebase-messaging-sw.js — v61
+   firebase-messaging-sw.js — v76
    Service Worker לקבלת התראות פוש כשהאפליקציה סגורה/ברקע.
    יושב באותה תיקייה של index.html בריפו (חובה — לא בתת-תיקייה).
    ============================================================ */
-// Handle only the local sound test. Register before Firebase's click listener.
+// Handle store reminders and the local sound test before Firebase's listener.
 self.addEventListener("notificationclick", (event) => {
-  if(!event.notification.data || event.notification.data.worksSoundTest !== true) return;
+  if(!event.notification.data || (!event.notification.data.worksSoundTest && !event.notification.data.worksShopReminder)) return;
   event.stopImmediatePropagation();
   event.notification.close();
   event.waitUntil((async () => {
@@ -32,7 +32,49 @@ firebase.initializeApp({
 
 // מספיק לאתחל — ה-SDK מציג לבד התראות שמגיעות ברקע (notification payload)
 // ובלחיצה פותח את הקישור שהפונקציה שלחה (fcmOptions.link => ?reminder=...).
-firebase.messaging();
+const messaging = firebase.messaging();
+
+const SHOP_POLICY_CACHE = "works-shop-notification-policy-v1";
+const SHOP_POLICY_URL = new URL("__shop_notification_policy", self.registration.scope).href;
+// Serialize display and opt-out so no in-flight display can outlive disabling.
+let shopQueue=Promise.resolve();
+function queueShop(work){const next=shopQueue.then(work);shopQueue=next.catch(()=>{});return next;}
+async function shopPolicy(){
+  const response = await (await caches.open(SHOP_POLICY_CACHE)).match(SHOP_POLICY_URL);
+  return response ? response.json() : {enabled:false};
+}
+async function showShopReminder(data){
+  if(!data || data.audience !== "shop" || !(Number(data.expiresAt) > Date.now())) return;
+  const policy = await shopPolicy();
+  if(policy.enabled !== true || policy.deviceId !== data.deviceId) return;
+  return self.registration.showNotification(data.title || "תזכורת החתמה", {
+    body:data.body || "", icon:new URL("icon-192.png", self.registration.scope).href,
+    dir:"rtl", lang:"he", tag:data.tag || "works-shop-reminder", renotify:true,
+    silent:false, vibrate:[250,100,250], requireInteraction:true,
+    data:{worksShopReminder:true,employeeId:data.employeeId || "",kind:data.kind || ""}
+  });
+}
+self.addEventListener("message", event => {
+  if(!event.source || !event.source.url.startsWith(self.registration.scope)) return;
+  if(event.data?.type === "SHOP_NOTIFICATION_POLICY") {
+    event.waitUntil(queueShop(async()=>{
+      try{
+        const cache=await caches.open(SHOP_POLICY_CACHE);
+        await cache.put(SHOP_POLICY_URL,new Response(JSON.stringify({enabled:event.data.enabled === true,deviceId:event.data.deviceId || ""}),{headers:{"Content-Type":"application/json"}}));
+        if(event.data.enabled !== true){
+          const notifications=await self.registration.getNotifications();
+          notifications.forEach(n=>{if(n.data?.worksShopReminder)n.close();});
+        }
+        event.ports[0]?.postMessage({ok:true});
+      }catch(e){event.ports[0]?.postMessage({ok:false});}
+    }));
+  }else if(event.data?.type === "SHOW_SHOP_REMINDER"){
+    event.waitUntil(queueShop(()=>showShopReminder(event.data.data)));
+  }
+});
+messaging.onBackgroundMessage(payload => {
+  if(payload.data?.audience === "shop") return queueShop(()=>showShopReminder(payload.data));
+});
 
 // עדכון מהיר של ה-Service Worker בגרסאות חדשות
 self.addEventListener("install", () => self.skipWaiting());
