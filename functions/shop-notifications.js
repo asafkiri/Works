@@ -1,6 +1,6 @@
 "use strict";
 const {randomUUID,createHash}=require("node:crypto");
-const {getDatabase}=require("firebase-admin/database");
+const {getDatabaseWithUrl}=require("firebase-admin/database");
 const {getMessaging}=require("firebase-admin/messaging");
 const {onCall,HttpsError}=require("firebase-functions/v2/https");
 const {onSchedule}=require("firebase-functions/v2/scheduler");
@@ -8,7 +8,7 @@ const logger=require("firebase-functions/logger");
 const {localClock,addIsoDays}=require("./reminder-logic");
 const {pendingShopEvents,deliveryDue,activeShopDevices,shopMessage}=require("./shop-reminder-logic");
 const DB_URL="https://mini-market-shalom-default-rtdb.firebaseio.com";
-const db=()=>getDatabase(undefined,DB_URL);
+const db=()=>getDatabaseWithUrl(DB_URL);
 const invalidTokens=new Set(["messaging/registration-token-not-registered","messaging/invalid-registration-token"]);
 const digest=value=>createHash("sha256").update(value).digest("hex");
 async function roots(names) {
