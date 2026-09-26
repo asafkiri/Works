@@ -19,7 +19,7 @@ function server(){
   };}};
   class HttpsError extends Error{constructor(code,message){super(message);this.code=code;}}
   const context={exports:{},Date:class extends Date{static now(){return now;}},require(name){
-    if(name==="firebase-admin/database")return {getDatabase:()=>db};
+    if(name==="firebase-admin/database")return {getDatabaseWithUrl:()=>db};
     if(name==="firebase-admin/messaging")return {getMessaging:()=>({send:async message=>{if(sendError)throw sendError;sent.push(clone(message));return "ok";}})};
     if(name==="firebase-functions/v2/https")return {onCall:(_,fn)=>fn,HttpsError};
     if(name==="firebase-functions/v2/scheduler")return {onSchedule:(_,fn)=>fn};
