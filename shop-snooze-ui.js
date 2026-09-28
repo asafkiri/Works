@@ -4,12 +4,22 @@
   const busy=new Set();
   function enabled(){return shopNotificationsEnabled() && window.ShopNotifications?.getState()==="active";}
   function clear(){version++;events=[];lastRefresh=0;render();}
+  // Any open shift of the employee counts, not only the openShiftId pointer
+  // (it can be missing or stale, e.g. after a punch saved while offline).
+  function inShift(id){
+    const employee=employees[id],pointed=employee?.openShiftId && shifts[employee.openShiftId];
+    return !!(pointed && !pointed.clockOut) || Object.values(shifts||{}).some(s=>s && s.employeeId===id && s.clockIn && !s.clockOut);
+  }
+  // A punch was just saved on this terminal: hide that reminder's controls at once.
+  function resolved(employeeId,kind){
+    version++;events=events.filter(e=>!(e.employeeId===employeeId && e.kind===kind));render();refresh(true);
+  }
   function render(){
     document.querySelectorAll("[data-shop-snooze]").forEach(slot=>{
-      const row=enabled()?events.find(e=>e.employeeId===slot.dataset.shopSnooze):null;
-      const employee=employees[slot.dataset.shopSnooze];
-      const live=employee?.openShiftId && shifts[employee.openShiftId] && !shifts[employee.openShiftId].clockOut;
-      if(!row || (row.kind==="in"?live:!live)){slot.replaceChildren();delete slot.dataset.signature;return;}
+      const employee=employees[slot.dataset.shopSnooze],live=inShift(slot.dataset.shopSnooze);
+      // Entry reminders matter while the employee is out, exit reminders while in.
+      const row=enabled()?events.find(e=>e.employeeId===slot.dataset.shopSnooze && e.kind===(live?"out":"in")):null;
+      if(!row){slot.replaceChildren();delete slot.dataset.signature;return;}
       const paused=Number(row.until)>Date.now(),working=busy.has(row.snoozeKey);
       const signature=JSON.stringify([row.snoozeKey,row.until,paused,working]);
       if(slot.dataset.signature===signature && slot.firstChild)return;
@@ -79,7 +89,7 @@
     }).catch(()=>{lastRefresh=0;}).finally(()=>{pending=null;if(again){again=false;refresh(true);}});
     return pending;
   }
-  window.ShopSnooze={render,refresh,clear};
+  window.ShopSnooze={render,refresh,clear,resolved};
   setInterval(()=>{if(document.visibilityState==="visible"){render();refresh();}},30_000);
   document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")refresh(true);});
 })();

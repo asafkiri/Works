@@ -37,7 +37,7 @@
       let body;try{body=await response.json();}catch(e){}
       if(!response.ok || body?.error){
         const failure=Error(body?.error?.message || "שרת תזכורות החנות עדיין אינו זמין. יש לפרסם את עדכון השרת ולנסות שוב.");
-        failure.status=body?.error?.status;throw failure;
+        failure.status=body?.error?.status;failure.details=body?.error?.details;throw failure;
       }
       return body.result || body.data || {};
     }catch(e){
@@ -102,14 +102,51 @@
     // or network error would otherwise mute foreground AND background pushes
     // indefinitely. New devices remain off until their first server opt-in.
     if(!stillEnabled())return false;
-    const token=await withTimeout(messaging.getToken({vapidKey:VAPID_KEY,serviceWorkerRegistration:reg}),30000,"קבלת מזהה ההתראות מתעכבת. ננסה שוב אוטומטית.");
-    if(!token)throw Error("לא התקבל מזהה התראות. נסה שוב.");
+    const pushToken=async()=>{
+      const token=await withTimeout(messaging.getToken({vapidKey:VAPID_KEY,serviceWorkerRegistration:reg}),30000,"קבלת מזהה ההתראות מתעכבת. ננסה שוב אוטומטית.");
+      if(!token)throw Error("לא התקבל מזהה התראות. נסה שוב.");
+      return token;
+    };
+    let token=await pushToken();
     if(!stillEnabled())return false;
-    await call("enable",id,token,user);
+    let sentAt=Date.now(),enabled;
+    try{enabled=await call("enable",id,token,user);}
+    catch(e){
+      if(e.details?.reason!=="token-rejected")throw e;
+      // FCM rejected this token. Drop the push subscription so Firebase creates a
+      // new subscription and token instead of returning the dead cached one.
+      const subscription=await reg.pushManager?.getSubscription().catch(()=>null);
+      if(subscription)await subscription.unsubscribe().catch(()=>{});
+      if(!stillEnabled())return false;
+      token=await pushToken();
+      if(!stillEnabled())return false;
+      sentAt=Date.now();enabled=await call("enable",id,token,user);
+    }
+    const receivedAt=Date.now();
     if(!stillEnabled()){await policy(false,id,reg);await call("disable",id,undefined,user);return false;}
-    await policy(true,id,reg,await serverOffset());
+    // Prefer the server time returned by this request; fall back to Realtime Database.
+    const serverTime=Number(enabled?.serverTime);
+    const offset=serverTime>0 ? Math.round(serverTime-(sentAt+receivedAt)/2) : await serverOffset();
+    await policy(true,id,reg,Math.abs(offset)<86400000?offset:0);
     if(!stillEnabled()){await policy(false,id,reg);await call("disable",id,undefined,user);return false;}
-    state="active";return true;
+    state="active";
+    uploadReceipts(reg,user).catch(()=>{});
+    return true;
+  }
+  // Sends the worker's receipt log (reminders received/shown/suppressed) to the
+  // server log, then lets the worker drop what was uploaded.
+  async function uploadReceipts(reg,user){
+    if(!reg?.active)return;
+    const entries=await new Promise(resolve=>{
+      const channel=new MessageChannel();
+      const timer=setTimeout(()=>{channel.port1.close();resolve([]);},5000);
+      channel.port1.onmessage=event=>{clearTimeout(timer);channel.port1.close();resolve(Array.isArray(event.data?.entries)?event.data.entries:[]);};
+      reg.active.postMessage({type:"SHOP_RECEIPTS_TAKE"},[channel.port2]);
+    });
+    if(!entries.length)return;
+    const batch=entries.slice(-50);
+    await call("report",deviceId(false),undefined,user,{entries:batch});
+    reg.active.postMessage({type:"SHOP_RECEIPTS_ACK",until:Math.max(...batch.map(e=>Number(e.receivedAt)||0))});
   }
   function retry(version){
     if(version!==generation || !shopNotificationsEnabled() || !messaging || Notification.permission!=="granted")return;
@@ -145,6 +182,14 @@
     const reg=await navigator.serviceWorker.ready;
     reg.active?.postMessage({type:"SHOW_SHOP_REMINDER",data});
   }
+  // Called by the terminal right after a punch is saved: closes that employee's
+  // reminder of this kind on this phone and hides its snooze controls at once.
+  async function resolved(employeeId,kind){
+    window.ShopSnooze?.resolved?.(employeeId,kind);
+    if(!shopNotificationsEnabled())return;
+    const reg=await navigator.serviceWorker.getRegistration("firebase-messaging-sw.js").catch(()=>null);
+    reg?.active?.postMessage({type:"SHOP_REMINDER_RESOLVED",employeeId,kind});
+  }
   async function test(){
     if(!shopNotificationsEnabled())return;
     if(!await sync(true))throw Error(error||"התראות החנות עדיין לא מחוברות לשרת.");
@@ -177,7 +222,7 @@
     reg?.active?.postMessage({type:"SHOP_REMINDER_CANCELLED",planKey:result.planKey,until:result.until});
     return result;
   }
-  window.ShopNotifications={sync,stop,receive,test,pending,snooze,cancel,getState:()=>state,getError:()=>error};
+  window.ShopNotifications={sync,stop,receive,resolved,test,pending,snooze,cancel,getState:()=>state,getError:()=>error};
   function refreshWhenReady(force){
     // Auth and manager-role lookup finish asynchronously on page load. An
     // early lifecycle event must not mistake loading for an explicit opt-out.

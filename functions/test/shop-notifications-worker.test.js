@@ -185,3 +185,31 @@ test("an opt-out closes visible reminders and blocks later ones even when storag
   assert.equal(w.notices[0].closed,true);
   await w.push({data:w.payload});assert.equal(w.notices.length,1);
 });
+async function take(w){const [reply]=await w.message({type:"SHOP_RECEIPTS_TAKE"});return JSON.parse(JSON.stringify(reply.entries));}
+test("every shop push leaves a receipt saying whether and why it was or was not shown",async()=>{
+  const w=worker();const payload={...w.payload,ref:"r",employeeId:"a",sentAt:String(Date.now())};
+  await w.push({data:payload});
+  await w.message({type:"SHOP_NOTIFICATION_POLICY",enabled:true,deviceId:"this-device"});
+  await w.push({data:payload});await w.push({data:{...payload,deviceId:"other"}});await w.push({data:{...payload,expiresAt:"1"}});
+  await w.message({type:"SHOP_REMINDER_SNOOZED",snoozeKey:"s",until:Date.now()+600000});await w.push({data:{...payload,snoozeKey:"s"}});
+  await w.message({type:"SHOP_REMINDER_CANCELLED",planKey:"p",until:Date.now()+600000});await w.push({data:{...payload,planKey:"p"}});
+  const entries=await take(w);
+  assert.deepEqual(entries.map(e=>e.outcome),["policy-off","shown","other-device","expired","snoozed","cancelled"]);
+  assert.ok(entries.every(e=>e.path==="push"&&e.ref==="r"&&e.employeeId==="a"&&e.receivedAt>0));
+  await w.message({type:"SHOP_RECEIPTS_ACK",until:entries[3].receivedAt});
+  assert.ok((await take(w)).every(e=>e.receivedAt>entries[3].receivedAt));
+});
+test("the receipt log keeps only the latest 50 entries",async()=>{
+  const w=worker();await w.message({type:"SHOP_NOTIFICATION_POLICY",enabled:true,deviceId:"this-device"});
+  for(let i=0;i<55;i++)await w.push({data:{...w.payload,ref:"r"+i}});
+  const entries=await take(w);assert.equal(entries.length,50);assert.equal(entries[0].ref,"r5");
+});
+test("a punch recorded on the terminal closes that employee's reminder and ignores copies still in transit",async()=>{
+  const w=worker();await w.message({type:"SHOP_NOTIFICATION_POLICY",enabled:true,deviceId:"this-device"});
+  await w.push({data:{...w.payload,employeeId:"a",kind:"in"}});await w.push({data:{...w.payload,employeeId:"b",kind:"in",tag:"b"}});
+  await w.message({type:"SHOP_REMINDER_RESOLVED",employeeId:"a",kind:"in"});
+  assert.equal(w.notices[0].closed,true);assert.equal(w.notices[1].closed,false);
+  await w.push({data:{...w.payload,employeeId:"a",kind:"in"}});assert.equal(w.notices.length,2,"late copy is not shown");
+  await w.push({data:{...w.payload,employeeId:"a",kind:"out"}});assert.equal(w.notices.length,3,"the other kind still shows");
+  await w.message({type:"SHOP_REMINDER_RESOLVED",employeeId:"a",kind:"bogus"});assert.equal(w.notices[2].closed,false);
+});

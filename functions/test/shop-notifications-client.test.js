@@ -2,11 +2,20 @@
 const test=require("node:test"),assert=require("node:assert/strict"),fs=require("node:fs"),path=require("node:path"),vm=require("node:vm");
 const source=fs.readFileSync(path.join(__dirname,"../../shop-notifications-client.js"),"utf8");
 function device(enabled=true){
-  const storage=new Map(),requests=[],policies=[],foreground=[],timers=new Map(),listeners={},intervals=[],swListeners=[];let enableDelay=null,serverOk=true,tokens=0,nextTimer=0,tokenError=null,localPolicy={enabled:false},clock=null,pendingFails=false,tokenHang=false;
+  const storage=new Map(),requests=[],policies=[],foreground=[],timers=new Map(),listeners={},intervals=[],swListeners=[];let enableDelay=null,serverOk=true,tokens=0,nextTimer=0,tokenError=null,localPolicy={enabled:false},clock=null,pendingFails=false,tokenHang=false,subscriptions=0;const rejected=new Set();
   class Channel{constructor(){this.port1={close(){}};this.port2={postMessage:data=>{this.port1.onmessage?.({data});}};}}
-  const reg={active:{postMessage(data,ports){if(data.type==="SHOP_NOTIFICATION_POLICY"){policies.push(data);localPolicy=data;ports[0].postMessage({ok:true});}else foreground.push(data);}},update:async()=>{}};
+  const receipts=[],uploaded=[];
+  const reg={active:{postMessage(data,ports){
+    if(data.type==="SHOP_NOTIFICATION_POLICY"){policies.push(data);localPolicy=data;ports[0].postMessage({ok:true});}
+    else if(data.type==="SHOP_RECEIPTS_TAKE")ports[0].postMessage({entries:receipts.slice()});
+    else if(data.type==="SHOP_RECEIPTS_ACK")receipts.splice(0,receipts.length,...receipts.filter(e=>e.receivedAt>data.until));
+    else foreground.push(data);
+  }},update:async()=>{},pushManager:{getSubscription:async()=>subscription}};
+  let subscription=null;
   const ctx={currentRole:"manager",auth:{currentUser:{uid:"manager",getIdToken:async()=>"auth"}},Notification:{permission:"granted"},
-    messaging:{getToken:async()=>{tokens++;if(tokenHang)return new Promise(()=>{});if(tokenError)throw Error(tokenError);return "shop-phone-token";}},VAPID_KEY:"key",
+    messaging:{getToken:async()=>{tokens++;if(tokenHang)return new Promise(()=>{});if(tokenError)throw Error(tokenError);
+      if(!subscription)subscription={id:++subscriptions,unsubscribe:async()=>{subscription=null;return true;}};
+      return subscription.id===1?"shop-phone-token":"shop-phone-token-"+subscription.id;}},VAPID_KEY:"key",
     Date:{now:()=>clock??Date.now()},setInterval:(fn,ms)=>{intervals.push({fn,ms});return intervals.length;},
     shopNotificationsEnabled:()=>enabled,renderShopNotificationTest(){},
     setTimeout:(fn,ms)=>{const id=++nextTimer;timers.set(id,{fn,ms});return id;},clearTimeout:id=>timers.delete(id),AbortController,MessageChannel:Channel,
@@ -15,11 +24,13 @@ function device(enabled=true){
     navigator:{serviceWorker:{register:async()=>reg,ready:Promise.resolve(reg),getRegistration:async()=>reg,addEventListener:(name,fn)=>swListeners.push(fn)}},
     fetch:async(url,options)=>{const data=JSON.parse(options.body).data;requests.push(data);if(data.action==="enable"&&enableDelay)await enableDelay;
       if(data.action==="pending"&&pendingFails)return {ok:false,json:async()=>({error:{status:"FAILED_PRECONDITION",message:"המכשיר לא רשום להתראות חנות."}})};
+      if(data.action==="report"){uploaded.push(...data.entries);return {ok:true,json:async()=>({result:{logged:data.entries.length}})};}
+      if(data.action==="enable"&&rejected.has(data.token))return {ok:false,json:async()=>({error:{status:"FAILED_PRECONDITION",message:"פג",details:{reason:"token-rejected"}}})};
       return {ok:serverOk,json:async()=>serverOk?{result:{enabled:data.action==="enable",events:[]}}:{error:{message:"Server not deployed"}}};},
     document:{visibilityState:"visible",addEventListener:(name,fn)=>{listeners[name]=fn;}},addEventListener:(name,fn)=>{listeners[name]=fn;}
   };ctx.window=ctx;vm.runInNewContext(source,ctx);
   return {ctx,api:ctx.ShopNotifications,requests,policies,foreground,timers,listeners,intervals,swListeners,reg,tokens:()=>tokens,enabled:v=>{enabled=v;},delay:p=>{enableDelay=p;},serverOk:v=>{serverOk=v;},tokenError:v=>{tokenError=v;},policy:()=>localPolicy,
-    clock:v=>{clock=v;},pendingFails:v=>{pendingFails=v;},tokenHang:v=>{tokenHang=v;}};
+    clock:v=>{clock=v;},pendingFails:v=>{pendingFails=v;},tokenHang:v=>{tokenHang=v;},receipts,uploaded,reject:token=>rejected.add(token)};
 }
 
 test("a transient token or server refresh failure must not turn off a working receiver",async()=>{
@@ -197,4 +208,29 @@ test("a service worker registration that never settles is bounded like the rest 
   const d=device();d.ctx.navigator.serviceWorker.register=()=>new Promise(()=>{});
   const syncing=d.api.sync(true);await settle();const timeout=[...d.timers.values()].find(t=>t.ms===12000);assert.ok(timeout);
   timeout.fn();assert.equal(await syncing,false);assert.equal(d.api.getState(),"error");
+});
+test("a token the server reports as rejected is replaced by a new push subscription and token",async()=>{
+  const d=device();await d.api.sync(true);assert.equal(d.requests.at(-1).token,"shop-phone-token");
+  d.reject("shop-phone-token");d.clock(Date.now()+120000);
+  assert.equal(await d.api.sync(true),true);assert.equal(d.api.getState(),"active");
+  const enables=d.requests.filter(r=>r.action==="enable");assert.equal(enables.at(-1).token,"shop-phone-token-2");
+  assert.equal(d.policy().enabled,true);
+});
+test("the worker's receipt log is uploaded after a successful registration and then acknowledged",async()=>{
+  const d=device();d.receipts.push({outcome:"shown",ref:"r1",employeeId:"a",kind:"in",sentAt:1,receivedAt:10},{outcome:"expired",ref:"r2",employeeId:"a",kind:"in",sentAt:2,receivedAt:20});
+  await d.api.sync(true);await settle();
+  assert.deepEqual(d.uploaded.map(e=>e.ref),["r1","r2"]);assert.equal(d.receipts.length,0);
+  assert.equal([...d.timers.values()].length,0,"no receipt timer left behind");
+});
+test("the policy offset comes from the server time returned by enable when available",async()=>{
+  const d=device();const serverAhead=90000;
+  d.ctx.fetch=(orig=>async(url,options)=>{const r=await orig(url,options);const data=JSON.parse(options.body).data;
+    if(data.action!=="enable")return r;const body=await r.json();body.result.serverTime=Date.now()+serverAhead;return {ok:true,json:async()=>body};})(d.ctx.fetch);
+  await d.api.sync(true);assert.ok(Math.abs(d.policy().offset-serverAhead)<1000);
+});
+test("a punch on the terminal closes that reminder on the worker and hides its controls immediately",async()=>{
+  const d=device();let hidden=null;d.ctx.ShopSnooze={resolved:(e,k)=>{hidden=[e,k];},refresh(){},clear(){}};
+  await d.api.sync(true);await d.api.resolved("a","in");
+  assert.deepEqual(hidden,["a","in"]);assert.deepEqual(JSON.parse(JSON.stringify(d.foreground.at(-1))),{type:"SHOP_REMINDER_RESOLVED",employeeId:"a",kind:"in"});
+  d.enabled(false);const before=d.foreground.length;await d.api.resolved("a","out");assert.equal(d.foreground.length,before);
 });
