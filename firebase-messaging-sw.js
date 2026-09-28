@@ -1,5 +1,5 @@
 /* ============================================================
-   firebase-messaging-sw.js — v76
+   firebase-messaging-sw.js — v77
    Service Worker לקבלת התראות פוש כשהאפליקציה סגורה/ברקע.
    יושב באותה תיקייה של index.html בריפו (חובה — לא בתת-תיקייה).
    ============================================================ */
@@ -36,6 +36,7 @@ const messaging = firebase.messaging();
 
 const SHOP_POLICY_CACHE = "works-shop-notification-policy-v1";
 const SHOP_POLICY_URL = new URL("__shop_notification_policy", self.registration.scope).href;
+const SHOP_SNOOZE_URL = new URL("__shop_notification_snoozes", self.registration.scope).href;
 // Serialize display and opt-out so no in-flight display can outlive disabling.
 let shopQueue=Promise.resolve();
 function queueShop(work){const next=shopQueue.then(work);shopQueue=next.catch(()=>{});return next;}
@@ -47,11 +48,13 @@ async function showShopReminder(data){
   if(!data || data.audience !== "shop" || !(Number(data.expiresAt) > Date.now())) return;
   const policy = await shopPolicy();
   if(policy.enabled !== true || policy.deviceId !== data.deviceId) return;
+  const saved=await (await caches.open(SHOP_POLICY_CACHE)).match(SHOP_SNOOZE_URL);
+  if(saved && Number((await saved.json())[data.snoozeKey])>Date.now()) return;
   return self.registration.showNotification(data.title || "תזכורת החתמה", {
     body:data.body || "", icon:new URL("icon-192.png", self.registration.scope).href,
     dir:"rtl", lang:"he", tag:data.tag || "works-shop-reminder", renotify:true,
     silent:false, vibrate:[250,100,250], requireInteraction:true,
-    data:{worksShopReminder:true,employeeId:data.employeeId || "",kind:data.kind || ""}
+    data:{worksShopReminder:true,employeeId:data.employeeId || "",kind:data.kind || "",snoozeKey:data.snoozeKey || ""}
   });
 }
 self.addEventListener("message", event => {
@@ -67,6 +70,16 @@ self.addEventListener("message", event => {
         }
         event.ports[0]?.postMessage({ok:true});
       }catch(e){event.ports[0]?.postMessage({ok:false});}
+    }));
+  }else if(event.data?.type === "SHOP_REMINDER_SNOOZED"){
+    event.waitUntil(queueShop(async()=>{
+      const {snoozeKey,until}=event.data;
+      if(typeof snoozeKey!=="string" || !snoozeKey || !(Number(until)>Date.now()))return;
+      const cache=await caches.open(SHOP_POLICY_CACHE),saved=await cache.match(SHOP_SNOOZE_URL);
+      const snoozes=Object.fromEntries(Object.entries(saved?await saved.json():{}).filter(([,v])=>Number(v)>Date.now()));
+      snoozes[snoozeKey]=Number(until);
+      await cache.put(SHOP_SNOOZE_URL,new Response(JSON.stringify(snoozes),{headers:{"Content-Type":"application/json"}}));
+      (await self.registration.getNotifications()).forEach(n=>{if(n.data?.worksShopReminder && n.data.snoozeKey===snoozeKey)n.close();});
     }));
   }else if(event.data?.type === "SHOW_SHOP_REMINDER"){
     event.waitUntil(queueShop(()=>showShopReminder(event.data.data)));

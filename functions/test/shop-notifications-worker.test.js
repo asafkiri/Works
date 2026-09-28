@@ -36,3 +36,11 @@ test("opting out closes an in-flight reminder and prevents late queued backgroun
   const late=w.background(w.payload);release();await Promise.all([displaying,disabling,late]);
   assert.equal(w.notices.length,1);assert.equal(w.notices[0].closed,true);
 });
+test("snooze closes only this shift's notice and suppresses late delivery for it",async()=>{
+  const w=worker();await w.message({type:"SHOP_NOTIFICATION_POLICY",enabled:true,deviceId:"this-device"});
+  await w.background({...w.payload,snoozeKey:"first"});await w.background({...w.payload,snoozeKey:"other"});
+  await w.message({type:"SHOP_REMINDER_SNOOZED",snoozeKey:"first",until:Date.now()+600000});
+  assert.equal(w.notices[0].closed,true);assert.equal(w.notices[1].closed,false);
+  await w.background({...w.payload,snoozeKey:"first"});assert.equal(w.notices.length,2);
+  await w.background({...w.payload,snoozeKey:"next-shift"});assert.equal(w.notices.length,3);
+});
