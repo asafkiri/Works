@@ -28,6 +28,12 @@ async function roots(names) {
   const snaps=await Promise.all(names.map(n=>db().ref(n).get()));
   return Object.fromEntries(names.map((n,i)=>[n,snaps[i].val()||{}]));
 }
+// FCM rejected this exact token: switch the device off and remember the token,
+// so the phone must create a new one (see action "enable").
+function rejectToken(deviceId,token) {
+  return db().ref(`shopNotificationDevices/${deviceId}`).transaction(whenLoaded(row=>row.token===token?
+    {...row,enabled:false,token:null,rejectedToken:digest(token),disabledReason:"token-rejected",disabledAt:Date.now()}:undefined),undefined,false);
+}
 async function send(device,data) {
   return getMessaging().send({token:device.token,data,webpush:{headers:{Urgency:"high",TTL:String(SHOP_TTL_SECONDS)}}});
 }
@@ -104,8 +110,17 @@ exports.setShopNotificationDevice=onCall({region:"europe-west1",timeoutSeconds:3
   const rate=db().ref(`shopNotificationTestRate/${deviceId}`),now=Date.now();
   const claim=await rate.transaction(last=>Number(last)>now-30_000?undefined:now,undefined,false);
   if(!claim.committed) throw new HttpsError("resource-exhausted","אפשר לבדוק שוב בעוד חצי דקה.");
-  await send({...current,deviceId},{audience:"shop",deviceId,kind:"test",title:"🔔 בדיקת תזכורות החנות",body:"הודעת הבדיקה הגיעה מהשרת לטלפון הזה.",tag:"works-shop-server-test",
-    ref:"server-test",sentAt:String(now),expiresAt:String(now+SHOP_TTL_SECONDS*1000)});
+  try{
+    await send({...current,deviceId},{audience:"shop",deviceId,kind:"test",title:"🔔 בדיקת תזכורות החנות",body:"הודעת הבדיקה הגיעה מהשרת לטלפון הזה.",tag:"works-shop-server-test",
+      ref:"server-test",sentAt:String(now),expiresAt:String(now+SHOP_TTL_SECONDS*1000)});
+  }catch(error) {
+    logger.warn("Shop test send failed",{code:error.code||"unknown",deviceId});
+    if(invalidTokens.has(error.code)) {
+      await rejectToken(deviceId,current.token);
+      throw new HttpsError("failed-precondition","מזהה ההתראות של הטלפון פג תוקף. מחדשים אותו אוטומטית.",{reason:"token-rejected"});
+    }
+    throw new HttpsError("unavailable","שירות ההתראות של Google לא קיבל את הודעת הבדיקה. נסה שוב בעוד דקה.");
+  }
   return {sent:true};
 });
 
@@ -142,8 +157,7 @@ exports.sendShopShiftReminders=onSchedule({schedule:"* * * * *",timeZone:"Asia/J
       }
     }catch(error) {
       failed=true;
-      if(invalidTokens.has(error.code)) await db().ref(`shopNotificationDevices/${device.deviceId}`).transaction(whenLoaded(row=>row.token===device.token?
-        {...row,enabled:false,token:null,rejectedToken:digest(device.token),disabledReason:"token-rejected",disabledAt:Date.now()}:undefined),undefined,false);
+      if(invalidTokens.has(error.code)) await rejectToken(device.deviceId,device.token);
       logger.warn("Shop reminder send failed",{...context,code:error.code||"unknown"});
     }finally {
       await ref.transaction(whenLoaded(state=>state.claimId===claimId?{...state,claimId:null,leaseUntil:0,

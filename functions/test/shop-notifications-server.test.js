@@ -240,3 +240,10 @@ test("snoozing after a send claim suppresses that send; exiting during snooze en
   s.now(end+20*60000);await s.tick();assert.equal(s.sent.length,0);
   assert.equal((await s.call("pending")).events.length,0);
 });
+test("the server test on a dead token switches the device off and says why, and other failures are readable",async()=>{
+  const s=server();await s.call("enable");s.fail(Object.assign(Error("gone"),{code:"messaging/registration-token-not-registered"}));
+  await assert.rejects(s.call("test"),e=>e.code==="failed-precondition"&&e.details?.reason==="token-rejected");
+  assert.equal(s.data.shopNotificationDevices[DEVICE].disabledReason,"token-rejected");
+  const t=server();await t.call("enable");t.fail(Object.assign(Error("busy"),{code:"messaging/server-unavailable"}));
+  await assert.rejects(t.call("test"),{code:"unavailable"});assert.equal(t.data.shopNotificationDevices[DEVICE].enabled,true);
+});

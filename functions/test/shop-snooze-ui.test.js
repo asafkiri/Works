@@ -74,3 +74,16 @@ test("a punch on this terminal hides that reminder's controls before the server 
   const d=ui("in");await d.ctx.ShopSnooze.refresh(true);assert.equal(d.slot.children.length,1);
   d.ctx.ShopSnooze.resolved("a","in");assert.equal(d.slot.children.length,0);
 });
+test("a punch by another employee while 'not coming' is being confirmed does not void the cancellation",async()=>{
+  const d=ui("in");await d.ctx.ShopSnooze.refresh(true);
+  let answer;d.ctx.uiConfirm=()=>new Promise(r=>{answer=r;});
+  const cancelling=d.cancel();d.ctx.ShopSnooze.resolved("b","in");answer(true);await cancelling;
+  assert.equal(d.calls.at(-1).action,"cancel");assert.match(d.messages.at(-1),/הכניסה והיציאה/);
+});
+test("snooze and 'not coming' apply to every overlapping plan reminding the same employee",async()=>{
+  const other={employeeId:"a",kind:"in",eventKey:"event-2",planKey:"plan-2",snoozeKey:"shift-2",until:0};
+  const d=ui("in",[other]);await d.ctx.ShopSnooze.refresh(true);await d.click(20);
+  assert.deepEqual(d.calls.map(c=>c.event.snoozeKey).sort(),["shift","shift-2"]);
+  const e=ui("in",[other]);await e.ctx.ShopSnooze.refresh(true);await e.cancel();
+  assert.deepEqual(e.calls.filter(c=>c.action==="cancel").map(c=>c.event.planKey).sort(),["plan","plan-2"]);
+});

@@ -115,12 +115,17 @@
       if(e.details?.reason!=="token-rejected")throw e;
       // FCM rejected this token. Drop the push subscription so Firebase creates a
       // new subscription and token instead of returning the dead cached one.
-      const subscription=await reg.pushManager?.getSubscription().catch(()=>null);
-      if(subscription)await subscription.unsubscribe().catch(()=>{});
-      if(!stillEnabled())return false;
-      token=await pushToken();
-      if(!stillEnabled())return false;
-      sentAt=Date.now();enabled=await call("enable",id,token,user);
+      try{
+        const subscription=await reg.pushManager?.getSubscription().catch(()=>null);
+        if(subscription)await subscription.unsubscribe().catch(()=>{});
+        if(!stillEnabled())return false;
+        token=await pushToken();
+        if(!stillEnabled())return false;
+        sentAt=Date.now();enabled=await call("enable",id,token,user);
+      }catch(failure){
+        // The server has this phone switched off: report it even while renewing.
+        failure.deviceDisabled=true;throw failure;
+      }
     }
     const receivedAt=Date.now();
     if(!stillEnabled()){await policy(false,id,reg);await call("disable",id,undefined,user);return false;}
@@ -129,7 +134,7 @@
     const offset=serverTime>0 ? Math.round(serverTime-(sentAt+receivedAt)/2) : await serverOffset();
     await policy(true,id,reg,Math.abs(offset)<86400000?offset:0);
     if(!stillEnabled()){await policy(false,id,reg);await call("disable",id,undefined,user);return false;}
-    state="active";
+    state="active";error="";
     uploadReceipts(reg,user).catch(()=>{});
     return true;
   }
@@ -169,7 +174,7 @@
       if(version!==generation)return false;
       // A failed renewal leaves the previous token and worker policy in place, so
       // the phone keeps receiving; recovery retries in the background.
-      state=shopNotificationsEnabled()?(renewing?"active":"error"):"off";error=e.message||"לא הצלחנו להתחבר לשרת ההתראות.";
+      state=shopNotificationsEnabled()?(renewing && !e.deviceDisabled?"active":"error"):"off";error=e.message||"לא הצלחנו להתחבר לשרת ההתראות.";
       retry(version);return false;
     }).finally(()=>{
       inflight=null;renderShopNotificationTest();window.ShopSnooze?.refresh();if(again){again=false;sync(true);}
@@ -193,7 +198,13 @@
   async function test(){
     if(!shopNotificationsEnabled())return;
     if(!await sync(true))throw Error(error||"התראות החנות עדיין לא מחוברות לשרת.");
-    await call("test",deviceId(false));
+    try{await call("test",deviceId(false));}
+    catch(e){
+      // The server just found this phone's token dead: renew it now (not a retest,
+      // the server allows one test per 30 seconds).
+      if(e.details?.reason==="token-rejected")sync(true);
+      throw e;
+    }
   }
   async function pending(){
     if(!shopNotificationsEnabled() || state!=="active")return {events:[]};

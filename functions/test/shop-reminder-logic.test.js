@@ -111,3 +111,43 @@ test("another employee's attendance never satisfies this employee's plan",()=>{
   d.shifts.s={employeeId:"b",clockIn:at("07:55","2026-09-28"),clockOut:null};
   assert.deepEqual(on(d,"08:00"),["in@08:00"]);
 });
+test("an auto-closed forgotten punch is not attendance: the next plan still gets entry reminders",()=>{
+  const d=plans(["07:00","11:00"],["17:00","21:00"]);
+  // Morning clock-out forgotten; the app's 12-hour auto-close later writes clockIn+12h.
+  d.shifts.s={employeeId:"a",clockIn:at("06:58","2026-09-28"),clockOut:at("18:58","2026-09-28"),autoCloseFlag:true};
+  assert.deepEqual(on(d,"19:00"),["in@17:00"]);
+  const next=plans(["07:00","15:00"]);next.oneTimeShifts.e={employeeId:"a",date:"2026-09-27",startTime:"19:00",endTime:"23:00"};
+  next.shifts.s={employeeId:"a",clockIn:at("19:02","2026-09-27"),clockOut:at("07:02","2026-09-28"),autoCloseFlag:true};
+  assert.deepEqual(on(next,"07:05"),["in@07:00"]);
+});
+test("a 'not coming' cancellation on an overlapping plan never swallows the exit of the plan worked",()=>{
+  const d=plans(["08:00","16:00"],["09:00","12:00"]);d.shifts.s={employeeId:"a",clockIn:at("09:00","2026-09-28"),clockOut:null};
+  const cancelledKey=require("node:crypto").createHash("sha256").update(JSON.stringify(["a","2026-09-28","08:00","16:00"])).digest("hex");
+  d.shopReminderCancellations={"2026-09-28":{[cancelledKey]:{cancelled:true}}};
+  assert.ok(on(d,"12:00").includes("out@09:00"));
+});
+test("overlapping plans that end together produce one exit reminder",()=>{
+  const d=plans(["08:00","16:00"],["12:00","16:00"]);d.shifts.s={employeeId:"a",clockIn:at("07:58","2026-09-28"),clockOut:null};
+  assert.equal(on(d,"16:00").length,1);
+});
+test("arriving early for the afternoon of a split day is not asked to clock out of the missed morning",()=>{
+  const d=plans(["08:00","12:00"],["12:30","16:30"]);d.shifts.s={employeeId:"a",clockIn:at("11:55","2026-09-28"),clockOut:null};
+  for(const time of ["12:00","12:15","12:29","12:45"])assert.deepEqual(on(d,time),[]);
+  assert.deepEqual(on(d,"16:30"),["out@12:30"]);
+});
+test("a late arrival for an evening plan still gets its exit reminder even with a plan the next morning",()=>{
+  const d=plans(["19:00","23:00"]);d.oneTimeShifts.m={employeeId:"a",date:"2026-09-29",startTime:"07:00",endTime:"15:00"};
+  d.shifts.s={employeeId:"a",clockIn:at("22:40","2026-09-28"),clockOut:null};
+  assert.deepEqual(on(d,"23:00"),["out@19:00"]);
+});
+test("a clock-out just after the next plan started does not count as attending it",()=>{
+  const d=plans(["08:00","12:00"],["12:00","16:00"]);d.shifts.s={employeeId:"a",clockIn:at("07:58","2026-09-28"),clockOut:at("12:04","2026-09-28")};
+  assert.deepEqual(on(d,"12:05"),["in@12:00"]);
+  const stayed=plans(["08:00","12:00"],["12:00","16:00"]);stayed.shifts.s={employeeId:"a",clockIn:at("07:58","2026-09-28"),clockOut:at("15:30","2026-09-28")};
+  assert.deepEqual(on(stayed,"15:45"),[],"a real stay through most of the plan still counts");
+});
+test("a claim whose release was lost counts as a possible send, keeping the five-minute spacing",()=>{
+  const sent=at("08:16"),claimed=at("08:21");
+  assert.equal(deliveryDue({lastSentAt:sent,lastAttemptAt:claimed,claimId:"lost",leaseUntil:claimed+75000},at("08:23")),false);
+  assert.equal(deliveryDue({lastSentAt:sent,lastAttemptAt:claimed,claimId:"lost",leaseUntil:claimed+75000},at("08:26")),true);
+});

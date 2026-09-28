@@ -11,8 +11,10 @@
     return !!(pointed && !pointed.clockOut) || Object.values(shifts||{}).some(s=>s && s.employeeId===id && s.clockIn && !s.clockOut);
   }
   // A punch was just saved on this terminal: hide that reminder's controls at once.
+  // Leaves `version` alone: a punch by another employee must not void an action
+  // in progress on this card. Rendering already hides rows that no longer apply.
   function resolved(employeeId,kind){
-    version++;events=events.filter(e=>!(e.employeeId===employeeId && e.kind===kind));render();refresh(true);
+    events=events.filter(e=>!(e.employeeId===employeeId && e.kind===kind));render();refresh(true);
   }
   function render(){
     document.querySelectorAll("[data-shop-snooze]").forEach(slot=>{
@@ -43,10 +45,13 @@
           busy.add(row.snoozeKey);render();
           const requestVersion=version;
           try{
-            const result=await ShopNotifications.snooze(row,minutes);
+            // Overlapping plans of this employee remind separately: snooze them all.
+            const same=events.filter(e=>e.employeeId===row.employeeId && e.kind===row.kind);
+            let result;
+            for(const e of same.length?same:[row])result=await ShopNotifications.snooze(e,minutes);
             if(requestVersion!==version || !enabled())return;
             version++;
-            events.forEach(e=>{if(e.snoozeKey===row.snoozeKey)e.until=result.until;});
+            events.forEach(e=>{if(same.some(x=>x.snoozeKey===e.snoozeKey) || e.snoozeKey===row.snoozeKey)e.until=result.until;});
             const shown=slot.querySelector("details");if(shown)shown.open=false;
             toast("התזכורת נדחתה ב־"+minutes+" דקות");
           }catch(error){if(requestVersion===version)toast(error.message||"הדחייה לא נשמרה. נסה שוב.");}
@@ -66,10 +71,13 @@
           try{
             const ok=await uiConfirm("לבטל את תזכורות הכניסה והיציאה של "+(employee?.name||"העובד")+" למשמרת הזו?\nהסידור וההחתמות לא ישתנו. המשמרת הבאה תמשיך לקבל תזכורות.", {title:"ביטול תזכורות למשמרת",okText:"בטל תזכורות"});
             if(!ok || requestVersion!==version || !enabled())return;
-            await ShopNotifications.cancel(row);
+            // "Not coming" covers every overlapping plan this employee is due to start now.
+            const entries=events.filter(e=>e.employeeId===row.employeeId && e.kind==="in");
+            const cancelling=entries.length?entries:[row];
+            for(const e of cancelling)await ShopNotifications.cancel(e);
             if(requestVersion!==version || !enabled())return;
             version++;
-            events=events.filter(e=>e.planKey!==row.planKey);
+            events=events.filter(e=>!cancelling.some(x=>x.planKey===e.planKey));
             toast("תזכורות הכניסה והיציאה למשמרת הזו בוטלו");
           }catch(error){if(requestVersion===version)toast(error.message||"הביטול לא נשמר. נסה שוב.");}
           finally{busy.delete(row.snoozeKey);render();refresh(true);}

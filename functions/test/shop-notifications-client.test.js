@@ -234,3 +234,10 @@ test("a punch on the terminal closes that reminder on the worker and hides its c
   assert.deepEqual(hidden,["a","in"]);assert.deepEqual(JSON.parse(JSON.stringify(d.foreground.at(-1))),{type:"SHOP_REMINDER_RESOLVED",employeeId:"a",kind:"in"});
   d.enabled(false);const before=d.foreground.length;await d.api.resolved("a","out");assert.equal(d.foreground.length,before);
 });
+test("a failed recovery after the server rejected the token is shown as an error, not as connected",async()=>{
+  const d=device();await d.api.sync(true);d.reject("shop-phone-token");d.clock(Date.now()+120000);
+  const original=d.ctx.messaging.getToken;let calls=0;
+  d.ctx.messaging.getToken=async(...args)=>{calls++;if(calls>1)throw Error("Registration failed - push service error");return original(...args);};
+  assert.equal(await d.api.sync(true),false);assert.equal(d.api.getState(),"error");assert.match(d.api.getError(),/push service error/);
+  assert.equal(d.timers.size,1,"recovery keeps retrying in the background");
+});
