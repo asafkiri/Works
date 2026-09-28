@@ -1,5 +1,5 @@
 /* ============================================================
-   firebase-messaging-sw.js — v77
+   firebase-messaging-sw.js — v78
    Service Worker לקבלת התראות פוש כשהאפליקציה סגורה/ברקע.
    יושב באותה תיקייה של index.html בריפו (חובה — לא בתת-תיקייה).
    ============================================================ */
@@ -49,12 +49,13 @@ async function showShopReminder(data){
   const policy = await shopPolicy();
   if(policy.enabled !== true || policy.deviceId !== data.deviceId) return;
   const saved=await (await caches.open(SHOP_POLICY_CACHE)).match(SHOP_SNOOZE_URL);
-  if(saved && Number((await saved.json())[data.snoozeKey])>Date.now()) return;
+  const muted=saved?await saved.json():{};
+  if(Number(muted[data.snoozeKey])>Date.now() || Number(muted["plan:"+data.planKey])>Date.now()) return;
   return self.registration.showNotification(data.title || "תזכורת החתמה", {
     body:data.body || "", icon:new URL("icon-192.png", self.registration.scope).href,
     dir:"rtl", lang:"he", tag:data.tag || "works-shop-reminder", renotify:true,
     silent:false, vibrate:[250,100,250], requireInteraction:true,
-    data:{worksShopReminder:true,employeeId:data.employeeId || "",kind:data.kind || "",snoozeKey:data.snoozeKey || ""}
+    data:{worksShopReminder:true,employeeId:data.employeeId || "",kind:data.kind || "",snoozeKey:data.snoozeKey || "",planKey:data.planKey || ""}
   });
 }
 self.addEventListener("message", event => {
@@ -71,15 +72,16 @@ self.addEventListener("message", event => {
         event.ports[0]?.postMessage({ok:true});
       }catch(e){event.ports[0]?.postMessage({ok:false});}
     }));
-  }else if(event.data?.type === "SHOP_REMINDER_SNOOZED"){
+  }else if(event.data?.type === "SHOP_REMINDER_SNOOZED" || event.data?.type === "SHOP_REMINDER_CANCELLED"){
     event.waitUntil(queueShop(async()=>{
-      const {snoozeKey,until}=event.data;
-      if(typeof snoozeKey!=="string" || !snoozeKey || !(Number(until)>Date.now()))return;
+      const cancelling=event.data.type==="SHOP_REMINDER_CANCELLED";
+      const field=cancelling?"planKey":"snoozeKey",key=event.data[field],until=event.data.until;
+      if(typeof key!=="string" || !key || !(Number(until)>Date.now()))return;
       const cache=await caches.open(SHOP_POLICY_CACHE),saved=await cache.match(SHOP_SNOOZE_URL);
       const snoozes=Object.fromEntries(Object.entries(saved?await saved.json():{}).filter(([,v])=>Number(v)>Date.now()));
-      snoozes[snoozeKey]=Number(until);
+      snoozes[(cancelling?"plan:":"")+key]=Number(until);
       await cache.put(SHOP_SNOOZE_URL,new Response(JSON.stringify(snoozes),{headers:{"Content-Type":"application/json"}}));
-      (await self.registration.getNotifications()).forEach(n=>{if(n.data?.worksShopReminder && n.data.snoozeKey===snoozeKey)n.close();});
+      (await self.registration.getNotifications()).forEach(n=>{if(n.data?.worksShopReminder && n.data[field]===key)n.close();});
     }));
   }else if(event.data?.type === "SHOW_SHOP_REMINDER"){
     event.waitUntil(queueShop(()=>showShopReminder(event.data.data)));

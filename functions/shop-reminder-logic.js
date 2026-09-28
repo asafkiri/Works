@@ -48,8 +48,8 @@ function pendingShopEvents(data, nowMs) {
     if(!kind) continue;
     const key=JSON.stringify([plan.key,kind]);
     const openShiftIds=actual.filter(s=>!s.clockOut).map(s=>s.shiftId).sort();
-    events.set(key,{...plan,key,kind,time:kind==="in"?plan.start:plan.end,
-      snoozeKey:kind==="out"?JSON.stringify([key,openShiftIds]):null});
+    events.set(key,{...plan,planKey:plan.key,key,kind,time:kind==="in"?plan.start:plan.end,
+      snoozeKey:JSON.stringify([key,openShiftIds])});
   }
   return events;
 }
@@ -75,7 +75,7 @@ function shopMessage(event,device,nowMs) {
   return {audience:"shop",deviceId:device.deviceId,employeeId:event.employeeId,kind:event.kind,
     title:`🔔 ${event.name} — צריך להחתים ${kind}`,
     body:`שעת ${kind}: ${event.time}. התזכורת תחזור כל 5 דקות עד לרישום ההחתמה.`,
-    tag:`works-shop-${event.employeeId}-${event.kind}`,eventKey:event.key,snoozeKey:event.snoozeKey||"",
+    tag:`works-shop-${event.employeeId}-${event.kind}`,eventKey:event.key,planKey:event.planKey,snoozeKey:event.snoozeKey,
     expiresAt:String(nowMs+60_000)};
 }
 module.exports={REPEAT_MS,buildShopPlans,pendingShopEvents,deliveryDue,activeShopDevices,shopMessage};

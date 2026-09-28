@@ -9,29 +9,52 @@ class Element {
   querySelector(tag){return this.children.find(c=>c.tag===tag)||this.children.map(c=>c.querySelector(tag)).find(Boolean);}
   addEventListener(type,handler){this.listeners[type]=handler;}
 }
-function ui(){
-  let opted=true,fail=false,stopped=false;
+function ui(kind="out"){
+  let opted=true,fail=false,stopped=false,cancelled=false,confirmed=true;
   const slot=new Element("div");slot.dataset.shopSnooze="a";
-  const row={employeeId:"a",eventKey:"plan",snoozeKey:"shift",until:0},calls=[],messages=[];
-  const ctx={Date,setInterval(){},employees:{a:{openShiftId:"s"}},shifts:{s:{clockOut:null}},
+  const row={employeeId:"a",kind,eventKey:"event",planKey:"plan",snoozeKey:"shift",until:0},calls=[],messages=[];
+  const ctx={Date,setInterval(){},employees:{a:{name:"דני",openShiftId:kind==="out"?"s":null}},shifts:kind==="out"?{s:{clockOut:null}}:{},
     document:{querySelectorAll:()=>[slot],createElement:tag=>new Element(tag),addEventListener(){}},
-    shopNotificationsEnabled:()=>opted,toast:m=>messages.push(m),
-    ShopNotifications:{getState:()=>"active",pending:async()=>({events:[structuredClone(row)]}),snooze:async(event,minutes)=>{
+    shopNotificationsEnabled:()=>opted,toast:m=>messages.push(m),uiConfirm:async()=>confirmed,
+    ShopNotifications:{getState:()=>"active",pending:async()=>({events:cancelled?[]:[structuredClone(row)]}),snooze:async(event,minutes)=>{
       calls.push({event,minutes});if(fail)throw Error("אין חיבור");row.until=Date.now()+minutes*60000;return {until:row.until};
-    }}};
+    },cancel:async event=>{calls.push({action:"cancel",event});if(fail)throw Error("אין חיבור");cancelled=true;return {cancelled:true};}}};
   ctx.window=ctx;vm.runInNewContext(source,ctx);
   const click=minutes=>slot.querySelector("details").children[2].children.find(b=>b.textContent===(minutes===60?"שעה":minutes+" דקות")).listeners.click({stopPropagation(){stopped=true;}});
-  return {ctx,slot,calls,messages,click,stopped:()=>stopped,opted:v=>{opted=v;},fail:()=>{fail=true;}};
+  const cancel=()=>slot.querySelector("details").children[3].listeners.click({stopPropagation(){stopped=true;}});
+  return {ctx,slot,calls,messages,click,cancel,confirm:v=>{confirmed=v;},stopped:()=>stopped,opted:v=>{opted=v;},fail:()=>{fail=true;}};
 }
 test("exit snooze stays folded, offers all durations, saves without triggering attendance and shows its deadline",async()=>{
   const d=ui();await d.ctx.ShopSnooze.refresh(true);
   assert.equal(d.slot.firstChild.open,false);
+  assert.equal(d.slot.firstChild.children.length,3); // No cancellation control for exit.
   assert.deepEqual(d.slot.firstChild.children[2].children.map(b=>b.textContent),["10 דקות","20 דקות","30 דקות","40 דקות","50 דקות","שעה"]);
   d.slot.firstChild.open=true;await d.click(20);
   assert.equal(d.stopped(),true);assert.equal(d.calls[0].minutes,20);
   assert.equal(d.ctx.shifts.s.clockOut,null);assert.equal(d.slot.firstChild.open,false);
   assert.match(d.slot.querySelector("summary").textContent,/נדחה עד/);
   d.ctx.shifts.s.clockOut=Date.now();d.ctx.ShopSnooze.render();assert.equal(d.slot.children.length,0);
+});
+test("entry offers snooze and cancellation only while pending, then hides immediately after a punch",async()=>{
+  const d=ui("in");d.ctx.ShopSnooze.render();assert.equal(d.slot.children.length,0);
+  await d.ctx.ShopSnooze.refresh(true);assert.equal(d.slot.firstChild.open,false);
+  assert.match(d.slot.firstChild.children[1].textContent,/כניסה/);
+  assert.match(d.slot.firstChild.children[3].textContent,/בטל תזכורות/);
+  await d.click(30);assert.equal(d.calls[0].minutes,30);assert.equal(Object.keys(d.ctx.shifts).length,0);
+  d.ctx.employees.a.openShiftId="s";d.ctx.shifts.s={clockOut:null};d.ctx.ShopSnooze.render();
+  assert.equal(d.slot.children.length,0);
+});
+test("cancelling entry asks for confirmation, hides all controls and never punches attendance",async()=>{
+  const d=ui("in");await d.ctx.ShopSnooze.refresh(true);d.confirm(false);await d.cancel();
+  assert.equal(d.calls.length,0);assert.equal(d.slot.children.length,1);
+  d.confirm(true);await d.cancel();assert.equal(d.calls[0].action,"cancel");
+  assert.equal(d.stopped(),true);assert.equal(d.slot.children.length,0);
+  assert.equal(Object.keys(d.ctx.shifts).length,0);assert.equal(d.ctx.employees.a.openShiftId,null);
+  assert.match(d.messages.at(-1),/הכניסה והיציאה/);
+});
+test("failed cancellation retains the pending controls and does not report success",async()=>{
+  const d=ui("in");await d.ctx.ShopSnooze.refresh(true);d.fail();await d.cancel();
+  assert.equal(d.messages.at(-1),"אין חיבור");assert.equal(d.slot.children.length,1);
 });
 test("failed snooze does not show success; opting out removes controls",async()=>{
   const d=ui();await d.ctx.ShopSnooze.refresh(true);d.fail();await d.click(10);
