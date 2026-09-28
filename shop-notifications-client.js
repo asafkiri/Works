@@ -56,11 +56,9 @@
       next.addEventListener("statechange",changed);changed();
     });
   }
-  async function worker(){
-    await navigator.serviceWorker.register("firebase-messaging-sw.js");
-    let timer;
-    try{return await Promise.race([navigator.serviceWorker.ready,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error("לא ניתן להכין התראות. רענן ונסה שוב.")),12000);})]);}
-    finally{clearTimeout(timer);}
+  function worker(){
+    // register() queues behind any stalled update job of the same scope; bound it too.
+    return withTimeout(navigator.serviceWorker.register("firebase-messaging-sw.js").then(()=>navigator.serviceWorker.ready),12000,"לא ניתן להכין התראות. רענן ונסה שוב.");
   }
   async function policy(enabled,id,reg,offset=0){
     reg=reg || await navigator.serviceWorker.getRegistration("firebase-messaging-sw.js");
@@ -86,7 +84,7 @@
     const failed=results.find(r=>r.status==="rejected");
     if(failed)throw failed.reason;
   }
-  async function performSync(){
+  async function performSync(renewing){
     const user=auth && auth.currentUser,version=generation;
     if(!shopNotificationsEnabled()){
       await stop();return false;
@@ -94,7 +92,8 @@
     if(!user)return false;
     const stillEnabled=()=>version===generation && user.uid===uid() && shopNotificationsEnabled();
     if(!messaging || Notification.permission!=="granted")throw Error("צריך לאפשר התראות בטלפון ולבחור שוב ״עם התראות״.");
-    state="pending";error="";renderShopNotificationTest();
+    // Renewing a working registration keeps it usable (snooze/cancel stay available).
+    if(!renewing){state="pending";error="";renderShopNotificationTest();}
     const id=deviceId(true),reg=await worker();
     // Prefer the newest worker, but a failed update check (offline, slow
     // network) must not block renewing a registration the active worker serves.
@@ -128,10 +127,12 @@
     if(!force && Date.now()-lastSync<60000)return Promise.resolve(state==="active");
     lastSync=Date.now();
     clearTimeout(retryTimer);retryTimer=null;
-    const version=generation;
-    inflight=performSync().then(connected=>{if(connected)retryDelay=15000;return connected;}).catch(e=>{
+    const version=generation,renewing=state==="active";
+    inflight=performSync(renewing).then(connected=>{if(connected)retryDelay=15000;return connected;}).catch(e=>{
       if(version!==generation)return false;
-      state=shopNotificationsEnabled()?"error":"off";error=e.message||"לא הצלחנו להתחבר לשרת ההתראות.";
+      // A failed renewal leaves the previous token and worker policy in place, so
+      // the phone keeps receiving; recovery retries in the background.
+      state=shopNotificationsEnabled()?(renewing?"active":"error"):"off";error=e.message||"לא הצלחנו להתחבר לשרת ההתראות.";
       retry(version);return false;
     }).finally(()=>{
       inflight=null;renderShopNotificationTest();window.ShopSnooze?.refresh();if(again){again=false;sync(true);}
@@ -151,11 +152,13 @@
   }
   async function pending(){
     if(!shopNotificationsEnabled() || state!=="active")return {events:[]};
+    const version=generation;
     try{return await call("pending",deviceId(false));}
     catch(e){
       // The server no longer has this phone enabled (for example after its push
       // token died) while the phone still believes it is connected: re-register.
-      if(e.status==="FAILED_PRECONDITION" && Date.now()-lastHeal>120000){lastHeal=Date.now();sync(true);}
+      // Never after this page itself opted out or logged out meanwhile.
+      if(e.status==="FAILED_PRECONDITION" && version===generation && state==="active" && shopNotificationsEnabled() && Date.now()-lastHeal>120000){lastHeal=Date.now();sync(true);}
       throw e;
     }
   }

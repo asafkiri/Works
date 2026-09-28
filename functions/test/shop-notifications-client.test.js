@@ -142,7 +142,7 @@ test("a failed worker update check does not block renewing the registration",asy
   const d=device();d.reg.update=async()=>{throw TypeError("Failed to update a ServiceWorker");};
   assert.equal(await d.api.sync(true),true);assert.equal(d.api.getState(),"active");assert.equal(d.policy().enabled,true);
 });
-test("a push token request that never settles times out into the recovery loop instead of freezing renewal",async()=>{
+test("a push token request that never settles times out into the recovery loop instead of freezing renewal",{timeout:10000},async()=>{
   const d=device();d.tokenHang(true);const syncing=d.api.sync(true);
   await settle();const timeout=[...d.timers.values()].find(t=>t.ms===30000);assert.ok(timeout,"getToken must be bounded");
   timeout.fn();assert.equal(await syncing,false);assert.equal(d.api.getState(),"error");
@@ -180,4 +180,21 @@ test("a reminder shown by the worker refreshes the terminal's snooze controls",a
   const d=device();let refreshed=0;d.ctx.ShopSnooze={refresh:force=>{if(force)refreshed++;},clear(){}};
   d.swListeners.forEach(fn=>fn({data:{type:"SHOP_REMINDER_SHOWN"}}));d.swListeners.forEach(fn=>fn({data:{type:"OTHER"}}));
   assert.equal(refreshed,1);
+});
+test("a renewal of a working registration keeps it usable while in flight and after a transient failure",{timeout:10000},async()=>{
+  const d=device();await d.api.sync(true);let release;d.delay(new Promise(r=>{release=r;}));
+  const renewal=d.api.sync(true);await settle();assert.equal(d.api.getState(),"active","snooze/cancel stay available during renewal");
+  release();await renewal;d.tokenError("Registration failed - push service error");
+  assert.equal(await d.api.sync(true),false);assert.equal(d.api.getState(),"active");assert.equal(d.policy().enabled,true);
+  assert.equal(d.timers.size,1,"recovery still retries in the background");
+});
+test("the heal never re-enables a phone that opted out or logged out while its pending poll was in flight",async()=>{
+  const d=device();await d.api.sync(true);d.pendingFails(true);const enables=()=>d.requests.filter(r=>r.action==="enable").length,before=enables();
+  const polling=d.api.pending();await d.api.stop();
+  await assert.rejects(polling);await settle();assert.equal(enables(),before);assert.equal(d.requests.at(-1).action,"disable");
+});
+test("a service worker registration that never settles is bounded like the rest of renewal",{timeout:10000},async()=>{
+  const d=device();d.ctx.navigator.serviceWorker.register=()=>new Promise(()=>{});
+  const syncing=d.api.sync(true);await settle();const timeout=[...d.timers.values()].find(t=>t.ms===12000);assert.ok(timeout);
+  timeout.fn();assert.equal(await syncing,false);assert.equal(d.api.getState(),"error");
 });
