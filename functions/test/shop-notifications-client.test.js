@@ -2,20 +2,24 @@
 const test=require("node:test"),assert=require("node:assert/strict"),fs=require("node:fs"),path=require("node:path"),vm=require("node:vm");
 const source=fs.readFileSync(path.join(__dirname,"../../shop-notifications-client.js"),"utf8");
 function device(enabled=true){
-  const storage=new Map(),requests=[],policies=[],foreground=[],timers=new Map(),listeners={};let enableDelay=null,serverOk=true,tokens=0,nextTimer=0,tokenError=null,localPolicy={enabled:false};
+  const storage=new Map(),requests=[],policies=[],foreground=[],timers=new Map(),listeners={},intervals=[],swListeners=[];let enableDelay=null,serverOk=true,tokens=0,nextTimer=0,tokenError=null,localPolicy={enabled:false},clock=null,pendingFails=false,tokenHang=false;
   class Channel{constructor(){this.port1={close(){}};this.port2={postMessage:data=>{this.port1.onmessage?.({data});}};}}
   const reg={active:{postMessage(data,ports){if(data.type==="SHOP_NOTIFICATION_POLICY"){policies.push(data);localPolicy=data;ports[0].postMessage({ok:true});}else foreground.push(data);}},update:async()=>{}};
   const ctx={currentRole:"manager",auth:{currentUser:{uid:"manager",getIdToken:async()=>"auth"}},Notification:{permission:"granted"},
-    messaging:{getToken:async()=>{tokens++;if(tokenError)throw Error(tokenError);return "shop-phone-token";}},VAPID_KEY:"key",
+    messaging:{getToken:async()=>{tokens++;if(tokenHang)return new Promise(()=>{});if(tokenError)throw Error(tokenError);return "shop-phone-token";}},VAPID_KEY:"key",
+    Date:{now:()=>clock??Date.now()},setInterval:(fn,ms)=>{intervals.push({fn,ms});return intervals.length;},
     shopNotificationsEnabled:()=>enabled,renderShopNotificationTest(){},
     setTimeout:(fn,ms)=>{const id=++nextTimer;timers.set(id,{fn,ms});return id;},clearTimeout:id=>timers.delete(id),AbortController,MessageChannel:Channel,
     crypto:{randomUUID:()=>"10000000-1000-4000-8000-100000000001"},
     localStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v)},
-    navigator:{serviceWorker:{register:async()=>reg,ready:Promise.resolve(reg),getRegistration:async()=>reg}},
-    fetch:async(url,options)=>{const data=JSON.parse(options.body).data;requests.push(data);if(data.action==="enable"&&enableDelay)await enableDelay;return {ok:serverOk,json:async()=>serverOk?{result:{enabled:data.action==="enable"}}:{error:{message:"Server not deployed"}}};},
+    navigator:{serviceWorker:{register:async()=>reg,ready:Promise.resolve(reg),getRegistration:async()=>reg,addEventListener:(name,fn)=>swListeners.push(fn)}},
+    fetch:async(url,options)=>{const data=JSON.parse(options.body).data;requests.push(data);if(data.action==="enable"&&enableDelay)await enableDelay;
+      if(data.action==="pending"&&pendingFails)return {ok:false,json:async()=>({error:{status:"FAILED_PRECONDITION",message:"המכשיר לא רשום להתראות חנות."}})};
+      return {ok:serverOk,json:async()=>serverOk?{result:{enabled:data.action==="enable",events:[]}}:{error:{message:"Server not deployed"}}};},
     document:{visibilityState:"visible",addEventListener:(name,fn)=>{listeners[name]=fn;}},addEventListener:(name,fn)=>{listeners[name]=fn;}
   };ctx.window=ctx;vm.runInNewContext(source,ctx);
-  return {ctx,api:ctx.ShopNotifications,requests,policies,foreground,timers,listeners,reg,tokens:()=>tokens,enabled:v=>{enabled=v;},delay:p=>{enableDelay=p;},serverOk:v=>{serverOk=v;},tokenError:v=>{tokenError=v;},policy:()=>localPolicy};
+  return {ctx,api:ctx.ShopNotifications,requests,policies,foreground,timers,listeners,intervals,swListeners,reg,tokens:()=>tokens,enabled:v=>{enabled=v;},delay:p=>{enableDelay=p;},serverOk:v=>{serverOk=v;},tokenError:v=>{tokenError=v;},policy:()=>localPolicy,
+    clock:v=>{clock=v;},pendingFails:v=>{pendingFails=v;},tokenHang:v=>{tokenHang=v;}};
 }
 
 test("a transient token or server refresh failure must not turn off a working receiver",async()=>{
@@ -131,4 +135,66 @@ test("cancel sends only this active event and updates the worker only after the 
   assert.equal(request.eventKey,event.eventKey);assert.equal(request.snoozeKey,event.snoozeKey);
   assert.equal(d.foreground.at(-1).type,"SHOP_REMINDER_CANCELLED");
   d.enabled(false);await assert.rejects(d.api.cancel(event));
+});
+
+const settle=async()=>{for(let i=0;i<30;i++)await new Promise(r=>setImmediate(r));};
+test("a failed worker update check does not block renewing the registration",async()=>{
+  const d=device();d.reg.update=async()=>{throw TypeError("Failed to update a ServiceWorker");};
+  assert.equal(await d.api.sync(true),true);assert.equal(d.api.getState(),"active");assert.equal(d.policy().enabled,true);
+});
+test("a push token request that never settles times out into the recovery loop instead of freezing renewal",{timeout:10000},async()=>{
+  const d=device();d.tokenHang(true);const syncing=d.api.sync(true);
+  await settle();const timeout=[...d.timers.values()].find(t=>t.ms===30000);assert.ok(timeout,"getToken must be bounded");
+  timeout.fn();assert.equal(await syncing,false);assert.equal(d.api.getState(),"error");
+  assert.equal(d.timers.size,1,"exactly one recovery attempt is scheduled");
+  d.tokenHang(false);assert.equal(await runRetry(d),15000);assert.equal(d.api.getState(),"active");
+});
+test("the worker policy carries the server clock offset so freshness survives a wrong phone clock",async()=>{
+  const d=device();d.ctx.db={ref:path=>({once:async()=>({val:()=>path===".info/serverTimeOffset"?-90000:null})})};
+  await d.api.sync(true);assert.equal(d.policy().offset,-90000);
+  const bogus=device();bogus.ctx.db={ref:()=>({once:async()=>({val:()=>"not a number"})})};
+  await bogus.api.sync(true);assert.equal(bogus.policy().offset,0);
+});
+test("a phone the server no longer has enabled is noticed through the pending poll and re-registered",async()=>{
+  const d=device();await d.api.sync(true);const enables=()=>d.requests.filter(r=>r.action==="enable").length;
+  const before=enables();d.pendingFails(true);
+  await assert.rejects(d.api.pending());await settle();
+  assert.equal(enables(),before+1,"a failed-precondition from the server must trigger a renewal");
+  await assert.rejects(d.api.pending());await settle();
+  assert.equal(enables(),before+1,"renewal on this signal is rate limited");
+});
+test("storage writes by other apps on the origin do not trigger renewals; this app's keys still do",async()=>{
+  const d=device();await d.api.sync(true);d.clock(Date.now()+120000);const count=()=>d.requests.length;
+  const before=count();d.listeners.storage({key:"yotvata_order_draft"});await settle();assert.equal(count(),before);
+  d.listeners.storage({key:"worksShopNotifications:manager"});await settle();assert.ok(count()>before);
+  const after=count();d.listeners.storage({key:null});await settle();assert.ok(count()>after,"a full clear is relevant");
+});
+test("a kiosk that never changes visibility is renewed periodically, only while opted in",async()=>{
+  const d=device();await d.api.sync(true);const renewal=d.intervals.find(i=>i.ms===15*60000);assert.ok(renewal);
+  const enables=()=>d.requests.filter(r=>r.action==="enable").length,before=enables();
+  d.clock(Date.now()+15*60000);renewal.fn();await settle();assert.equal(enables(),before+1);
+  d.enabled(false);await d.api.stop();const stopped=d.requests.length;
+  d.clock(Date.now()+30*60000);renewal.fn();await settle();assert.equal(d.requests.length,stopped);
+});
+test("a reminder shown by the worker refreshes the terminal's snooze controls",async()=>{
+  const d=device();let refreshed=0;d.ctx.ShopSnooze={refresh:force=>{if(force)refreshed++;},clear(){}};
+  d.swListeners.forEach(fn=>fn({data:{type:"SHOP_REMINDER_SHOWN"}}));d.swListeners.forEach(fn=>fn({data:{type:"OTHER"}}));
+  assert.equal(refreshed,1);
+});
+test("a renewal of a working registration keeps it usable while in flight and after a transient failure",{timeout:10000},async()=>{
+  const d=device();await d.api.sync(true);let release;d.delay(new Promise(r=>{release=r;}));
+  const renewal=d.api.sync(true);await settle();assert.equal(d.api.getState(),"active","snooze/cancel stay available during renewal");
+  release();await renewal;d.tokenError("Registration failed - push service error");
+  assert.equal(await d.api.sync(true),false);assert.equal(d.api.getState(),"active");assert.equal(d.policy().enabled,true);
+  assert.equal(d.timers.size,1,"recovery still retries in the background");
+});
+test("the heal never re-enables a phone that opted out or logged out while its pending poll was in flight",async()=>{
+  const d=device();await d.api.sync(true);d.pendingFails(true);const enables=()=>d.requests.filter(r=>r.action==="enable").length,before=enables();
+  const polling=d.api.pending();await d.api.stop();
+  await assert.rejects(polling);await settle();assert.equal(enables(),before);assert.equal(d.requests.at(-1).action,"disable");
+});
+test("a service worker registration that never settles is bounded like the rest of renewal",{timeout:10000},async()=>{
+  const d=device();d.ctx.navigator.serviceWorker.register=()=>new Promise(()=>{});
+  const syncing=d.api.sync(true);await settle();const timeout=[...d.timers.values()].find(t=>t.ms===12000);assert.ok(timeout);
+  timeout.fn();assert.equal(await syncing,false);assert.equal(d.api.getState(),"error");
 });

@@ -1,10 +1,24 @@
 /* Store-phone push registration. No database rules or employee data are changed here. */
 (function(){
   let inflight=null,again=false,lastSync=0,state="off",error="",generation=0;
-  let retryTimer=null,retryDelay=15000;
+  let retryTimer=null,retryDelay=15000,lastHeal=0;
   const endpoint="https://europe-west1-mini-market-shalom.cloudfunctions.net/setShopNotificationDevice";
   const key=uid=>"worksShopDevice:"+uid;
   function uid(){return auth && auth.currentUser && auth.currentUser.uid;}
+  // A registration step that never settles must not freeze renewal for the page's lifetime.
+  function withTimeout(promise,ms,message){
+    let timer;
+    return Promise.race([promise,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(message)),ms);})]).finally(()=>clearTimeout(timer));
+  }
+  // Server time minus this phone's clock, from Realtime Database. The worker uses
+  // it to judge reminder freshness even when the phone clock is off.
+  async function serverOffset(){
+    try{
+      if(typeof db==="undefined" || !db)return 0;
+      const value=Number((await withTimeout(db.ref(".info/serverTimeOffset").once("value"),3000,"offset")).val());
+      return Number.isFinite(value) && Math.abs(value)<86400000 ? value : 0;
+    }catch(e){return 0;}
+  }
   function deviceId(create){
     const user=uid();if(!user)return null;
     let id=localStorage.getItem(key(user));
@@ -21,7 +35,10 @@
     try{
       const response=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+bearer},body:JSON.stringify({data:{...extra,action,deviceId:id,...(token?{token}:{})}}),signal:controller.signal});
       let body;try{body=await response.json();}catch(e){}
-      if(!response.ok || body?.error)throw Error(body?.error?.message || "שרת תזכורות החנות עדיין אינו זמין. יש לפרסם את עדכון השרת ולנסות שוב.");
+      if(!response.ok || body?.error){
+        const failure=Error(body?.error?.message || "שרת תזכורות החנות עדיין אינו זמין. יש לפרסם את עדכון השרת ולנסות שוב.");
+        failure.status=body?.error?.status;throw failure;
+      }
       return body.result || body.data || {};
     }catch(e){
       if(e.name==="TypeError" || e.name==="AbortError")throw Error("לא ניתן להתחבר לשרת התזכורות. בדוק חיבור לאינטרנט; אם הבעיה נמשכת, יש לפרסם את עדכון השרת.");
@@ -39,20 +56,18 @@
       next.addEventListener("statechange",changed);changed();
     });
   }
-  async function worker(){
-    await navigator.serviceWorker.register("firebase-messaging-sw.js");
-    let timer;
-    try{return await Promise.race([navigator.serviceWorker.ready,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error("לא ניתן להכין התראות. רענן ונסה שוב.")),12000);})]);}
-    finally{clearTimeout(timer);}
+  function worker(){
+    // register() queues behind any stalled update job of the same scope; bound it too.
+    return withTimeout(navigator.serviceWorker.register("firebase-messaging-sw.js").then(()=>navigator.serviceWorker.ready),12000,"לא ניתן להכין התראות. רענן ונסה שוב.");
   }
-  async function policy(enabled,id,reg){
+  async function policy(enabled,id,reg,offset=0){
     reg=reg || await navigator.serviceWorker.getRegistration("firebase-messaging-sw.js");
     if(!reg?.active){if(enabled)throw Error("יש לרענן את האפליקציה כדי לעדכן את ההתראות.");return;}
     return new Promise((resolve,reject)=>{
       const channel=new MessageChannel();
       const timer=setTimeout(()=>{channel.port1.close();reject(Error("יש לרענן את האפליקציה כדי לעדכן את ההתראות."));},4000);
       channel.port1.onmessage=event=>{clearTimeout(timer);channel.port1.close();event.data?.ok?resolve():reject(Error("הגדרת ההתראות לא נשמרה במכשיר."));};
-      reg.active.postMessage({type:"SHOP_NOTIFICATION_POLICY",enabled,deviceId:id},[channel.port2]);
+      reg.active.postMessage({type:"SHOP_NOTIFICATION_POLICY",enabled,deviceId:id,offset},[channel.port2]);
     });
   }
   async function stop(){
@@ -69,7 +84,7 @@
     const failed=results.find(r=>r.status==="rejected");
     if(failed)throw failed.reason;
   }
-  async function performSync(){
+  async function performSync(renewing){
     const user=auth && auth.currentUser,version=generation;
     if(!shopNotificationsEnabled()){
       await stop();return false;
@@ -77,20 +92,22 @@
     if(!user)return false;
     const stillEnabled=()=>version===generation && user.uid===uid() && shopNotificationsEnabled();
     if(!messaging || Notification.permission!=="granted")throw Error("צריך לאפשר התראות בטלפון ולבחור שוב ״עם התראות״.");
-    state="pending";error="";renderShopNotificationTest();
+    // Renewing a working registration keeps it usable (snooze/cancel stay available).
+    if(!renewing){state="pending";error="";renderShopNotificationTest();}
     const id=deviceId(true),reg=await worker();
-    // Ensure the current worker has taken over before enabling server sends.
-    await updateWorker(reg);
+    // Prefer the newest worker, but a failed update check (offline, slow
+    // network) must not block renewing a registration the active worker serves.
+    await withTimeout(updateWorker(reg),15000,"worker-update").catch(()=>{});
     // Renewal must not disable the last working registration. A temporary FCM
     // or network error would otherwise mute foreground AND background pushes
     // indefinitely. New devices remain off until their first server opt-in.
     if(!stillEnabled())return false;
-    const token=await messaging.getToken({vapidKey:VAPID_KEY,serviceWorkerRegistration:reg});
+    const token=await withTimeout(messaging.getToken({vapidKey:VAPID_KEY,serviceWorkerRegistration:reg}),30000,"קבלת מזהה ההתראות מתעכבת. ננסה שוב אוטומטית.");
     if(!token)throw Error("לא התקבל מזהה התראות. נסה שוב.");
     if(!stillEnabled())return false;
     await call("enable",id,token,user);
     if(!stillEnabled()){await policy(false,id,reg);await call("disable",id,undefined,user);return false;}
-    await policy(true,id,reg);
+    await policy(true,id,reg,await serverOffset());
     if(!stillEnabled()){await policy(false,id,reg);await call("disable",id,undefined,user);return false;}
     state="active";return true;
   }
@@ -110,10 +127,12 @@
     if(!force && Date.now()-lastSync<60000)return Promise.resolve(state==="active");
     lastSync=Date.now();
     clearTimeout(retryTimer);retryTimer=null;
-    const version=generation;
-    inflight=performSync().then(connected=>{if(connected)retryDelay=15000;return connected;}).catch(e=>{
+    const version=generation,renewing=state==="active";
+    inflight=performSync(renewing).then(connected=>{if(connected)retryDelay=15000;return connected;}).catch(e=>{
       if(version!==generation)return false;
-      state=shopNotificationsEnabled()?"error":"off";error=e.message||"לא הצלחנו להתחבר לשרת ההתראות.";
+      // A failed renewal leaves the previous token and worker policy in place, so
+      // the phone keeps receiving; recovery retries in the background.
+      state=shopNotificationsEnabled()?(renewing?"active":"error"):"off";error=e.message||"לא הצלחנו להתחבר לשרת ההתראות.";
       retry(version);return false;
     }).finally(()=>{
       inflight=null;renderShopNotificationTest();window.ShopSnooze?.refresh();if(again){again=false;sync(true);}
@@ -133,7 +152,15 @@
   }
   async function pending(){
     if(!shopNotificationsEnabled() || state!=="active")return {events:[]};
-    return call("pending",deviceId(false));
+    const version=generation;
+    try{return await call("pending",deviceId(false));}
+    catch(e){
+      // The server no longer has this phone enabled (for example after its push
+      // token died) while the phone still believes it is connected: re-register.
+      // Never after this page itself opted out or logged out meanwhile.
+      if(e.status==="FAILED_PRECONDITION" && version===generation && state==="active" && shopNotificationsEnabled() && Date.now()-lastHeal>120000){lastHeal=Date.now();sync(true);}
+      throw e;
+    }
   }
   async function snooze(event,minutes){
     if(!shopNotificationsEnabled() || state!=="active")throw Error("יש להפעיל התראות בטלפון החנות.");
@@ -160,5 +187,15 @@
   }
   window.addEventListener("online",()=>refreshWhenReady(true));
   document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")refreshWhenReady(state==="error");});
-  window.addEventListener("storage",()=>refreshWhenReady(true));
+  // Other apps on this origin write their own localStorage keys constantly;
+  // only this app's opt-in, device id, device mode or a full clear matter here.
+  window.addEventListener("storage",event=>{
+    const changed=event && event.key;
+    if(changed===null || changed===undefined || changed==="deviceMode" || /^worksShop(Notifications|Device):/.test(changed))refreshWhenReady(true);
+  });
+  // A kiosk that stays on screen never fires visibilitychange. Renew regularly so
+  // a token that died or a worker policy that was lost is repaired within minutes.
+  setInterval(()=>{if(shopNotificationsEnabled())refreshWhenReady(false);},15*60000);
+  if(navigator.serviceWorker && navigator.serviceWorker.addEventListener)
+    navigator.serviceWorker.addEventListener("message",event=>{if(event.data?.type==="SHOP_REMINDER_SHOWN")window.ShopSnooze?.refresh(true);});
 })();
