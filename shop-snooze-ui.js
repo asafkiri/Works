@@ -4,12 +4,24 @@
   const busy=new Set();
   function enabled(){return shopNotificationsEnabled() && window.ShopNotifications?.getState()==="active";}
   function clear(){version++;events=[];lastRefresh=0;render();}
+  // Any open shift of the employee counts, not only the openShiftId pointer
+  // (it can be missing or stale, e.g. after a punch saved while offline).
+  function inShift(id){
+    const employee=employees[id],pointed=employee?.openShiftId && shifts[employee.openShiftId];
+    return !!(pointed && !pointed.clockOut) || Object.values(shifts||{}).some(s=>s && s.employeeId===id && s.clockIn && !s.clockOut);
+  }
+  // A punch was just saved on this terminal: hide that reminder's controls at once.
+  // Leaves `version` alone: a punch by another employee must not void an action
+  // in progress on this card. Rendering already hides rows that no longer apply.
+  function resolved(employeeId,kind){
+    events=events.filter(e=>!(e.employeeId===employeeId && e.kind===kind));render();refresh(true);
+  }
   function render(){
     document.querySelectorAll("[data-shop-snooze]").forEach(slot=>{
-      const row=enabled()?events.find(e=>e.employeeId===slot.dataset.shopSnooze):null;
-      const employee=employees[slot.dataset.shopSnooze];
-      const live=employee?.openShiftId && shifts[employee.openShiftId] && !shifts[employee.openShiftId].clockOut;
-      if(!row || (row.kind==="in"?live:!live)){slot.replaceChildren();delete slot.dataset.signature;return;}
+      const employee=employees[slot.dataset.shopSnooze],live=inShift(slot.dataset.shopSnooze);
+      // Entry reminders matter while the employee is out, exit reminders while in.
+      const row=enabled()?events.find(e=>e.employeeId===slot.dataset.shopSnooze && e.kind===(live?"out":"in")):null;
+      if(!row){slot.replaceChildren();delete slot.dataset.signature;return;}
       const paused=Number(row.until)>Date.now(),working=busy.has(row.snoozeKey);
       const signature=JSON.stringify([row.snoozeKey,row.until,paused,working]);
       if(slot.dataset.signature===signature && slot.firstChild)return;
@@ -33,10 +45,13 @@
           busy.add(row.snoozeKey);render();
           const requestVersion=version;
           try{
-            const result=await ShopNotifications.snooze(row,minutes);
+            // Overlapping plans of this employee remind separately: snooze them all.
+            const same=events.filter(e=>e.employeeId===row.employeeId && e.kind===row.kind);
+            let result;
+            for(const e of same.length?same:[row])result=await ShopNotifications.snooze(e,minutes);
             if(requestVersion!==version || !enabled())return;
             version++;
-            events.forEach(e=>{if(e.snoozeKey===row.snoozeKey)e.until=result.until;});
+            events.forEach(e=>{if(same.some(x=>x.snoozeKey===e.snoozeKey) || e.snoozeKey===row.snoozeKey)e.until=result.until;});
             const shown=slot.querySelector("details");if(shown)shown.open=false;
             toast("התזכורת נדחתה ב־"+minutes+" דקות");
           }catch(error){if(requestVersion===version)toast(error.message||"הדחייה לא נשמרה. נסה שוב.");}
@@ -56,10 +71,13 @@
           try{
             const ok=await uiConfirm("לבטל את תזכורות הכניסה והיציאה של "+(employee?.name||"העובד")+" למשמרת הזו?\nהסידור וההחתמות לא ישתנו. המשמרת הבאה תמשיך לקבל תזכורות.", {title:"ביטול תזכורות למשמרת",okText:"בטל תזכורות"});
             if(!ok || requestVersion!==version || !enabled())return;
-            await ShopNotifications.cancel(row);
+            // "Not coming" covers every overlapping plan this employee is due to start now.
+            const entries=events.filter(e=>e.employeeId===row.employeeId && e.kind==="in");
+            const cancelling=entries.length?entries:[row];
+            for(const e of cancelling)await ShopNotifications.cancel(e);
             if(requestVersion!==version || !enabled())return;
             version++;
-            events=events.filter(e=>e.planKey!==row.planKey);
+            events=events.filter(e=>!cancelling.some(x=>x.planKey===e.planKey));
             toast("תזכורות הכניסה והיציאה למשמרת הזו בוטלו");
           }catch(error){if(requestVersion===version)toast(error.message||"הביטול לא נשמר. נסה שוב.");}
           finally{busy.delete(row.snoozeKey);render();refresh(true);}
@@ -79,7 +97,7 @@
     }).catch(()=>{lastRefresh=0;}).finally(()=>{pending=null;if(again){again=false;refresh(true);}});
     return pending;
   }
-  window.ShopSnooze={render,refresh,clear};
+  window.ShopSnooze={render,refresh,clear,resolved};
   setInterval(()=>{if(document.visibilityState==="visible"){render();refresh();}},30_000);
   document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")refresh(true);});
 })();

@@ -5,7 +5,7 @@ const DEVICE="10000000-1000-4000-8000-100000000001";
 const TOKEN="only-the-shop-phone-token";
 const start=Date.parse("2026-09-27T08:00:00+03:00");
 function server(){
-  let now=start,sendError=null,afterClaim=null;
+  let now=start,sendError=null,afterClaim=null,attempts=0;const logs=[];
   const data={config:{managerUid:"manager"},employees:{a:{name:"דני"}},oneTimeShifts:{p:{employeeId:"a",date:"2026-09-27",startTime:"08:00",endTime:"16:00"}},shifts:{}};
   const sent=[];
   const clone=v=>v===undefined?null:structuredClone(v);
@@ -15,20 +15,27 @@ function server(){
     async get(){return {val:()=>clone(read(p))};},
     async set(v){write(p,v);},async remove(){write(p,null);},
     async update(v){for(const [k,value]of Object.entries(v))write([p,k].filter(Boolean).join("/"),value);},
-    async transaction(fn){const result=fn(clone(read(p)));if(result===undefined)return {committed:false};write(p,result);if(result?.claimId&&afterClaim)afterClaim();return {committed:true};}
+    // Like the Admin SDK with no listener: the update first runs on an empty local
+    // cache (null); undefined aborts locally, anything else is re-run on the server value.
+    async transaction(fn){
+      let result=fn(null);if(result===undefined)return {committed:false};
+      const actual=clone(read(p));
+      if(actual!==null){result=fn(actual);if(result===undefined)return {committed:false};}
+      write(p,result);if(result?.claimId&&afterClaim)afterClaim();return {committed:true};
+    }
   };}};
-  class HttpsError extends Error{constructor(code,message){super(message);this.code=code;}}
+  class HttpsError extends Error{constructor(code,message,details){super(message);this.code=code;this.details=details;}}
   const context={exports:{},Date:class extends Date{static now(){return now;}},require(name){
     if(name==="firebase-admin/database")return {getDatabaseWithUrl:()=>db};
-    if(name==="firebase-admin/messaging")return {getMessaging:()=>({send:async message=>{if(sendError)throw sendError;sent.push(clone(message));return "ok";}})};
+    if(name==="firebase-admin/messaging")return {getMessaging:()=>({send:async message=>{attempts++;if(sendError)throw sendError;sent.push(clone(message));return "ok";}})};
     if(name==="firebase-functions/v2/https")return {onCall:(_,fn)=>fn,HttpsError};
     if(name==="firebase-functions/v2/scheduler")return {onSchedule:(_,fn)=>fn};
-    if(name==="firebase-functions/logger")return {warn(){},info(){}};
+    if(name==="firebase-functions/logger")return {warn:(msg,o)=>logs.push({msg,...o}),info:(msg,o)=>logs.push({msg,...o})};
     if(name.startsWith("./"))return require("../"+name.slice(2));return require(name);
   }};
   vm.runInNewContext(source,context);
   const call=(action,uid="manager",extra={})=>context.exports.setShopNotificationDevice({auth:uid?{uid}:undefined,data:{action,deviceId:DEVICE,token:TOKEN,...extra}});
-  return {data,sent,call,tick:context.exports.sendShopShiftReminders,now:v=>{now=v;},fail:v=>{sendError=v;},afterClaim:fn=>{afterClaim=fn;}};
+  return {data,sent,logs,call,tick:context.exports.sendShopShiftReminders,now:v=>{now=v;},fail:v=>{sendError=v;},afterClaim:fn=>{afterClaim=fn;},attempts:()=>attempts};
 }
 test("device enrollment is manager-authenticated and switches only explicit terminals to shop routing",async()=>{
   const s=server();await assert.rejects(s.call("enable",null),{code:"unauthenticated"});
@@ -64,12 +71,39 @@ test("clock-in or opt-out racing a scheduler claim suppresses the pending send",
 test("overlapping scheduler invocations claim a delivery once",async()=>{
   const s=server();await s.call("enable");await Promise.all([s.tick(),s.tick()]);assert.equal(s.sent.length,1);
 });
-test("failed sends do not retry every minute; invalid tokens are deactivated",async()=>{
-  const s=server();await s.call("enable");s.fail(Object.assign(Error("temporary"),{code:"messaging/server-unavailable"}));
-  await s.tick();s.fail(null);s.now(start+60000);await s.tick();assert.equal(s.sent.length,0);
-  s.now(start+5*60000);await s.tick();assert.equal(s.sent.length,1);
-  s.now(start+10*60000);s.fail(Object.assign(Error("gone"),{code:"messaging/registration-token-not-registered"}));
-  await s.tick();assert.equal(s.data.shopNotificationDevices[DEVICE].enabled,false);
+test("a failed send is retried once on the next minute, then backs off while failures continue",async()=>{
+  const s=server();await s.call("enable");const temporary=Object.assign(Error("temporary"),{code:"messaging/server-unavailable"});
+  s.fail(temporary);await s.tick();assert.equal(s.attempts(),1);
+  s.fail(null);s.now(start+60000);await s.tick();assert.equal(s.sent.length,1,"the reminder is not lost for five minutes");
+  s.now(start+5*60000);await s.tick();assert.equal(s.sent.length,1,"cadence counts from the successful send");
+  s.now(start+6*60000);await s.tick();assert.equal(s.sent.length,2);
+  s.fail(temporary);s.now(start+11*60000);await s.tick();s.now(start+12*60000);await s.tick();assert.equal(s.attempts(),5);
+  for(const minute of [13,14,15,16])await (s.now(start+minute*60000),s.tick());
+  assert.equal(s.attempts(),5,"no retry every minute while sends keep failing");
+  s.now(start+17*60000);await s.tick();assert.equal(s.attempts(),6);
+});
+test("the delivery lease is released and the successful send is recorded under real transaction semantics",async()=>{
+  const s=server();await s.call("enable");await s.tick();
+  const [row]=Object.values(s.data.shopReminderDeliveries["2026-09-27"]);
+  assert.equal(row.claimId,null);assert.equal(row.leaseUntil,0);assert.equal(row.lastSentAt,start);
+  assert.ok(s.logs.some(l=>l.msg==="Shop reminder sent"&&l.employeeId==="a"&&l.kind==="in"&&l.ref));
+});
+test("a token FCM rejects is deactivated and cannot be re-enabled; a new token can",async()=>{
+  const s=server();await s.call("enable");s.fail(Object.assign(Error("gone"),{code:"messaging/registration-token-not-registered"}));
+  await s.tick();const row=s.data.shopNotificationDevices[DEVICE];
+  assert.equal(row.enabled,false);assert.equal(row.token??null,null);assert.equal(row.disabledReason,"token-rejected");
+  await assert.rejects(s.call("pending"),e=>e.code==="failed-precondition"&&e.details?.reason==="token-rejected");
+  await assert.rejects(s.call("enable"),e=>e.code==="failed-precondition"&&e.details?.reason==="token-rejected");
+  s.fail(null);const fresh=await s.call("enable","manager",{token:"a-brand-new-shop-phone-token"});
+  assert.equal(fresh.enabled,true);assert.ok(fresh.serverTime>0);
+  s.now(start+60000);await s.tick();assert.equal(s.sent.at(-1).token,"a-brand-new-shop-phone-token");
+});
+test("receipts from the phone are logged only for this manager's device and only with known outcomes",async()=>{
+  const s=server();await assert.rejects(s.call("report","manager",{entries:[]}),{code:"failed-precondition"});
+  await s.call("enable");
+  const result=await s.call("report","manager",{entries:[{outcome:"shown",ref:"abc",employeeId:"a",kind:"in",sentAt:1,receivedAt:2,path:"push"},{outcome:"bogus"},null]});
+  assert.equal(result.logged,1);assert.ok(s.logs.some(l=>l.msg==="Shop reminder receipt"&&l.outcome==="shown"&&l.deviceId===DEVICE));
+  await assert.rejects(s.call("report","employee",{entries:[]}),{code:"permission-denied"});
 });
 test("server test targets this device, requires opt-in and is rate limited",async()=>{
   const s=server();await assert.rejects(s.call("test"),{code:"failed-precondition"});
@@ -205,4 +239,11 @@ test("snoozing after a send claim suppresses that send; exiting during snooze en
   s.afterClaim(null);s.data.shifts.s.clockOut=end+60000;
   s.now(end+20*60000);await s.tick();assert.equal(s.sent.length,0);
   assert.equal((await s.call("pending")).events.length,0);
+});
+test("the server test on a dead token switches the device off and says why, and other failures are readable",async()=>{
+  const s=server();await s.call("enable");s.fail(Object.assign(Error("gone"),{code:"messaging/registration-token-not-registered"}));
+  await assert.rejects(s.call("test"),e=>e.code==="failed-precondition"&&e.details?.reason==="token-rejected");
+  assert.equal(s.data.shopNotificationDevices[DEVICE].disabledReason,"token-rejected");
+  const t=server();await t.call("enable");t.fail(Object.assign(Error("busy"),{code:"messaging/server-unavailable"}));
+  await assert.rejects(t.call("test"),{code:"unavailable"});assert.equal(t.data.shopNotificationDevices[DEVICE].enabled,true);
 });

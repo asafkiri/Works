@@ -1,5 +1,5 @@
 /* ============================================================
-   firebase-messaging-sw.js — v80
+   firebase-messaging-sw.js — v81
    Service Worker לקבלת התראות פוש כשהאפליקציה סגורה/ברקע.
    יושב באותה תיקייה של index.html בריפו (חובה — לא בתת-תיקייה).
    ============================================================ */
@@ -30,7 +30,7 @@ self.addEventListener("push", (event) => {
   // until the notification is really shown (its icon may load slowly).
   let settle;
   const displayed = new Promise(resolve => { settle = resolve; });
-  queueShop(() => { const shown = showShopReminder(data); shown.then(settle, settle); return shown; }).catch(() => {});
+  queueShop(() => { const shown = deliverShop(data, "push"); shown.then(settle, settle); return shown; }).catch(() => {});
   event.waitUntil(Promise.race([displayed, new Promise(resolve => setTimeout(resolve, SHOP_EVENT_MS))]));
 });
 
@@ -58,7 +58,7 @@ const SHOP_POLICY_CACHE = "works-shop-notification-policy-v1";
 const SHOP_POLICY_URL = new URL("__shop_notification_policy", self.registration.scope).href;
 const SHOP_SNOOZE_URL = new URL("__shop_notification_snoozes", self.registration.scope).href;
 const SHOP_DB = "works-shop-notifications", SHOP_STORE = "state";
-const SHOP_TASK_MS = 15000, SHOP_EVENT_MS = 90000;
+const SHOP_TASK_MS = 15000, SHOP_EVENT_MS = 90000, SHOP_RESOLVED_MS = 180000, SHOP_RECEIPTS_MAX = 50;
 let shopDb = null, shopOptedOut = false;
 function openShopDb(){
   if(!shopDb) shopDb = new Promise((resolve, reject) => {
@@ -96,6 +96,7 @@ async function readShop(key, legacyUrl, fallback){
     const value = await shopStore("readonly", store => store.get(key));
     if(value !== undefined) return value;
   }catch(e){}
+  if(!legacyUrl) return fallback;
   try{
     const saved = await (await caches.open(SHOP_POLICY_CACHE)).match(legacyUrl);
     if(saved){
@@ -116,7 +117,7 @@ async function readShop(key, legacyUrl, fallback){
 async function writeShop(key, legacyUrl, value){
   await shopStore("readwrite", store => store.put(value, key));
   // A stale legacy copy must never override a newer IndexedDB value.
-  try{ await (await caches.open(SHOP_POLICY_CACHE)).delete(legacyUrl); }catch(e){}
+  if(legacyUrl) try{ await (await caches.open(SHOP_POLICY_CACHE)).delete(legacyUrl); }catch(e){}
 }
 const shopPolicy = () => readShop("policy", SHOP_POLICY_URL, {enabled:false});
 const shopSnoozes = () => readShop("snoozes", SHOP_SNOOZE_URL, {});
@@ -145,14 +146,19 @@ function queueShop(work){
 async function closeShopNotices(match){
   (await self.registration.getNotifications()).forEach(n => { if(n.data && n.data.worksShopReminder && match(n.data)) n.close(); });
 }
+// Returns what happened to the reminder; recorded in the receipt log.
 async function showShopReminder(data){
-  if(!data || data.audience !== "shop" || shopOptedOut) return;
+  if(shopOptedOut) return "opted-out";
   const policy = await shopPolicy();
-  if(policy.enabled !== true || policy.deviceId !== data.deviceId) return;
+  if(policy.enabled !== true) return "policy-off";
+  if(policy.deviceId !== data.deviceId) return "other-device";
   const clocks = shopClocks(policy);
-  if(!(Number(data.expiresAt) > clocks.earliest)) return;
+  if(!(Number(data.expiresAt) > clocks.earliest)) return "expired";
   const muted = await shopSnoozes();
-  if(Number(muted[data.snoozeKey]) > clocks.latest || Number(muted["plan:"+data.planKey]) > clocks.latest) return;
+  if(Number(muted["plan:"+data.planKey]) > clocks.latest) return "cancelled";
+  if(Number(muted[data.snoozeKey]) > clocks.latest) return "snoozed";
+  // The terminal just recorded this punch; a copy still in transit is obsolete.
+  if(Number(muted["resolved:"+data.employeeId+":"+data.kind]) > clocks.latest) return "resolved";
   await self.registration.showNotification(data.title || "תזכורת החתמה", {
     body:data.body || "", icon:new URL("icon-192.png", self.registration.scope).href,
     dir:"rtl", lang:"he", tag:data.tag || "works-shop-reminder", renotify:true,
@@ -161,12 +167,27 @@ async function showShopReminder(data){
   });
   // An opt-out may have run while a slow display timed out of the queue.
   const after = await shopPolicy();
-  if(shopOptedOut || after.enabled !== true || after.deviceId !== data.deviceId) await closeShopNotices(() => true);
+  if(shopOptedOut || after.enabled !== true || after.deviceId !== data.deviceId){ await closeShopNotices(() => true); return "opted-out"; }
   try{
     const scope = self.registration.scope;
     (await self.clients.matchAll({type:"window", includeUncontrolled:true}))
       .forEach(client => { if(client.url.startsWith(scope)) client.postMessage({type:"SHOP_REMINDER_SHOWN"}); });
   }catch(e){}
+  return "shown";
+}
+// Local receipt log: which reminders reached this phone and whether they were
+// shown. The page uploads it to the server so delivery can be verified.
+async function deliverShop(data, path){
+  if(!data || data.audience !== "shop") return;
+  let outcome;
+  try{ outcome = await showShopReminder(data); }catch(e){ outcome = "error"; }
+  try{
+    const list = await readShop("receipts", null, []);
+    const entries = (Array.isArray(list) ? list : []).concat([{outcome, path, ref:String(data.ref || ""), employeeId:String(data.employeeId || ""),
+      kind:String(data.kind || ""), sentAt:Number(data.sentAt) || 0, receivedAt:Date.now()}]).slice(-SHOP_RECEIPTS_MAX);
+    await writeShop("receipts", null, entries);
+  }catch(e){}
+  return outcome;
 }
 self.addEventListener("message", event => {
   if(!event.source || !event.source.url.startsWith(self.registration.scope)) return;
@@ -193,13 +214,37 @@ self.addEventListener("message", event => {
       await writeShop("snoozes",SHOP_SNOOZE_URL,snoozes);
       await closeShopNotices(data => data[field]===key);
     }));
+  }else if(event.data?.type === "SHOP_REMINDER_RESOLVED"){
+    // A punch was just recorded on this terminal: close that employee's reminders
+    // of this kind and ignore copies of them still in transit.
+    const employeeId=event.data.employeeId,kind=event.data.kind;
+    if(typeof employeeId!=="string" || !employeeId || (kind!=="in" && kind!=="out"))return;
+    event.waitUntil(queueShop(async()=>{
+      const now=shopClocks(await shopPolicy()).latest;
+      const snoozes=Object.fromEntries(Object.entries(await shopSnoozes()).filter(([,v])=>Number(v)>now));
+      snoozes["resolved:"+employeeId+":"+kind]=now+SHOP_RESOLVED_MS;
+      await writeShop("snoozes",SHOP_SNOOZE_URL,snoozes).catch(()=>{});
+      await closeShopNotices(data => data.employeeId===employeeId && data.kind===kind);
+    }));
+  }else if(event.data?.type === "SHOP_RECEIPTS_TAKE"){
+    event.waitUntil(queueShop(async()=>{
+      const list=await readShop("receipts",null,[]);
+      event.ports[0]?.postMessage({entries:Array.isArray(list)?list:[]});
+    }));
+  }else if(event.data?.type === "SHOP_RECEIPTS_ACK"){
+    const until=Number(event.data.until);
+    if(!Number.isFinite(until))return;
+    event.waitUntil(queueShop(async()=>{
+      const list=await readShop("receipts",null,[]);
+      await writeShop("receipts",null,(Array.isArray(list)?list:[]).filter(e=>Number(e.receivedAt)>until));
+    }));
   }else if(event.data?.type === "SHOW_SHOP_REMINDER"){
-    event.waitUntil(queueShop(()=>showShopReminder(event.data.data)));
+    event.waitUntil(queueShop(()=>deliverShop(event.data.data,"page")));
   }
 });
 // Fallback only: shop pushes are normally handled by the listener above.
 messaging.onBackgroundMessage(payload => {
-  if(payload.data?.audience === "shop") return queueShop(()=>showShopReminder(payload.data));
+  if(payload.data?.audience === "shop") return queueShop(()=>deliverShop(payload.data,"fallback"));
 });
 
 // עדכון מהיר של ה-Service Worker בגרסאות חדשות

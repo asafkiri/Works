@@ -6,12 +6,17 @@ const {onCall,HttpsError}=require("firebase-functions/v2/https");
 const {onSchedule}=require("firebase-functions/v2/scheduler");
 const logger=require("firebase-functions/logger");
 const {localClock,addIsoDays}=require("./reminder-logic");
-const {pendingShopEvents,deliveryDue,activeShopDevices,shopMessage}=require("./shop-reminder-logic");
+const {pendingShopEvents,deliveryDue,activeShopDevices,shopMessage,shopRef,SHOP_TTL_SECONDS}=require("./shop-reminder-logic");
 const DB_URL="https://mini-market-shalom-default-rtdb.firebaseio.com";
 const db=()=>getDatabaseWithUrl(DB_URL);
 const invalidTokens=new Set(["messaging/registration-token-not-registered","messaging/invalid-registration-token"]);
 const digest=value=>createHash("sha256").update(value).digest("hex");
 const snoozeMinutes=new Set([10,20,30,40,50,60]);
+const receiptOutcomes=new Set(["shown","expired","policy-off","other-device","snoozed","cancelled","resolved","opted-out","error"]);
+// The Admin SDK first runs a transaction update with its local cache, which is
+// empty (null) when nothing listens. Returning undefined there aborts without
+// asking the server; returning null makes the server resend the real value.
+const whenLoaded=update=>state=>state===null?null:update(state);
 const eventRoots=["employees","recurringShifts","oneTimeShifts","shifts","shopNotificationDevices","config/managerUid","shopReminderSnoozes","shopReminderCancellations"];
 const snoozePath=event=>`shopReminderSnoozes/${event.date}/${digest(event.snoozeKey)}`;
 function snoozedUntil(data,event) {
@@ -23,8 +28,14 @@ async function roots(names) {
   const snaps=await Promise.all(names.map(n=>db().ref(n).get()));
   return Object.fromEntries(names.map((n,i)=>[n,snaps[i].val()||{}]));
 }
+// FCM rejected this exact token: switch the device off and remember the token,
+// so the phone must create a new one (see action "enable").
+function rejectToken(deviceId,token) {
+  return db().ref(`shopNotificationDevices/${deviceId}`).transaction(whenLoaded(row=>row.token===token?
+    {...row,enabled:false,token:null,rejectedToken:digest(token),disabledReason:"token-rejected",disabledAt:Date.now()}:undefined),undefined,false);
+}
 async function send(device,data) {
-  return getMessaging().send({token:device.token,data,webpush:{headers:{Urgency:"high",TTL:"60"}}});
+  return getMessaging().send({token:device.token,data,webpush:{headers:{Urgency:"high",TTL:String(SHOP_TTL_SECONDS)}}});
 }
 
 exports.setShopNotificationDevice=onCall({region:"europe-west1",timeoutSeconds:30,maxInstances:2},async request=>{
@@ -33,7 +44,7 @@ exports.setShopNotificationDevice=onCall({region:"europe-west1",timeoutSeconds:3
   const managerUid=(await db().ref("config/managerUid").get()).val();
   if(uid!==managerUid) throw new HttpsError("permission-denied","הגדרת טלפון החנות מיועדת למנהל בלבד.");
   const {deviceId,action,token}=request.data||{};
-  if(typeof deviceId!=="string" || !/^[a-f0-9-]{36}$/i.test(deviceId) || !["enable","disable","status","test","pending","snooze","cancel"].includes(action))
+  if(typeof deviceId!=="string" || !/^[a-f0-9-]{36}$/i.test(deviceId) || !["enable","disable","status","test","pending","snooze","cancel","report"].includes(action))
     throw new HttpsError("invalid-argument","בקשת מכשיר לא תקינה.");
   const ref=db().ref(`shopNotificationDevices/${deviceId}`);
   const current=(await ref.get()).val();
@@ -44,12 +55,33 @@ exports.setShopNotificationDevice=onCall({region:"europe-west1",timeoutSeconds:3
   if(action==="status") return {enabled:current?.uid===uid && current.enabled===true};
   if(action==="enable") {
     if(typeof token!=="string" || token.length<20 || token.length>4096) throw new HttpsError("invalid-argument","חסר מזהה התראות תקין.");
+    // FCM rejected this exact token: the phone must create a new one, or the
+    // server would keep re-enabling a token that can never be delivered to.
+    if(current?.uid===uid && current.rejectedToken===digest(token))
+      throw new HttpsError("failed-precondition","מזהה ההתראות של הטלפון פג תוקף. מחדשים אותו אוטומטית.",{reason:"token-rejected"});
     // Atomic opt-in and routing switch. Disabling the last terminal never falls
     // back to employee phones; the requested channel stays shop-only.
     await db().ref().update({[`shopNotificationDevices/${deviceId}`]:{uid,enabled:true,token,updatedAt:Date.now()},"shopNotificationRouting/mode":"shop-only"});
-    return {enabled:true};
+    return {enabled:true,serverTime:Date.now()};
   }
-  if(!current || current.uid!==uid || current.enabled!==true) throw new HttpsError("failed-precondition","המכשיר לא רשום להתראות חנות.");
+  if(action==="report") {
+    // Receipts recorded by the phone's service worker: what arrived and whether
+    // it was shown. Only logged; they never change reminders or attendance.
+    if(!current || current.uid!==uid) throw new HttpsError("failed-precondition","המכשיר לא רשום להתראות חנות.");
+    const entries=Array.isArray(request.data.entries)?request.data.entries.slice(0,50):[];
+    let logged=0;
+    for(const e of entries) {
+      if(!e || typeof e!=="object" || !receiptOutcomes.has(e.outcome)) continue;
+      const text=(v,n)=>typeof v==="string"?v.slice(0,n):"";
+      const time=v=>Number.isFinite(Number(v))?Number(v):0;
+      logger.info("Shop reminder receipt",{deviceId,outcome:e.outcome,ref:text(e.ref,32),employeeId:text(e.employeeId,64),kind:text(e.kind,8),
+        sentAt:time(e.sentAt),receivedAt:time(e.receivedAt),path:text(e.path,16)});
+      logged++;
+    }
+    return {logged,serverTime:Date.now()};
+  }
+  if(!current || current.uid!==uid || current.enabled!==true)
+    throw new HttpsError("failed-precondition","המכשיר לא רשום להתראות חנות.",{reason:current?.uid===uid && current.disabledReason || "not-registered"});
   if(action==="pending" || action==="snooze" || action==="cancel") {
     const now=Date.now(),data=await roots(eventRoots);
     const events=[...pendingShopEvents(data,now).values()].filter(e=>!cancelled(data,e));
@@ -78,7 +110,17 @@ exports.setShopNotificationDevice=onCall({region:"europe-west1",timeoutSeconds:3
   const rate=db().ref(`shopNotificationTestRate/${deviceId}`),now=Date.now();
   const claim=await rate.transaction(last=>Number(last)>now-30_000?undefined:now,undefined,false);
   if(!claim.committed) throw new HttpsError("resource-exhausted","אפשר לבדוק שוב בעוד חצי דקה.");
-  await send({...current,deviceId},{audience:"shop",deviceId,kind:"test",title:"🔔 בדיקת תזכורות החנות",body:"הודעת הבדיקה הגיעה מהשרת לטלפון הזה.",tag:"works-shop-server-test",expiresAt:String(now+60_000)});
+  try{
+    await send({...current,deviceId},{audience:"shop",deviceId,kind:"test",title:"🔔 בדיקת תזכורות החנות",body:"הודעת הבדיקה הגיעה מהשרת לטלפון הזה.",tag:"works-shop-server-test",
+      ref:"server-test",sentAt:String(now),expiresAt:String(now+SHOP_TTL_SECONDS*1000)});
+  }catch(error) {
+    logger.warn("Shop test send failed",{code:error.code||"unknown",deviceId});
+    if(invalidTokens.has(error.code)) {
+      await rejectToken(deviceId,current.token);
+      throw new HttpsError("failed-precondition","מזהה ההתראות של הטלפון פג תוקף. מחדשים אותו אוטומטית.",{reason:"token-rejected"});
+    }
+    throw new HttpsError("unavailable","שירות ההתראות של Google לא קיבל את הודעת הבדיקה. נסה שוב בעוד דקה.");
+  }
   return {sent:true};
 });
 
@@ -86,7 +128,7 @@ exports.sendShopShiftReminders=onSchedule({schedule:"* * * * *",timeZone:"Asia/J
   const startedAt=Date.now(),today=localClock(startedAt).date;
   const data=await roots(eventRoots);
   const devices=activeShopDevices(data.shopNotificationDevices,data["config/managerUid"]);
-  if(devices.length===0) return;
+  if(devices.length===0) {logger.info("Shop reminders checked",{sent:0,devices:0});return;}
   const events=pendingShopEvents(data,startedAt);
   let sent=0;
   for(const event of events.values()) for(const device of devices) {
@@ -96,19 +138,30 @@ exports.sendShopShiftReminders=onSchedule({schedule:"* * * * *",timeZone:"Asia/J
     const claimId=randomUUID(),now=Date.now();
     const claim=await ref.transaction(state=>deliveryDue(state,now)?{...(state||{}),claimId,leaseUntil:now+75_000,lastAttemptAt:now}:undefined,undefined,false);
     if(!claim.committed) continue;
-    let success=false;
+    let success=false,failed=false;
+    const context={ref:shopRef(event),employeeId:event.employeeId,kind:event.kind,date:event.date,start:event.start,deviceId:device.deviceId};
     try {
       // Never trust a device's UI state or a stale employee openShiftId pointer.
       // Recheck both recipient opt-in and actual punches just before dispatch.
       const fresh=await roots(eventRoots);
       const recipient=activeShopDevices(fresh.shopNotificationDevices,fresh["config/managerUid"]).find(d=>d.deviceId===device.deviceId && d.token===device.token);
       const pending=pendingShopEvents(fresh,Date.now()).get(event.key);
-      if(recipient && pending && !suppressed(fresh,pending,Date.now())) {await send(recipient,shopMessage(pending,recipient,Date.now()));success=true;sent++;}
+      if(!recipient) logger.info("Shop reminder skipped",{...context,reason:"recipient-changed"});
+      else if(!pending) logger.info("Shop reminder skipped",{...context,reason:"resolved"});
+      else if(suppressed(fresh,pending,Date.now())) logger.info("Shop reminder skipped",{...context,reason:"snoozed-or-cancelled"});
+      else {
+        const message=shopMessage(pending,recipient,Date.now());
+        const messageId=await send(recipient,message);
+        success=true;sent++;
+        logger.info("Shop reminder sent",{...context,sentAt:Number(message.sentAt),messageId:String(messageId||"")});
+      }
     }catch(error) {
-      if(invalidTokens.has(error.code)) await db().ref(`shopNotificationDevices/${device.deviceId}`).transaction(row=>row?.token===device.token?{...row,enabled:false,token:null}:undefined,undefined,false);
-      logger.warn("Shop reminder send failed",{code:error.code||"unknown",deviceId:device.deviceId});
+      failed=true;
+      if(invalidTokens.has(error.code)) await rejectToken(device.deviceId,device.token);
+      logger.warn("Shop reminder send failed",{...context,code:error.code||"unknown"});
     }finally {
-      await ref.transaction(state=>state?.claimId===claimId?{...state,claimId:null,leaseUntil:0,...(success?{lastSentAt:Date.now()}:{})}:undefined,undefined,false);
+      await ref.transaction(whenLoaded(state=>state.claimId===claimId?{...state,claimId:null,leaseUntil:0,
+        ...(success?{lastSentAt:Date.now(),failedAttempts:0}:failed?{failedAttempts:(Number(state.failedAttempts)||0)+1}:{})}:undefined),undefined,false);
     }
   }
   // Keep audit/deduplication state bounded without changing attendance records.
