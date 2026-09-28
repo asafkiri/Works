@@ -48,3 +48,14 @@ test("snooze sends the exact event and duration only from an active opted-in pho
   assert.equal(request.eventKey,"plan-a");assert.equal(request.snoozeKey,"actual-shift-a");
   d.enabled(false);await assert.rejects(d.api.snooze(event,20));
 });
+test("cancel sends only this active event and updates the worker only after the server accepts",async()=>{
+  const d=device(),event={eventKey:"entry-a",snoozeKey:"entry-snooze-a"};
+  await assert.rejects(d.api.cancel(event));assert.equal(d.requests.length,0);
+  await d.api.sync(true);d.serverOk(false);await assert.rejects(d.api.cancel(event));
+  assert.equal(d.foreground.length,0);
+  d.serverOk(true);await d.api.cancel(event);
+  const request=d.requests.at(-1);assert.equal(request.action,"cancel");
+  assert.equal(request.eventKey,event.eventKey);assert.equal(request.snoozeKey,event.snoozeKey);
+  assert.equal(d.foreground.at(-1).type,"SHOP_REMINDER_CANCELLED");
+  d.enabled(false);await assert.rejects(d.api.cancel(event));
+});

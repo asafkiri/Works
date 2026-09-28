@@ -122,7 +122,14 @@
     reg?.active?.postMessage({type:"SHOP_REMINDER_SNOOZED",snoozeKey:event.snoozeKey,until:result.until});
     return result;
   }
-  window.ShopNotifications={sync,stop,receive,test,pending,snooze,getState:()=>state,getError:()=>error};
+  async function cancel(event){
+    if(!shopNotificationsEnabled() || state!=="active")throw Error("יש להפעיל התראות בטלפון החנות.");
+    const result=await call("cancel",deviceId(false),undefined,auth.currentUser,{eventKey:event.eventKey,snoozeKey:event.snoozeKey});
+    const reg=await navigator.serviceWorker.getRegistration("firebase-messaging-sw.js").catch(()=>null);
+    reg?.active?.postMessage({type:"SHOP_REMINDER_CANCELLED",planKey:result.planKey,until:result.until});
+    return result;
+  }
+  window.ShopNotifications={sync,stop,receive,test,pending,snooze,cancel,getState:()=>state,getError:()=>error};
   window.addEventListener("online",()=>sync(true));
   document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")sync();});
   window.addEventListener("storage",()=>sync(true));

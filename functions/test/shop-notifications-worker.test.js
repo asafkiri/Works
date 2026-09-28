@@ -44,3 +44,14 @@ test("snooze closes only this shift's notice and suppresses late delivery for it
   await w.background({...w.payload,snoozeKey:"first"});assert.equal(w.notices.length,2);
   await w.background({...w.payload,snoozeKey:"next-shift"});assert.equal(w.notices.length,3);
 });
+test("plan cancellation closes both kinds and blocks late entry/exit notices while other plans still display",async()=>{
+  const w=worker();await w.message({type:"SHOP_NOTIFICATION_POLICY",enabled:true,deviceId:"this-device"});
+  await w.background({...w.payload,planKey:"first",kind:"in",snoozeKey:"entry-first"});
+  await w.background({...w.payload,planKey:"first",kind:"out",snoozeKey:"exit-first"});
+  await w.background({...w.payload,planKey:"other",snoozeKey:"exit-other"});
+  await w.message({type:"SHOP_REMINDER_CANCELLED",planKey:"first",until:Date.now()+48*3600000});
+  assert.equal(w.notices[0].closed,true);assert.equal(w.notices[1].closed,true);assert.equal(w.notices[2].closed,false);
+  for(const kind of ["in","out"])await w.background({...w.payload,planKey:"first",kind,snoozeKey:"new-key"});
+  assert.equal(w.notices.length,3);
+  await w.background({...w.payload,planKey:"next",kind:"in",snoozeKey:"entry-next"});assert.equal(w.notices.length,4);
+});

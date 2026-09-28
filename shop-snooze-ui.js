@@ -1,4 +1,4 @@
-/* Compact, per-employee exit-reminder controls on the shop terminal. */
+/* Compact controls for active entry/exit reminders on the shop terminal. */
 (function(){
   let events=[],pending=null,lastRefresh=0,version=0,again=false;
   const busy=new Set();
@@ -9,7 +9,7 @@
       const row=enabled()?events.find(e=>e.employeeId===slot.dataset.shopSnooze):null;
       const employee=employees[slot.dataset.shopSnooze];
       const live=employee?.openShiftId && shifts[employee.openShiftId] && !shifts[employee.openShiftId].clockOut;
-      if(!row || !live){slot.replaceChildren();delete slot.dataset.signature;return;}
+      if(!row || (row.kind==="in"?live:!live)){slot.replaceChildren();delete slot.dataset.signature;return;}
       const paused=Number(row.until)>Date.now(),working=busy.has(row.snoozeKey);
       const signature=JSON.stringify([row.snoozeKey,row.until,paused,working]);
       if(slot.dataset.signature===signature && slot.firstChild)return;
@@ -21,7 +21,7 @@
       summary.textContent=paused?"⏸ נדחה עד "+new Date(row.until).toLocaleTimeString("he-IL",{timeZone:"Asia/Jerusalem",hour:"2-digit",minute:"2-digit"})+" · שינוי":"⏰ הזכר לי בעוד…";
       details.append(summary);
       const text=document.createElement("div");
-      text.textContent="דוחה רק את תזכורת היציאה שלך. לאחר מכן היא חוזרת כל 5 דקות.";
+      text.textContent="דוחה את תזכורת ה"+(row.kind==="in"?"כניסה":"יציאה")+" למשמרת הזו. לאחר מכן היא חוזרת כל 5 דקות עד להחתמה.";
       text.style.cssText="color:var(--muted);line-height:1.5;margin:8px 0";
       details.append(text);
       const choices=document.createElement("div");choices.style.cssText="display:grid;grid-template-columns:repeat(3,1fr);gap:6px";
@@ -44,7 +44,29 @@
         });
         choices.append(button);
       }
-      details.append(choices);slot.replaceChildren(details);
+      details.append(choices);
+      if(row.kind==="in"){
+        const cancel=document.createElement("button");cancel.type="button";cancel.className="btn line sm";
+        cancel.textContent="לא מגיע — בטל תזכורות למשמרת הזו";cancel.disabled=working;
+        cancel.style.cssText="width:100%;margin-top:8px";
+        cancel.addEventListener("click",async event=>{
+          event.stopPropagation();if(busy.has(row.snoozeKey))return;
+          busy.add(row.snoozeKey);render();
+          const requestVersion=version;
+          try{
+            const ok=await uiConfirm("לבטל את תזכורות הכניסה והיציאה של "+(employee?.name||"העובד")+" למשמרת הזו?\nהסידור וההחתמות לא ישתנו. המשמרת הבאה תמשיך לקבל תזכורות.", {title:"ביטול תזכורות למשמרת",okText:"בטל תזכורות"});
+            if(!ok || requestVersion!==version || !enabled())return;
+            await ShopNotifications.cancel(row);
+            if(requestVersion!==version || !enabled())return;
+            version++;
+            events=events.filter(e=>e.planKey!==row.planKey);
+            toast("תזכורות הכניסה והיציאה למשמרת הזו בוטלו");
+          }catch(error){if(requestVersion===version)toast(error.message||"הביטול לא נשמר. נסה שוב.");}
+          finally{busy.delete(row.snoozeKey);render();refresh(true);}
+        });
+        details.append(cancel);
+      }
+      slot.replaceChildren(details);
     });
   }
   async function refresh(force=false){

@@ -112,7 +112,7 @@ test("snooze affects all shop devices for one shift, never another employee or a
   assert.equal(s.sent.filter(m=>m.data.employeeId==="a").length,2);
   await assert.rejects(s.call("snooze","manager",{...event,minutes:10}),{code:"failed-precondition"});
 });
-test("closed shifts, entry reminders, unsupported durations and non-enrolled phones cannot snooze",async()=>{
+test("closed shifts, stale events, unsupported durations and non-enrolled phones cannot snooze",async()=>{
   const {s,event}=await exitServer();
   for(const minutes of [5,15,0,-10,61,"10",null])await assert.rejects(s.call("snooze","manager",{...event,minutes}),{code:"invalid-argument"});
   await assert.rejects(s.call("snooze","employee",{...event,minutes:10}),{code:"permission-denied"});
@@ -121,8 +121,79 @@ test("closed shifts, entry reminders, unsupported durations and non-enrolled pho
   await assert.rejects(s.call("snooze","manager",{...event,minutes:10}),{code:"failed-precondition"});
   assert.equal((await s.call("pending")).events.length,0);
   delete s.data.shifts.s;s.now(start);
-  assert.equal((await s.call("pending")).events.length,0);
+  assert.equal((await s.call("pending")).events[0].kind,"in");
   await assert.rejects(s.call("snooze","manager",{...event,minutes:10}),{code:"failed-precondition"});
+});
+
+test("all six entry snoozes resume five-minute repeats; actual entry ends the pending control",async()=>{
+  for(const minutes of [10,20,30,40,50,60]){
+    const s=server();await s.call("enable");await s.tick();
+    const event=(await s.call("pending")).events[0];assert.equal(event.kind,"in");
+    const result=await s.call("snooze","manager",{...event,minutes});
+    for(let m=1;m<minutes;m++){s.now(start+m*60000);await s.tick();}
+    assert.equal(s.sent.length,1);
+    assert.equal((await s.call("pending")).events[0].until,result.until);
+    s.now(result.until);await s.tick();assert.equal(s.sent.length,2);
+    s.now(result.until+4*60000);await s.tick();assert.equal(s.sent.length,2);
+    s.now(result.until+5*60000);await s.tick();assert.equal(s.sent.length,3);
+    await s.call("snooze","manager",{...event,minutes:60});
+    s.data.shifts.s={employeeId:"a",clockIn:result.until+5*60000,clockOut:null};
+    assert.equal((await s.call("pending")).events.length,0);
+    s.now(result.until+65*60000);await s.tick();assert.equal(s.sent.length,3);
+    s.now(end);await s.tick();assert.equal(s.sent.length,4);assert.equal(s.sent.at(-1).data.kind,"out");
+  }
+});
+test("cancelling entry cancels both kinds for this plan across terminals without changing attendance or schedule",async()=>{
+  const s=server();await s.call("enable");
+  await s.call("enable","manager",{deviceId:DEVICE.replace(/1$/,"2"),token:TOKEN+"-second"});
+  s.data.employees.b={name:"טל"};s.data.oneTimeShifts.q={...s.data.oneTimeShifts.p,employeeId:"b"};
+  const event=(await s.call("pending")).events.find(e=>e.employeeId==="a");
+  const attendance=structuredClone(s.data.shifts),schedule=structuredClone(s.data.oneTimeShifts);
+  await s.call("snooze","manager",{...event,minutes:10});
+  const result=await s.call("cancel","manager",event);assert.equal(result.planKey,event.planKey);
+  assert.equal(result.cancelled,true);
+  assert.deepEqual(s.data.shifts,attendance);assert.deepEqual(s.data.oneTimeShifts,schedule);
+  assert.ok((await s.call("pending")).events.every(e=>e.employeeId==="b"));
+  s.now(start+15*60000);await s.tick();assert.equal(s.sent.length,2);
+  assert.ok(s.sent.every(m=>m.data.employeeId==="b"));
+  // A later real punch must not resurrect the cancelled plan's exit reminder.
+  s.data.shifts.s={employeeId:"a",clockIn:start+20*60000,clockOut:null};
+  s.now(end);await s.tick();s.now(end+5*60000);await s.tick();assert.equal(s.sent.length,2);
+  assert.equal((await s.call("pending")).events.length,0);
+  assert.equal(s.data.shifts.s.clockOut,null);
+});
+test("cancellation does not mute a second same-day shift, the next recurring date, or another employee",async()=>{
+  const s=server();await s.call("enable");delete s.data.oneTimeShifts.p;
+  s.data.recurringShifts={r:{employeeId:"a",daysOfWeek:[0,1],startTime:"08:00",endTime:"16:00"}};
+  const event=(await s.call("pending")).events[0];await s.call("cancel","manager",event);
+  s.data.oneTimeShifts.late={employeeId:"a",date:"2026-09-27",startTime:"18:00",endTime:"22:00"};
+  s.now(start+10*3600000);await s.tick();assert.equal(s.sent.length,1);assert.equal(s.sent[0].data.kind,"in");
+  s.now(start+24*3600000);await s.tick();assert.equal(s.sent.length,2);
+  assert.notEqual(s.sent[1].data.planKey,event.planKey);
+});
+test("cancellation requires an active entry reminder and an enrolled manager phone",async()=>{
+  const s=server();await s.call("enable");const event=(await s.call("pending")).events[0];
+  await assert.rejects(s.call("cancel",null,event),{code:"unauthenticated"});
+  await assert.rejects(s.call("cancel","employee",event),{code:"permission-denied"});
+  await s.call("disable");await assert.rejects(s.call("cancel","manager",event),{code:"failed-precondition"});
+  await s.call("enable");await assert.rejects(s.call("cancel","manager",{...event,eventKey:"unknown"}),{code:"failed-precondition"});
+  s.data.shifts.s={employeeId:"a",clockIn:start,clockOut:null};
+  await assert.rejects(s.call("cancel","manager",event),{code:"failed-precondition"});
+  s.now(end);const out=(await s.call("pending")).events[0];
+  await assert.rejects(s.call("cancel","manager",out),{code:"failed-precondition"});
+  assert.equal(s.data.shopReminderCancellations,undefined);
+});
+test("a cancellation racing dispatch or snooze cannot be undone by stale state",async()=>{
+  const s=server();await s.call("enable");const event=(await s.call("pending")).events[0];
+  await Promise.all([s.call("cancel","manager",event),s.call("snooze","manager",{...event,minutes:10})]);
+  s.now(start+20*60000);await s.tick();assert.equal(s.sent.length,0);
+  await assert.rejects(s.call("snooze","manager",{...event,minutes:10}),{code:"failed-precondition"});
+  const t=server();await t.call("enable");const active=(await t.call("pending")).events[0];
+  t.afterClaim(()=>{
+    const hash=require("node:crypto").createHash("sha256").update(active.planKey).digest("hex");
+    t.data.shopReminderCancellations={"2026-09-27":{[hash]:{cancelled:true}}};
+  });
+  await t.tick();assert.equal(t.sent.length,0);
 });
 test("snoozing after a send claim suppresses that send; exiting during snooze ends reminders",async()=>{
   const {s,event}=await exitServer();
