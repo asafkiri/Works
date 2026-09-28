@@ -2,20 +2,93 @@
 const test=require("node:test"),assert=require("node:assert/strict"),fs=require("node:fs"),path=require("node:path"),vm=require("node:vm");
 const source=fs.readFileSync(path.join(__dirname,"../../shop-notifications-client.js"),"utf8");
 function device(enabled=true){
-  const storage=new Map(),requests=[],policies=[],foreground=[];let enableDelay=null,serverOk=true,tokens=0;
+  const storage=new Map(),requests=[],policies=[],foreground=[],timers=new Map(),listeners={};let enableDelay=null,serverOk=true,tokens=0,nextTimer=0,tokenError=null,localPolicy={enabled:false};
   class Channel{constructor(){this.port1={close(){}};this.port2={postMessage:data=>{this.port1.onmessage?.({data});}};}}
-  const reg={active:{postMessage(data,ports){if(data.type==="SHOP_NOTIFICATION_POLICY"){policies.push(data);ports[0].postMessage({ok:true});}else foreground.push(data);}},update:async()=>{}};
-  const ctx={auth:{currentUser:{uid:"manager",getIdToken:async()=>"auth"}},Notification:{permission:"granted"},
-    messaging:{getToken:async()=>{tokens++;return "shop-phone-token";}},VAPID_KEY:"key",
-    shopNotificationsEnabled:()=>enabled,renderShopNotificationTest(){},setTimeout,clearTimeout,AbortController,MessageChannel:Channel,
+  const reg={active:{postMessage(data,ports){if(data.type==="SHOP_NOTIFICATION_POLICY"){policies.push(data);localPolicy=data;ports[0].postMessage({ok:true});}else foreground.push(data);}},update:async()=>{}};
+  const ctx={currentRole:"manager",auth:{currentUser:{uid:"manager",getIdToken:async()=>"auth"}},Notification:{permission:"granted"},
+    messaging:{getToken:async()=>{tokens++;if(tokenError)throw Error(tokenError);return "shop-phone-token";}},VAPID_KEY:"key",
+    shopNotificationsEnabled:()=>enabled,renderShopNotificationTest(){},
+    setTimeout:(fn,ms)=>{const id=++nextTimer;timers.set(id,{fn,ms});return id;},clearTimeout:id=>timers.delete(id),AbortController,MessageChannel:Channel,
     crypto:{randomUUID:()=>"10000000-1000-4000-8000-100000000001"},
     localStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v)},
     navigator:{serviceWorker:{register:async()=>reg,ready:Promise.resolve(reg),getRegistration:async()=>reg}},
     fetch:async(url,options)=>{const data=JSON.parse(options.body).data;requests.push(data);if(data.action==="enable"&&enableDelay)await enableDelay;return {ok:serverOk,json:async()=>serverOk?{result:{enabled:data.action==="enable"}}:{error:{message:"Server not deployed"}}};},
-    document:{addEventListener(){}},addEventListener(){}
+    document:{visibilityState:"visible",addEventListener:(name,fn)=>{listeners[name]=fn;}},addEventListener:(name,fn)=>{listeners[name]=fn;}
   };ctx.window=ctx;vm.runInNewContext(source,ctx);
-  return {ctx,api:ctx.ShopNotifications,requests,policies,foreground,tokens:()=>tokens,enabled:v=>{enabled=v;},delay:p=>{enableDelay=p;},serverOk:v=>{serverOk=v;}};
+  return {ctx,api:ctx.ShopNotifications,requests,policies,foreground,timers,listeners,reg,tokens:()=>tokens,enabled:v=>{enabled=v;},delay:p=>{enableDelay=p;},serverOk:v=>{serverOk=v;},tokenError:v=>{tokenError=v;},policy:()=>localPolicy};
 }
+
+test("a transient token or server refresh failure must not turn off a working receiver",async()=>{
+  for(const failure of ["token","server"]){
+    const d=device();await d.api.sync(true);const deviceId=d.policy().deviceId;
+    if(failure==="token")d.tokenError("Registration failed - push service error");else d.serverOk(false);
+    assert.equal(await d.api.sync(true),false);
+    assert.equal(d.policy().enabled,true,"previously connected phone must still receive push");
+    assert.equal(d.policy().deviceId,deviceId);
+  }
+});
+
+test("routine renewal does not close or interrupt existing reminders",async()=>{
+  const d=device();await d.api.sync(true);d.policies.length=0;
+  let release;d.delay(new Promise(r=>{release=r;}));const renewal=d.api.sync(true);
+  while(d.requests.filter(r=>r.action==="enable").length<2)await new Promise(r=>setImmediate(r));
+  assert.equal(d.policy().enabled,true);
+  release();await renewal;assert.ok(d.policies.every(p=>p.enabled));
+});
+
+async function runRetry(d){
+  assert.equal(d.timers.size,1,"only one recovery attempt may be scheduled");
+  const [id,timer]=d.timers.entries().next().value;d.timers.delete(id);timer.fn();
+  for(let i=0;i<20;i++)await new Promise(r=>setImmediate(r));
+  return timer.ms;
+}
+test("registration failures recover without a click, with bounded retry backoff",async()=>{
+  const d=device();d.tokenError("Registration failed - push service error");
+  await d.api.sync(true);assert.equal(d.policy().enabled,false);
+  assert.equal(await runRetry(d),15000);assert.equal(await runRetry(d),30000);
+  assert.equal(await runRetry(d),60000);
+  d.tokenError(null);assert.equal(await runRetry(d),60000);
+  assert.equal(d.api.getState(),"active");assert.equal(d.policy().enabled,true);assert.equal(d.timers.size,0);
+});
+test("opt-out cancels recovery and cannot be undone by a previously queued retry",async()=>{
+  const d=device();d.tokenError("temporary");await d.api.sync(true);
+  const queued=d.timers.values().next().value.fn;
+  d.enabled(false);await d.api.stop();const calls=d.tokens();
+  queued();await new Promise(r=>setImmediate(r));
+  assert.equal(d.tokens(),calls);assert.equal(d.policy().enabled,false);assert.equal(d.timers.size,0);
+});
+test("background and foreground pushes remain enabled after a failed renewal until explicit opt-out",async()=>{
+  const d=device();await d.api.sync(true);d.serverOk(false);await d.api.sync(true);
+  const id=d.policy().deviceId;await d.api.receive({deviceId:id});
+  assert.equal(d.foreground.length,1);assert.equal(d.policy().enabled,true);
+  d.enabled(false);await d.api.stop().catch(()=>{});assert.equal(d.policy().enabled,false);
+});
+test("offline retry waits for connectivity and a denied permission never loops",async()=>{
+  const d=device();d.tokenError("temporary");await d.api.sync(true);d.ctx.navigator.onLine=false;
+  const calls=d.tokens();await runRetry(d);assert.equal(d.tokens(),calls);
+  d.ctx.navigator.onLine=true;d.tokenError(null);d.listeners.online();
+  for(let i=0;i<20;i++)await new Promise(r=>setImmediate(r));
+  assert.equal(d.api.getState(),"active");assert.equal(d.timers.size,0);
+  const denied=device();denied.ctx.Notification.permission="denied";await denied.api.sync(true);
+  assert.equal(denied.timers.size,0);assert.equal(denied.tokens(),0);
+});
+test("page lifecycle events during role loading must not disable a saved receiver",async()=>{
+  const d=device();await d.api.sync(true);const requests=d.requests.length;
+  d.ctx.currentRole=null;d.enabled(false);
+  d.listeners.online();d.listeners.visibilitychange();d.listeners.storage();
+  await new Promise(r=>setImmediate(r));
+  assert.equal(d.requests.length,requests);assert.equal(d.policy().enabled,true);
+  d.ctx.currentRole="manager";d.enabled(true);await d.api.sync(true);
+  assert.equal(d.api.getState(),"active");
+});
+test("a failed first sync after page reload preserves the worker's earlier opt-in",async()=>{
+  const previous=device();await previous.api.sync(true);
+  const reloaded=device();reloaded.ctx.navigator.serviceWorker=previous.ctx.navigator.serviceWorker;
+  reloaded.tokenError("Registration failed - push service error");
+  await reloaded.api.sync(true);
+  assert.equal(previous.policy().enabled,true);
+  assert.equal(reloaded.api.getState(),"error");assert.equal(reloaded.timers.size,1);
+});
 test("permission without opt-in never creates a push registration",async()=>{
   const d=device(false);await d.api.sync(true);assert.equal(d.tokens(),0);assert.equal(d.requests.length,0);assert.equal(d.api.getState(),"off");
 });

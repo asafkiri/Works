@@ -1,6 +1,7 @@
 /* Store-phone push registration. No database rules or employee data are changed here. */
 (function(){
   let inflight=null,again=false,lastSync=0,state="off",error="",generation=0;
+  let retryTimer=null,retryDelay=15000;
   const endpoint="https://europe-west1-mini-market-shalom.cloudfunctions.net/setShopNotificationDevice";
   const key=uid=>"worksShopDevice:"+uid;
   function uid(){return auth && auth.currentUser && auth.currentUser.uid;}
@@ -56,6 +57,7 @@
   }
   async function stop(){
     ++generation;state="off";
+    clearTimeout(retryTimer);retryTimer=null;retryDelay=15000;
     window.ShopSnooze?.clear();
     const user=auth && auth.currentUser,id=deviceId(false);
     // Local suppression and server deregistration must each run even if the
@@ -79,7 +81,9 @@
     const id=deviceId(true),reg=await worker();
     // Ensure the current worker has taken over before enabling server sends.
     await updateWorker(reg);
-    await policy(false,id,reg);
+    // Renewal must not disable the last working registration. A temporary FCM
+    // or network error would otherwise mute foreground AND background pushes
+    // indefinitely. New devices remain off until their first server opt-in.
     if(!stillEnabled())return false;
     const token=await messaging.getToken({vapidKey:VAPID_KEY,serviceWorkerRegistration:reg});
     if(!token)throw Error("לא התקבל מזהה התראות. נסה שוב.");
@@ -90,11 +94,28 @@
     if(!stillEnabled()){await policy(false,id,reg);await call("disable",id,undefined,user);return false;}
     state="active";return true;
   }
+  function retry(version){
+    if(version!==generation || !shopNotificationsEnabled() || !messaging || Notification.permission!=="granted")return;
+    clearTimeout(retryTimer);
+    const delay=retryDelay;retryDelay=Math.min(retryDelay*2,60000);
+    retryTimer=setTimeout(()=>{
+      retryTimer=null;
+      if(version!==generation || !shopNotificationsEnabled())return;
+      if(navigator.onLine===false){retry(version);return;}
+      sync(true);
+    },delay);
+  }
   function sync(force){
     if(inflight){again=true;return inflight;}
     if(!force && Date.now()-lastSync<60000)return Promise.resolve(state==="active");
     lastSync=Date.now();
-    inflight=performSync().catch(e=>{state=shopNotificationsEnabled()?"error":"off";error=e.message||"לא הצלחנו להתחבר לשרת ההתראות.";return false;}).finally(()=>{
+    clearTimeout(retryTimer);retryTimer=null;
+    const version=generation;
+    inflight=performSync().then(connected=>{if(connected)retryDelay=15000;return connected;}).catch(e=>{
+      if(version!==generation)return false;
+      state=shopNotificationsEnabled()?"error":"off";error=e.message||"לא הצלחנו להתחבר לשרת ההתראות.";
+      retry(version);return false;
+    }).finally(()=>{
       inflight=null;renderShopNotificationTest();window.ShopSnooze?.refresh();if(again){again=false;sync(true);}
     });
     return inflight;
@@ -130,7 +151,14 @@
     return result;
   }
   window.ShopNotifications={sync,stop,receive,test,pending,snooze,cancel,getState:()=>state,getError:()=>error};
-  window.addEventListener("online",()=>sync(true));
-  document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")sync();});
-  window.addEventListener("storage",()=>sync(true));
+  function refreshWhenReady(force){
+    // Auth and manager-role lookup finish asynchronously on page load. An
+    // early lifecycle event must not mistake loading for an explicit opt-out.
+    // Logout, role changes and device-mode changes already call stop/sync.
+    if(!uid() || typeof currentRole==="undefined" || currentRole===null)return;
+    sync(force);
+  }
+  window.addEventListener("online",()=>refreshWhenReady(true));
+  document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")refreshWhenReady(state==="error");});
+  window.addEventListener("storage",()=>refreshWhenReady(true));
 })();
