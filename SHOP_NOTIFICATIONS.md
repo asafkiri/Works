@@ -10,14 +10,22 @@
 לצורך תזכורות כשהמסך כבוי צריך לפרסם את שלוש הפונקציות הבאות מחשבון בעל גישה לפרויקט
 `mini-market-shalom`. ללא הפריסה, בדיקת הצליל המקומית עדיין עובדת והמסך מציג ״דרוש חיבור לשרת״.
 
-מתוך עותק עדכני של המאגר, עם Node.js 22:
+הקוד הפעיל בענן הוא `clockReminders` (אזור `europe-west1`), ולא
+`sendShiftReminders` שבמאגר. אין לפרסם את האחרון כתחליף: כך נשארות תזכורות כפולות.
+מתוך עותק עדכני של המאגר ב־Cloud Shell:
 
 ```sh
-npm ci --prefix functions
-npm test --prefix functions
-npx firebase-tools login
-npx firebase-tools deploy --project mini-market-shalom --only functions:setShopNotificationDevice,functions:sendShopShiftReminders,functions:sendShiftReminders
+python3 scripts/deploy-shop.py
 ```
+
+הסקריפט מוריד מחדש את ארכיון המקור הפעיל ושומר גיבוי בתיקיית `works-deploy-*`
+בתיקיית הבית. הוא מוסיף בדיקת `shop-only` רק ללולאת תזכורות ההחתמה הישנות,
+ושומר את שאר קוד המקור, כולל התראות משמרת ארוכה ותזכורות אישור שינויי סידור.
+הוא מריץ את הבדיקות, מפרסם תחילה את `clockReminders`, ורק לאחר הצלחה מפרסם
+את `setShopNotificationDevice` ואת `sendShopShiftReminders`. הפונקציות האחרות אינן נפרסות מחדש.
+אם מבנה הקוד הפעיל אינו מוכר, הסקריפט עוצר לפני הפרסום. הרצה חוזרת אינה מכפילה את התיקון.
+הסקריפט משתמש ב־Node.js 22 וב־Firebase CLI 15.31.0. נדרש אימות Google/Firebase מורשה בסביבת ההרצה.
+זהו פרסום דרך Cloud Shell; הוא אינו יוצר טריגר לפרסום אוטומטי של שינויים עתידיים.
 
 הפריסה ממוקדת בשמות האלה כדי שלא להסיר פונקציות אחרות בפרויקט. נדרשת תמיכה בפרויקט
 ב־Cloud Functions וב־Cloud Scheduler. אין צורך לשנות את כללי הגישה של Realtime Database;
