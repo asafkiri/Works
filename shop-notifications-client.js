@@ -13,12 +13,12 @@
     }
     return id;
   }
-  async function call(action,id,token,user=auth && auth.currentUser){
+  async function call(action,id,token,user=auth && auth.currentUser,extra={}){
     if(!user)throw Error("יש להתחבר מחדש כמנהל.");
     const bearer=await user.getIdToken();
     const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000);
     try{
-      const response=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+bearer},body:JSON.stringify({data:{action,deviceId:id,...(token?{token}:{})}}),signal:controller.signal});
+      const response=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+bearer},body:JSON.stringify({data:{...extra,action,deviceId:id,...(token?{token}:{})}}),signal:controller.signal});
       let body;try{body=await response.json();}catch(e){}
       if(!response.ok || body?.error)throw Error(body?.error?.message || "שרת תזכורות החנות עדיין אינו זמין. יש לפרסם את עדכון השרת ולנסות שוב.");
       return body.result || body.data || {};
@@ -56,6 +56,7 @@
   }
   async function stop(){
     ++generation;state="off";
+    window.ShopSnooze?.clear();
     const user=auth && auth.currentUser,id=deviceId(false);
     // Local suppression and server deregistration must each run even if the
     // other fails (for example, when the phone is currently offline).
@@ -76,7 +77,7 @@
     if(!messaging || Notification.permission!=="granted")throw Error("צריך לאפשר התראות בטלפון ולבחור שוב ״עם התראות״.");
     state="pending";error="";renderShopNotificationTest();
     const id=deviceId(true),reg=await worker();
-    // Ensure v76 worker has taken over before enabling server sends.
+    // Ensure the current worker has taken over before enabling server sends.
     await updateWorker(reg);
     await policy(false,id,reg);
     if(!stillEnabled())return false;
@@ -94,12 +95,13 @@
     if(!force && Date.now()-lastSync<60000)return Promise.resolve(state==="active");
     lastSync=Date.now();
     inflight=performSync().catch(e=>{state=shopNotificationsEnabled()?"error":"off";error=e.message||"לא הצלחנו להתחבר לשרת ההתראות.";return false;}).finally(()=>{
-      inflight=null;renderShopNotificationTest();if(again){again=false;sync(true);}
+      inflight=null;renderShopNotificationTest();window.ShopSnooze?.refresh();if(again){again=false;sync(true);}
     });
     return inflight;
   }
   async function receive(data){
     if(!shopNotificationsEnabled() || data.deviceId!==deviceId(false))return;
+    window.ShopSnooze?.refresh(true);
     const reg=await navigator.serviceWorker.ready;
     reg.active?.postMessage({type:"SHOW_SHOP_REMINDER",data});
   }
@@ -108,7 +110,19 @@
     if(!await sync(true))throw Error(error||"התראות החנות עדיין לא מחוברות לשרת.");
     await call("test",deviceId(false));
   }
-  window.ShopNotifications={sync,stop,receive,test,getState:()=>state,getError:()=>error};
+  async function pending(){
+    if(!shopNotificationsEnabled() || state!=="active")return {events:[]};
+    return call("pending",deviceId(false));
+  }
+  async function snooze(event,minutes){
+    if(!shopNotificationsEnabled() || state!=="active")throw Error("יש להפעיל התראות בטלפון החנות.");
+    const result=await call("snooze",deviceId(false),undefined,auth.currentUser,{eventKey:event.eventKey,snoozeKey:event.snoozeKey,minutes});
+    // Dismiss notices already visible on this phone after successful server save.
+    const reg=await navigator.serviceWorker.getRegistration("firebase-messaging-sw.js").catch(()=>null);
+    reg?.active?.postMessage({type:"SHOP_REMINDER_SNOOZED",snoozeKey:event.snoozeKey,until:result.until});
+    return result;
+  }
+  window.ShopNotifications={sync,stop,receive,test,pending,snooze,getState:()=>state,getError:()=>error};
   window.addEventListener("online",()=>sync(true));
   document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")sync();});
   window.addEventListener("storage",()=>sync(true));

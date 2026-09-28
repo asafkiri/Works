@@ -40,3 +40,11 @@ test("foreground forwarding is limited to the opted-in device id",async()=>{
   await d.api.receive({deviceId});assert.equal(d.foreground.length,1);
   d.enabled(false);await d.api.receive({deviceId});assert.equal(d.foreground.length,1);
 });
+test("snooze sends the exact event and duration only from an active opted-in phone",async()=>{
+  const d=device();const event={eventKey:"plan-a",snoozeKey:"actual-shift-a"};
+  await assert.rejects(d.api.snooze(event,20));assert.equal(d.requests.length,0);
+  await d.api.sync(true);await d.api.snooze(event,20);
+  const request=d.requests.at(-1);assert.equal(request.action,"snooze");assert.equal(request.minutes,20);
+  assert.equal(request.eventKey,"plan-a");assert.equal(request.snoozeKey,"actual-shift-a");
+  d.enabled(false);await assert.rejects(d.api.snooze(event,20));
+});

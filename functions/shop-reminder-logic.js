@@ -31,13 +31,13 @@ function pendingShopEvents(data, nowMs) {
   const now=localClock(nowMs);
   const plans=buildShopPlans(data,[addIsoDays(now.date,-1),now.date,addIsoDays(now.date,1)]);
   const punches=new Map(plans.map(p=>[p.key,[]]));
-  for(const shift of Object.values(data.shifts||{})) {
+  for(const [shiftId,shift] of Object.entries(data.shifts||{})) {
     const stamp=Number(shift?.clockIn);
     if(!Number.isFinite(stamp) || stamp<=0 || stamp>nowMs) continue;
     const at=localClock(stamp).linear;
     const candidates=plans.filter(p=>p.employeeId===shift.employeeId && at>=p.startLinear-EARLY_ENTRY_MINUTES && at<p.endLinear);
     candidates.sort((a,b)=>Math.abs(at-a.startLinear)-Math.abs(at-b.startLinear)||a.startLinear-b.startLinear);
-    if(candidates[0]) punches.get(candidates[0].key).push(shift);
+    if(candidates[0]) punches.get(candidates[0].key).push({...shift,shiftId});
   }
   const events=new Map();
   for(const plan of plans) {
@@ -47,7 +47,9 @@ function pendingShopEvents(data, nowMs) {
     else if(now.linear>=plan.endLinear && actual.some(s=>!s.clockOut)) kind="out";
     if(!kind) continue;
     const key=JSON.stringify([plan.key,kind]);
-    events.set(key,{...plan,key,kind,time:kind==="in"?plan.start:plan.end});
+    const openShiftIds=actual.filter(s=>!s.clockOut).map(s=>s.shiftId).sort();
+    events.set(key,{...plan,key,kind,time:kind==="in"?plan.start:plan.end,
+      snoozeKey:kind==="out"?JSON.stringify([key,openShiftIds]):null});
   }
   return events;
 }
@@ -73,7 +75,7 @@ function shopMessage(event,device,nowMs) {
   return {audience:"shop",deviceId:device.deviceId,employeeId:event.employeeId,kind:event.kind,
     title:`🔔 ${event.name} — צריך להחתים ${kind}`,
     body:`שעת ${kind}: ${event.time}. התזכורת תחזור כל 5 דקות עד לרישום ההחתמה.`,
-    tag:`works-shop-${event.employeeId}-${event.kind}`,eventKey:event.key,
+    tag:`works-shop-${event.employeeId}-${event.kind}`,eventKey:event.key,snoozeKey:event.snoozeKey||"",
     expiresAt:String(nowMs+60_000)};
 }
 module.exports={REPEAT_MS,buildShopPlans,pendingShopEvents,deliveryDue,activeShopDevices,shopMessage};

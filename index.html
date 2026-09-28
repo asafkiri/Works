@@ -837,7 +837,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v76</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v77</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -862,7 +862,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v76</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v77</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -1862,7 +1862,8 @@
 </div>
 <script src="store-gifts.js?v=73"></script>
 <script src="luach.js?v=73"></script>
-<script src="shop-notifications-client.js?v=76"></script>
+<script src="shop-notifications-client.js?v=77"></script>
+<script src="shop-snooze-ui.js?v=77"></script>
 <script>
 /* ============================================================
    1. הגדרות
@@ -3875,10 +3876,12 @@ function renderTerminal(){
             : 'לא במשמרת'}</div>
         </div>
         ${breakBtn}
+        <div data-shop-snooze="${esc(e.id)}" onclick="event.stopPropagation()"></div>
         <div class="cta">${live?(onBreak?'חזרה מהפסקה ←':'סיים משמרת ←'):'התחל משמרת ←'}</div>
       </div>`;
   }).join("");
   updateLiveTimers();
+  if(window.ShopSnooze){ShopSnooze.render();ShopSnooze.refresh();}
 }
 
 function onEmployeeTap(empId){

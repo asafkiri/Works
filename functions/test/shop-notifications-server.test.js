@@ -77,3 +77,61 @@ test("server test targets this device, requires opt-in and is rate limited",asyn
   await assert.rejects(s.call("test"),{code:"resource-exhausted"});
   await s.call("disable");s.now(start+10*60000);await s.tick();assert.equal(s.sent.length,1);
 });
+
+const end=start+8*3600000;
+async function exitServer(){
+  const s=server();await s.call("enable");
+  s.data.shifts.s={employeeId:"a",clockIn:start,clockOut:null};s.now(end);
+  const event=(await s.call("pending")).events[0];
+  return {s,event};
+}
+test("all six exit snoozes pause until their deadline then resume five-minute repeats",async()=>{
+  for(const minutes of [10,20,30,40,50,60]){
+    const {s,event}=await exitServer();await s.tick();assert.equal(s.sent.length,1);
+    const attendance=structuredClone(s.data.shifts);
+    const result=await s.call("snooze","manager",{...event,minutes});
+    assert.equal(result.until,end+minutes*60000);
+    for(let m=1;m<minutes;m++){s.now(end+m*60000);await s.tick();}
+    assert.equal(s.sent.length,1);
+    s.now(result.until);await s.tick();assert.equal(s.sent.length,2);
+    s.now(result.until+4*60000);await s.tick();assert.equal(s.sent.length,2);
+    s.now(result.until+5*60000);await s.tick();assert.equal(s.sent.length,3);
+    assert.deepEqual(s.data.shifts,attendance);
+  }
+});
+test("snooze affects all shop devices for one shift, never another employee or a later actual shift",async()=>{
+  const {s,event}=await exitServer();
+  await s.call("enable","manager",{deviceId:DEVICE.replace(/1$/,"2"),token:TOKEN+"-second"});
+  s.data.employees.b={name:"טל"};s.data.oneTimeShifts.q={...s.data.oneTimeShifts.p,employeeId:"b"};
+  s.data.shifts.b={employeeId:"b",clockIn:start,clockOut:null};
+  await s.call("snooze","manager",{...event,minutes:60});await s.tick();
+  assert.equal(s.sent.length,2);assert.ok(s.sent.every(m=>m.data.employeeId==="b"));
+  s.data.shifts.s.clockOut=end;
+  s.data.shifts.next={employeeId:"a",clockIn:start+60000,clockOut:null};
+  s.now(end+60000);await s.tick();
+  assert.equal(s.sent.filter(m=>m.data.employeeId==="a").length,2);
+  await assert.rejects(s.call("snooze","manager",{...event,minutes:10}),{code:"failed-precondition"});
+});
+test("closed shifts, entry reminders, unsupported durations and non-enrolled phones cannot snooze",async()=>{
+  const {s,event}=await exitServer();
+  for(const minutes of [5,15,0,-10,61,"10",null])await assert.rejects(s.call("snooze","manager",{...event,minutes}),{code:"invalid-argument"});
+  await assert.rejects(s.call("snooze","employee",{...event,minutes:10}),{code:"permission-denied"});
+  await s.call("disable");await assert.rejects(s.call("snooze","manager",{...event,minutes:10}),{code:"failed-precondition"});
+  await s.call("enable");s.data.shifts.s.clockOut=end;
+  await assert.rejects(s.call("snooze","manager",{...event,minutes:10}),{code:"failed-precondition"});
+  assert.equal((await s.call("pending")).events.length,0);
+  delete s.data.shifts.s;s.now(start);
+  assert.equal((await s.call("pending")).events.length,0);
+  await assert.rejects(s.call("snooze","manager",{...event,minutes:10}),{code:"failed-precondition"});
+});
+test("snoozing after a send claim suppresses that send; exiting during snooze ends reminders",async()=>{
+  const {s,event}=await exitServer();
+  s.afterClaim(()=>{
+    const hash=require("node:crypto").createHash("sha256").update(event.snoozeKey).digest("hex");
+    s.data.shopReminderSnoozes={"2026-09-27":{[hash]:{until:end+10*60000}}};
+  });
+  await s.tick();assert.equal(s.sent.length,0);
+  s.afterClaim(null);s.data.shifts.s.clockOut=end+60000;
+  s.now(end+20*60000);await s.tick();assert.equal(s.sent.length,0);
+  assert.equal((await s.call("pending")).events.length,0);
+});
