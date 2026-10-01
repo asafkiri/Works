@@ -11,8 +11,9 @@ DAY="${1:-$(TZ=Asia/Jerusalem date +%F)}"; P=mini-market-shalom
 [[ "$DAY" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || { echo "usage: $0 YYYY-MM-DD" >&2; exit 2; }
 S=$(date -u -d "TZ=\"Asia/Jerusalem\" $DAY 00:00" +%FT%TZ)
 # Receipts are uploaded by the phone up to ~15 minutes after the reminder.
-E=$(date -u -d "TZ=\"Asia/Jerusalem\" $DAY 23:59:59 + 1 hour" +%FT%TZ)
+E=$(date -u -d "@$(( $(date -d "TZ=\"Asia/Jerusalem\" $DAY 23:59:59" +%s) + 3600 ))" +%FT%TZ)
 OUT=~/works-evidence-$DAY; mkdir -p "$OUT"; cd "$OUT"
+rm -f devices.raw.json employees.raw.json   # raw copies written by older versions of this script
 FB(){ ${FB_GET:-npx --yes --package=firebase-tools@15.31.0 firebase database:get} "$@" --project "$P"; }
 
 {
@@ -34,12 +35,19 @@ logs setshopnotificationdevice 'NOT logName:"run.googleapis.com%2Frequests"' > d
 logs setshopnotificationdevice 'logName:"run.googleapis.com%2Frequests"' > device-requests.json
 
 FB /config/managerUid > mgr.json
-FB /shopNotificationDevices > devices.raw.json
+FB /shopNotificationDevices | python3 -c 'import sys,json,hashlib
+d=json.load(sys.stdin) or {}
+for r in d.values():
+  if isinstance(r,dict) and r.get("token"): r["token"]=hashlib.sha256(r["token"].encode()).hexdigest()[:10]
+json.dump(d,sys.stdout)' > devices.json
 FB /shopNotificationRouting > routing.json
 FB "/shopReminderDeliveries/$DAY" > deliveries.json
 FB "/shopReminderSnoozes/$DAY" > snoozes.json
 FB "/shopReminderCancellations/$DAY" > cancellations.json
-FB /employees > employees.raw.json
+# Names only: employee rows also hold wages and one-time passwords.
+FB /employees | python3 -c 'import sys,json
+d=json.load(sys.stdin) or {}
+json.dump({k:{"name":v.get("name"),"active":v.get("active")} for k,v in d.items() if isinstance(v,dict)},sys.stdout,ensure_ascii=False)' > employees.json
 FB /oneTimeShifts > onetime.json
 FB /recurringShifts > recurring.json
 # Attendance since the day before only: push ids start with their creation time.
@@ -62,9 +70,10 @@ def L(f):
   except Exception: return {}
   return v if v is not None else {}
 t=lambda ms:datetime.datetime.fromtimestamp(ms/1000,IL).strftime("%H:%M:%S") if ms else "-"
+T=lambda ms:datetime.datetime.fromtimestamp(ms/1000,IL).strftime("%m-%d %H:%M:%S") if ms else "-"
 sha=lambda s:hashlib.sha256(s.encode()).hexdigest()
 js=lambda v:json.dumps(v,ensure_ascii=False,separators=(",",":"))
-mgr=L("mgr.json"); devs=L("devices.raw.json"); emps=L("employees.raw.json")
+mgr=L("mgr.json"); devs=L("devices.json"); emps=L("employees.json")
 name=lambda e:(emps.get(e) or {}).get("name") or ("…"+str(e)[-6:])
 print("Works shop reminders — evidence for",DAY,"(Asia/Jerusalem)\n")
 print(open("config.txt").read())
@@ -72,8 +81,8 @@ print("== devices (token only as sha256[:10])")
 for k,d in devs.items():
   d=d or {}
   print(" ",k[:8],"enabled=%s"%d.get("enabled"),"manager=%s"%(d.get("uid")==mgr),
-        "token=%s"%(sha(d["token"])[:10] if d.get("token") else "NONE"),"updatedAt="+t(d.get("updatedAt")),
-        ("disabled=%s at %s"%(d.get("disabledReason"),t(d.get("disabledAt"))) if d.get("disabledReason") else ""))
+        "token=%s"%(d.get("token") or "NONE"),"updatedAt="+T(d.get("updatedAt")),
+        ("disabled=%s at %s"%(d.get("disabledReason"),T(d.get("disabledAt"))) if d.get("disabledReason") else ""))
 print("  routing:",L("routing.json"))
 def nt(v):
   m=re.match(r"^(\d{1,2}):(\d{2})$",str(v or ""))
@@ -91,6 +100,8 @@ for (e,a,b) in plans:
   pk=js([e,DAY,a,b]); label[sha(pk)]="%s %s-%s"%(name(e),a,b)
   for kind in ("in","out"):
     ek=js([pk,kind]); label[sha(js([ek,[]]))]="%s %s-%s %s"%(name(e),a,b,kind)
+    for sid,sh in L("shifts.recent.json").items():
+      if isinstance(sh,dict) and sh.get("employeeId")==e: label[sha(js([ek,[sid]]))]="%s %s-%s %s snooze"%(name(e),a,b,kind)
     for dev in devs: label[sha(ek+dev)]="%s %s-%s %-3s dev %s"%(name(e),a,b,kind,dev[:8])
 print("\n== planned shifts:"," | ".join(sorted(label[sha(js([e,DAY,a,b]))] for (e,a,b) in plans if e and a and b and a!=b)) or "none")
 print("\n== delivery rows (last attempt/send per reminder)")
@@ -104,7 +115,7 @@ for k,s in sorted(L("shifts.recent.json").items(),key=lambda x:(x[1] or {}).get(
   if isinstance(s,dict):
     print(" ",name(s.get("employeeId")),datetime.datetime.fromtimestamp((s.get("clockIn") or 0)/1000,IL).strftime("%m-%d %H:%M"),"->",
           t(s.get("clockOut")) if s.get("clockOut") else "OPEN","(auto-closed)" if s.get("autoCloseFlag") else "")
-lt=lambda e:datetime.datetime.fromisoformat(e["timestamp"].replace("Z","+00:00")).astimezone(IL)
+lt=lambda e:datetime.datetime.strptime(e["timestamp"][:19],"%Y-%m-%dT%H:%M:%S").replace(tzinfo=datetime.timezone.utc).astimezone(IL)
 sched=L("scheduler.json") or []; dev=L("device.json") or []
 receipts={}
 for e in dev:
@@ -113,9 +124,13 @@ for e in dev:
 print("\n== reminders sent by the server and what the phone reported")
 print("   (a missing receipt: the phone never received it, or has not uploaded yet)")
 checked=set(); counts=collections.Counter()
+hourly=collections.defaultdict(collections.Counter)
 for e in sched:
+  if lt(e).strftime("%F")!=DAY: continue
   j=e.get("jsonPayload") or {}; m=j.get("message") or e.get("textPayload") or ""; at=lt(e).strftime("%H:%M:%S")
-  if m=="Shop reminders checked": checked.add(lt(e).strftime("%H:%M")); counts["ticks"]+=1
+  if m=="Shop reminders checked":
+    checked.add(lt(e).strftime("%H:%M")); counts["ticks"]+=1
+    hourly[lt(e).strftime("%H")]["devices=%s pending=%s"%(int(j.get("devices") or 0),int(j["pending"]) if "pending" in j else "-")]+=1
   elif m=="Shop reminder sent":
     r=receipts.get((j.get("ref"),int(j.get("sentAt") or 0)),[])
     got=", ".join("%s via %s after %.0fs"%(x.get("outcome"),x.get("path"),(int(x.get("receivedAt") or 0)-int(j.get("sentAt") or 0))/1000) for x in r) or "NO RECEIPT"
@@ -131,19 +146,21 @@ for e in dev:
 def statuses(f):
   st=collections.Counter(); bad=[]
   for e in L(f) or []:
+    if lt(e).strftime("%F")!=DAY: continue
     h=e.get("httpRequest") or {}; st[h.get("status")]+=1
     lat=float(str(h.get("latency","0s")).rstrip("s") or 0)
     if h.get("status")!=200 or lat>20: bad.append("%s %s %.1fs"%(lt(e).strftime("%H:%M:%S"),h.get("status"),lat))
   return st,bad
+print("\n== what the scheduler saw, per hour (ticks per devices/pending)")
+for h in sorted(hourly): print("  ",h+":00"," | ".join("%s x%d"%kv for kv in sorted(hourly[h].items())))
 st,bad=statuses("scheduler-requests.json")
 print("\n== scheduler runs by HTTP status:",dict(st),"| 'checked' lines:",counts["ticks"])
 for x in bad[:60]: print("  ",x)
 reqmin={lt(e).strftime("%H:%M") for e in L("scheduler-requests.json") or [] if lt(e).strftime("%F")==DAY}
-print("minutes without a scheduler run:",[m for m in ("%02d:%02d"%(h,i) for h in range(24) for i in range(60)) if m not in reqmin][:60])
+print("minutes without a scheduler run:",[m for m in ("%02d:%02d"%(h,i) for h in range(24) for i in range(60)) if m not in reqmin and m<=max(reqmin or ["23:59"])][:60])
 st,bad=statuses("device-requests.json")
 print("\n== phone -> server calls by HTTP status:",dict(st))
 for x in bad[:40]: print("  ",x)
 PY
-echo '{}' > devices.raw.json
 echo "Report: $OUT/report.txt"
 cat "$OUT/report.txt"
