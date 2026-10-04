@@ -851,7 +851,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v86</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v87</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -876,7 +876,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v86</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v87</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -1958,6 +1958,19 @@
 
 <div id="printArea"></div>
 
+<div id="pdfExportModal" class="modal-bg" role="dialog" aria-modal="true" aria-labelledby="pdfExportTitle">
+  <div class="modal">
+    <h3 id="pdfExportTitle">ייצוא PDF</h3>
+    <p class="who" id="pdfExportStatus" role="status" aria-live="polite"></p>
+    <div class="modal-actions hidden" id="pdfExportActions">
+      <button class="btn" id="pdfExportShare" onclick="sharePreparedPdf()">שיתוף PDF</button>
+      <a class="btn line" id="pdfExportOpen" target="_blank" rel="noopener" style="text-align:center;text-decoration:none">פתיחה / שמירה</a>
+    </div>
+    <button class="btn hidden" id="pdfExportRetry" style="margin-top:12px">נסה שוב</button>
+    <div class="modal-actions"><button class="btn line" onclick="closeModal('pdfExportModal')">סגירה</button></div>
+  </div>
+</div>
+
 <div id="toast" class="toast"></div>
 
 <!-- מתנה היא יתרה לקניות בחנות בלבד; אינה תשלום שכר. -->
@@ -1978,6 +1991,7 @@
     </div>
   </div>
 </div>
+<script src="report-pdf.js?v=87"></script>
 <script src="store-gifts.js?v=73"></script>
 <script src="luach.js?v=73"></script>
 <script src="shop-notifications-client.js?v=81"></script>
@@ -2234,7 +2248,7 @@ function toast(msg){
   clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("show"),2200);
 }
 function openModal(id){ $(id).classList.add("show"); }
-function closeModal(id){ $(id).classList.remove("show"); }
+function closeModal(id){ $(id).classList.remove("show"); if(id==='pdfExportModal') resetPdfExport(); }
 
 /* ---- מודאלים שמחליפים prompt/confirm/alert (עובדים גם במצב אפליקציה מהמסך הבית) ---- */
 let _uiPromptResolve=null;
@@ -5393,7 +5407,7 @@ function renderPayDetail(){
         <button class="btn" style="flex:1" onclick="imagePayrollAccountant()">📷 דוח לרו"ח (תמונה)</button>
         <button class="btn line" onclick="exportPayrollAccountant()">PDF</button>
       </div>
-      <div class="pay-export-note">תמונה נוחה לשליחה בוואטסאפ; PDF מתאים להדפסה.</div>
+      <div class="pay-export-note">תמונה לשליחה בוואטסאפ; קובץ PDF לשמירה, שיתוף והדפסה.</div>
     </div>`:''}`;
 }
 
@@ -5484,24 +5498,122 @@ function accountantReportHtml(D){
 }
 
 // ---------- PDF (הדפסה) ----------
-function exportPayrollAccountant(){ const D=payReportData(); if(!D) return; $("printArea").innerHTML=accountantReportHtml(D); setTimeout(()=>window.print(), 100); }
+function exportPayrollAccountant(){
+  const D=payReportData(); if(!D) return;
+  return reportToPdf(accountantReportHtml(D),'דוח לרואה החשבון - '+D.e.name+' - '+paySelMonthKey);
+}
 
 // ---------- תמונה (ברירת מחדל) ----------
 function imagePayrollAccountant(){ const D=payReportData(); if(!D) return; reportToImage(accountantReportHtml(D), "דוח לרואה החשבון - "+D.e.name); }
 
-// טוען את ספריית יצירת התמונה (html2canvas) פעם אחת, רק כשצריך
-let _h2cPromise=null;
-function loadHtml2Canvas(){
-  if(window.html2canvas) return Promise.resolve(window.html2canvas);
-  if(_h2cPromise) return _h2cPromise;
-  _h2cPromise=new Promise((res,rej)=>{
-    const sc=document.createElement("script");
-    sc.src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
-    sc.onload=()=>res(window.html2canvas);
-    sc.onerror=()=>{ _h2cPromise=null; rej(new Error("load failed")); };
+// Load only when exporting, with bounded errors and a fresh retry after failure.
+function loadReportLibrary(src, ready){
+  const existing=ready(); if(existing) return Promise.resolve(existing);
+  return new Promise((resolve,reject)=>{
+    const sc=document.createElement('script');
+    let finished=false;
+    const finish=error=>{
+      if(finished) return; finished=true;
+      clearTimeout(timer); sc.onload=null; sc.onerror=null;
+      const library=error?null:ready();
+      if(library) resolve(library);
+      else { sc.remove(); reject(error||new Error('Library unavailable')); }
+    };
+    const timer=setTimeout(()=>finish(new Error('Library timeout')),20000);
+    sc.src=src; sc.onload=()=>finish(); sc.onerror=()=>finish(new Error('Library download failed'));
     document.head.appendChild(sc);
   });
+}
+let _h2cPromise=null, _pdfLibPromise=null;
+function loadHtml2Canvas(){
+  if(!_h2cPromise) _h2cPromise=loadReportLibrary('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',()=>window.html2canvas)
+    .catch(error=>{ _h2cPromise=null; throw error; });
   return _h2cPromise;
+}
+function loadPdfLib(){
+  if(!_pdfLibPromise) _pdfLibPromise=loadReportLibrary('https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js',()=>window.PDFLib)
+    .catch(error=>{ _pdfLibPromise=null; throw error; });
+  return _pdfLibPromise;
+}
+let pdfExportBusy=false, pdfExportVersion=0, pdfExportFile=null, pdfExportUrl=null;
+function resetPdfExport(){
+  pdfExportVersion++; pdfExportFile=null;
+  if(pdfExportUrl){
+    const oldUrl=pdfExportUrl; pdfExportUrl=null;
+    // A PDF opened in another viewer may still be reading the blob.
+    setTimeout(()=>URL.revokeObjectURL(oldUrl),60000);
+  }
+  $('pdfExportOpen').removeAttribute('href');
+  $('pdfExportOpen').removeAttribute('download');
+  $('pdfExportRetry').onclick=null;
+}
+function canSharePdf(file){
+  try{ return !!(file && navigator.share && navigator.canShare && navigator.canShare({files:[file]})); }
+  catch(e){ return false; }
+}
+async function sharePreparedPdf(){
+  const file=pdfExportFile; if(!file) return;
+  // Called directly by the user's button press, after async rendering has finished.
+  // This preserves the fresh user activation required by mobile sharing.
+  if(!canSharePdf(file)){
+    $('pdfExportStatus').textContent='אפשר לפתוח ולשמור את הקובץ באמצעות הכפתור שלצד השיתוף.'; return;
+  }
+  try{ await navigator.share({files:[file],title:file.name}); }
+  catch(e){
+    if(!e || e.name!=='AbortError') $('pdfExportStatus').textContent='השיתוף לא נפתח. אפשר להשתמש ב״פתיחה / שמירה״.';
+  }
+}
+async function reportToPdf(html, filename){
+  if(pdfExportBusy){ toast('קובץ PDF כבר בהכנה…'); return; }
+  resetPdfExport(); const version=pdfExportVersion; pdfExportBusy=true;
+  $('pdfExportStatus').textContent='מכין קובץ PDF…';
+  $('pdfExportActions').classList.add('hidden');
+  $('pdfExportRetry').classList.add('hidden');
+  openModal('pdfExportModal');
+  let holder,canvas;
+  try{
+    const [h2c,library]=await Promise.all([loadHtml2Canvas(),loadPdfLib()]);
+    if(version!==pdfExportVersion) return;
+    if(document.fonts) await document.fonts.ready;
+    if(version!==pdfExportVersion) return;
+    holder=document.createElement('div');
+    holder.style.cssText='position:absolute;left:-10000px;top:0;width:794px;background:#fff;pointer-events:none';
+    holder.setAttribute('aria-hidden','true'); holder.innerHTML=html;
+    document.body.appendChild(holder);
+    await Promise.all(Array.from(holder.querySelectorAll('img')).map(img=>img.decode?img.decode():Promise.resolve()));
+    if(version!==pdfExportVersion) return;
+    const report=holder.firstElementChild;
+    const rect=report.getBoundingClientRect();
+    if(!rect.width || !rect.height) throw new Error('Empty report');
+    // Bound the raster buffer so a long report does not exceed mobile canvas limits.
+    const scale=Math.min(2,Math.sqrt(8000000/(rect.width*rect.height)),16000/rect.height,16000/rect.width);
+    canvas=await h2c(report,{scale,backgroundColor:'#ffffff',useCORS:true,windowWidth:794,scrollX:0,scrollY:0});
+    if(version!==pdfExportVersion) return;
+    const ratio=canvas.height/rect.height;
+    const blocks=Array.from(report.querySelectorAll('tr,.pr-h1,.pr-meta,.pr-tot,.pr-foot,img')).map(el=>{
+      const r=el.getBoundingClientRect();
+      return {top:Math.max(0,(r.top-rect.top)*ratio),bottom:(r.bottom-rect.top)*ratio};
+    });
+    const blob=await ReportPdf.fromCanvas(canvas,blocks,library.PDFDocument,()=>document.createElement('canvas'),filename);
+    if(version!==pdfExportVersion) return;
+    const name=String(filename||'דוח').replace(/[\\/:*?"<>|\x00-\x1f]/g,'_')+'.pdf';
+    pdfExportFile=typeof File==='function'?new File([blob],name,{type:'application/pdf'}):null;
+    pdfExportUrl=URL.createObjectURL(blob);
+    $('pdfExportOpen').href=pdfExportUrl; $('pdfExportOpen').download=name;
+    $('pdfExportShare').classList.toggle('hidden',!canSharePdf(pdfExportFile));
+    $('pdfExportStatus').textContent='הקובץ מוכן. אפשר לשתף אותו או לפתוח ולשמור במכשיר.';
+    $('pdfExportActions').classList.remove('hidden');
+  }catch(e){
+    if(version===pdfExportVersion){
+      $('pdfExportStatus').textContent='יצירת ה־PDF נכשלה. בדקו את החיבור לאינטרנט ונסו שוב.';
+      $('pdfExportRetry').classList.remove('hidden');
+      $('pdfExportRetry').onclick=()=>reportToPdf(html,filename);
+    }
+  }finally{
+    if(holder) holder.remove();
+    if(canvas){ canvas.width=0; canvas.height=0; }
+    pdfExportBusy=false;
+  }
 }
 
 // מרנדר HTML של דוח לתמונה ופותח את חלון השיתוף של המכשיר (או מוריד כגיבוי)
@@ -5561,8 +5673,8 @@ function imageSignedForm(empId, formId){
 function pdfSignedForm(empId, formId){
   const html=signedFormHtml(empId, formId);
   if(!html){ toast("הטופס לא נמצא"); return; }
-  $("printArea").innerHTML=html;
-  setTimeout(()=>window.print(), 100);
+  const e=employees[empId];
+  return reportToPdf(html,'טופס חתום - '+((e&&e.name)||'עובד'));
 }
 
 /* ============================================================
