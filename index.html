@@ -850,7 +850,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v83</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v84</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -875,7 +875,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v83</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v84</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -1779,7 +1779,7 @@
     <div id="netFixedFields" class="hidden net-contribution-card">
       <label class="fld" for="netMonthlyAmount">הנטו הקבוע לחודש (₪)</label>
       <input type="number" id="netMonthlyAmount" min="0" step="0.01" inputmode="decimal" placeholder="10000">
-      <p class="net-contribution-help">הסכום קבוע ואינו משתנה לפי הנוכחות. לאחר סיום החודש נחשב איזה שכר בסיס ברוטו לשעה היה נותן את אותו נטו, כולל שעות נוספות. הפנסיה וקרן ההשתלמות כבר נלקחו בחשבון בנטו — לא נוריד אותן שוב.</p>
+      <p class="net-contribution-help">הזינו את כל הנטו החודשי, כולל בונוס ותוספות שמשולמים בו. הסכום קבוע ואינו משתנה לפי הנוכחות. לאחר סיום החודש נציג את כל הברוטו המשוער חלקי שעות העבודה בפועל — ממוצע ברוטו לשעה. הפנסיה וקרן ההשתלמות כבר נלקחו בחשבון בנטו — לא נוריד אותן שוב.</p>
     </div>
     <div id="netHourlyFields">
     <div class="net-field">
@@ -2056,16 +2056,18 @@ function fixedNetEquivalent(cp, emp, monthKey){
   if(weighted<=0) return null;
   const profile={...emp,netIsNet:false};
   const target=cp.totalPay;
-  const netAt=rate=>estimateNet(rate*weighted,profile,monthRefDate(monthKey),rate*cp.regH);
-  let lo=0, hi=Math.max(1,target/weighted);
+  // The hours split estimates contribution bases while grossing up the total net.
+  // The displayed average includes ALL gross and divides by actual hours only.
+  const netAt=gross=>estimateNet(gross,profile,monthRefDate(monthKey),gross*cp.regH/weighted);
+  let lo=0, hi=Math.max(1,target);
   for(let i=0;i<40 && netAt(hi).net<target;i++) hi*=2;
   if(netAt(hi).net<target) return null;
   for(let i=0;i<70;i++){
     const mid=(lo+hi)/2;
     if(netAt(mid).net<target) lo=mid; else hi=mid;
   }
-  const rate=(lo+hi)/2;
-  return {rate, ...netAt(rate)};
+  const gross=(lo+hi)/2;
+  return {...netAt(gross), grossPerHour:gross/cp.totalH};
 }
 function fixedNetSummaryHtml(cp, emp, monthKey){
   if(!cp.fixedNet) return '';
@@ -2073,14 +2075,14 @@ function fixedNetSummaryHtml(cp, emp, monthKey){
   const equivalent=fixedNetEquivalent(cp,emp,monthKey);
   return `<div class="net-box">
     <div class="nb-net"><span>נטו חודשי קבוע</span><span class="v">₪${cp.totalPay.toLocaleString('he-IL',{maximumFractionDigits:2})}</span></div>
-    ${ended?`<div class="nb-net"><span>שכר בסיס מקביל לשעה<br><small>ברוטו משוער</small></span><span class="v">${equivalent==null?'—':'₪'+equivalent.rate.toFixed(2)}</span></div>
-    <div class="net-note">${cp.totalH<=0?'אין שעות לחישוב':'התעריף שהיה נותן את הנטו הקבוע אילו השכר חושב לפי שעות, כולל שעות נוספות וניכויי חובה.'}${cp.incomplete?' חסרות החתמות או אישורים — החישוב עדיין לא סופי.':''}</div>
-    ${equivalent?`<details class="pay-extra-fold"><summary>איך חושב התעריף לשעה?</summary><div class="pay-extra-body">
-      <div class="nb-row"><span>שעות רגילות</span><span>${fmtHours(cp.regH)}</span></div>
-      <div class="nb-row"><span>שעות נוספות 125%</span><span>${fmtHours(cp.ot125H)}</span></div>
-      <div class="nb-row"><span>שעות נוספות 150%</span><span>${fmtHours(cp.ot150H)}</span></div>
+    ${ended?`<div class="nb-net"><span>ממוצע ברוטו לשעת עבודה<br><small>משוער · כולל כל רכיבי השכר</small></span><span class="v">${equivalent==null?'—':'₪'+(Math.round((equivalent.grossPerHour+1e-9)*100)/100).toFixed(2)}</span></div>
+    <div class="net-note">${cp.totalH<=0?'אין שעות לחישוב':equivalent?'כל הברוטו המשוער של החודש, כולל בונוסים ותוספות שמגולמים בנטו שהוזן, מתחלק בין כל שעות העבודה שנרשמו ואושרו.':'לא ניתן לאמוד את הברוטו לפי ההגדרות שהוזנו.'}${cp.incomplete?' חסרות החתמות או אישורים — החישוב עדיין לא סופי.':''}</div>
+    ${equivalent?`<details class="pay-extra-fold"><summary>איך חושב הממוצע לשעה?</summary><div class="pay-extra-body">
+      <div class="nb-row"><span>כל הברוטו המשוער</span><span>₪${equivalent.gross.toFixed(2)}</span></div>
+      <div class="nb-row"><span>חלקי שעות העבודה בפועל</span><span>${fmtHours(cp.totalH)}</span></div>
+      <div class="net-note">כל שעה נספרת פעם אחת בחלוקת הסכום, גם שעה נוספת. הברוטו נאמד מהנטו לפי הגדרות המס וההפרשות; הוא עשוי להיות שונה מהברוטו בתלוש.</div>
       ${netSummaryHtml(equivalent.gross,{...emp,netIsNet:false},monthRefDate(monthKey),equivalent.regularGross)}
-    </div></details>`:''}`:'<div class="net-note">התעריף המקביל לשעה יופיע כאן לאחר סיום החודש.</div>'}
+    </div></details>`:''}`:'<div class="net-note">ממוצע הברוטו לשעה יופיע כאן לאחר סיום החודש.</div>'}
     <details class="pay-extra-fold"><summary>פרטי השכר וההפרשות</summary><div class="pay-extra-body">
       <div class="net-note">נקודות זיכוי: ${emp.creditPoints==null?2.25:Number(emp.creditPoints)||0}<br>${contributionSettingsText(emp,'pension')}<br>${contributionSettingsText(emp,'studyFund')}</div>
       <div class="net-note">אלה ההגדרות שנשמרו לחודש זה. סכומי ההפרשות בפועל מפורטים בתלוש. אין ניכוי נוסף מהנטו שהוגדר.</div>
@@ -5224,7 +5226,7 @@ function renderPayDetail(){
     ? "החישוב מבוסס על תעריף נטו לשעה."
     : "החישוב מבוסס על ברוטו לפי שעות, לפני ניכויי חובה; הערכת הנטו מוצגת בהמשך.";
   const currentMonthNote=paySelMonthKey===currentMonthKey()
-    ? (cp.fixedNet?' החודש עדיין פתוח. התעריף המקביל לשעה יוצג לאחר סיומו.':" החודש עדיין פתוח והסכומים יתעדכנו עם המשמרות הבאות.")
+    ? (cp.fixedNet?' החודש עדיין פתוח. ממוצע הברוטו לשעה יוצג לאחר סיומו.':" החודש עדיין פתוח והסכומים יתעדכנו עם המשמרות הבאות.")
     : "";
   const balanceDetail=balanceView.note+(hasActivity?" "+balanceBasis:"")+currentMonthNote;
   const paymentsRows = payList.length ? payList.map(p=>`<div class="hk-row">
