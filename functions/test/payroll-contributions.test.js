@@ -212,21 +212,39 @@ test('fixed salary never deducts pension or study fund again, regardless of atte
   assert.doesNotMatch(c.fixedNetSummaryHtml(pay,c.payrollEmployee('sample'),'2026-07'),/ברוטו משוער|−₪/);
 });
 
-test('inverse hourly gross reproduces the known wage with overtime and both employee funds',async()=>{
+test('all estimated gross is divided by actual hours, including overtime pay and both funds',async()=>{
   const {context:c}=await fixedHarness(10058.568825);
   c.currentMonthKey=()=> '2026-08';
   const pay={fixedNet:true,totalPay:10058.568825,totalH:50*52/12,regH:42*52/12,ot125H:5*52/12,ot150H:3*52/12};
   const e=c.payrollEmployee('sample','2026-07');
   const result=c.fixedNetEquivalent(pay,e,'2026-07');
-  close(result.rate,51);
+  close(result.grossPerHour,53.805);
   close(result.gross,11657.75);
   close(result.pension,556.92);
   close(result.studyFund,232.05);
   close(result.net,pay.totalPay);
   const summary=c.fixedNetSummaryHtml(pay,e,'2026-07');
-  assert.match(summary,/שכר בסיס מקביל לשעה/);
-  assert.match(summary,/₪51.00/);
+  assert.match(summary,/ממוצע ברוטו לשעת עבודה/);
+  assert.match(summary,/₪53.81/);
+  assert.match(summary,/בונוסים ותוספות/);
+  assert.doesNotMatch(summary,/שכר בסיס מקביל|₪51.00/);
   assert.doesNotMatch(summary,/ממוצע נטו לשעה/);
+});
+
+test('a bonus included in the entered net increases the all-in gross average without changing hours',async()=>{
+  const {context:c}=await fixedHarness();
+  c.currentMonthKey=()=> '2026-08';
+  // Full-gross contributions remove allocation assumptions from this fixture.
+  const e={...profile,pensionBase:'gross',studyFundBase:'gross'};
+  const hours={fixedNet:true,totalH:200,regH:170,ot125H:20,ot150H:10};
+  const withoutBonus=c.estimateNet(9314,e,new Date(2026,6,15),9314).net;
+  const withBonus=c.estimateNet(10314,e,new Date(2026,6,15),10314).net;
+  const before=c.fixedNetEquivalent({...hours,totalPay:withoutBonus},e,'2026-07');
+  const after=c.fixedNetEquivalent({...hours,totalPay:withBonus},e,'2026-07');
+  close(before.grossPerHour,46.57);
+  close(after.grossPerHour,51.57);
+  close(after.grossPerHour-before.grossPerHour,5);
+  assert.match(c.fixedNetSummaryHtml({...hours,totalPay:withBonus},e,'2026-07'),/₪51.57/);
 });
 
 test('inverse estimate round-trips tax brackets and independent fund bases',async()=>{
