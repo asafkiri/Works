@@ -230,6 +230,7 @@ function appContext() {
     payShiftsFor: () => [{ clockIn: Date.UTC(2026, 8, 1, 8), clockOut: Date.UTC(2026, 8, 1, 16) }],
   };
   vm.createContext(ctx);
+  ctx.payrollEmployee = id => ctx.employees[id];
   for (const name of ["giftLedgerFor", "giftMoney", "giftVisibleFor", "giftSummaryHtml", "giftHistoryHtml", "takingsListFor", "takingsSumFor", "paymentsListFor", "paymentsSumFor", "payBalanceSnapshot", "payReportData", "accountantReportHtml"]) {
     vm.runInContext(sourceFunction(name), ctx);
   }
