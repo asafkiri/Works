@@ -487,7 +487,8 @@
   .net-note{font-size:11.5px;color:var(--muted);margin-top:9px;line-height:1.5}
   .net-field{margin-bottom:14px}
   #netModal .modal{display:flex;flex-direction:column;max-height:calc(100vh - 36px);max-height:calc(100dvh - 36px);overflow:hidden}
-  .net-settings-scroll{overflow-y:auto;min-height:0;padding:0 3px;overscroll-behavior:contain}
+  .net-settings-scroll{overflow-y:auto;min-height:0;min-width:0;width:100%;padding:0 3px;overscroll-behavior:contain}
+  #netModal input:not([type="checkbox"]),#netModal select{min-width:0;max-width:100%;width:100%}
   #netModal .modal-actions{flex-shrink:0}
   .net-contribution-card{border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px;background:var(--paper)}
   .net-contribution-card .net-toggle-row{margin-bottom:0}
@@ -850,7 +851,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v84</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v85</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -875,7 +876,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v84</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v85</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -977,9 +978,16 @@
           <p class="sub">בחר מסלול שכר ומלא פרטי התחברות. אפשר להשלים פנסיה, קרן השתלמות ונקודות זיכוי בפרטי העובד.</p>
 
           <label class="fld" for="newEmpPayMode">מסלול שכר</label>
-          <select id="newEmpPayMode" onchange="$('newEmpRateLabel').textContent=this.value==='fixedNet'?'נטו קבוע לחודש (₪)':'תעריף לשעה (₪)'" style="margin-bottom:10px">
-            <option value="hourly">לפי שעות עבודה</option><option value="fixedNet">נטו חודשי קבוע</option>
+          <select id="newEmpPayMode" onchange="newEmpSyncPayMode(true)" style="margin-bottom:10px">
+            <option value="hourly">לפי שעות עבודה</option><option value="fixed">משכורת חודשית קבועה</option>
           </select>
+          <div id="newEmpFixedFields" class="hidden" style="margin-bottom:10px">
+            <label class="fld" for="newEmpFixedKind">מה הסכום הקבוע?</label>
+            <select id="newEmpFixedKind" onchange="newEmpSyncPayMode(true)">
+              <option value="fixedNet">נטו קבוע — הסכום שמקבלים ליד</option>
+              <option value="fixedGross">ברוטו קבוע — לפני ניכויים</option>
+            </select>
+          </div>
 
           <div class="row" style="margin-bottom:10px">
             <div style="flex:2">
@@ -1773,13 +1781,20 @@
       <label class="fld" for="netPayMode">איך משולם השכר?</label>
       <select id="netPayMode" onchange="netSyncMode()">
         <option value="hourly">לפי שעות עבודה</option>
-        <option value="fixedNet">נטו חודשי קבוע</option>
+        <option value="fixed">משכורת חודשית קבועה</option>
       </select>
     </div>
     <div id="netFixedFields" class="hidden net-contribution-card">
-      <label class="fld" for="netMonthlyAmount">הנטו הקבוע לחודש (₪)</label>
+      <div class="net-field">
+        <label class="fld" for="netFixedKind">מה הסכום הקבוע?</label>
+        <select id="netFixedKind" onchange="netChangeFixedKind()">
+          <option value="fixedNet">נטו קבוע — הסכום שמקבלים ליד</option>
+          <option value="fixedGross">ברוטו קבוע — לפני ניכויים</option>
+        </select>
+      </div>
+      <label class="fld" id="netMonthlyLabel" for="netMonthlyAmount">הנטו הקבוע לחודש (₪)</label>
       <input type="number" id="netMonthlyAmount" min="0" step="0.01" inputmode="decimal" placeholder="10000">
-      <p class="net-contribution-help">הזינו את כל הנטו החודשי, כולל בונוס ותוספות שמשולמים בו. הסכום קבוע ואינו משתנה לפי הנוכחות. לאחר סיום החודש נציג את כל הברוטו המשוער חלקי שעות העבודה בפועל — ממוצע ברוטו לשעה. הפנסיה וקרן ההשתלמות כבר נלקחו בחשבון בנטו — לא נוריד אותן שוב.</p>
+      <p class="net-contribution-help" id="netMonthlyHelp"></p>
     </div>
     <div id="netHourlyFields">
     <div class="net-field">
@@ -1825,13 +1840,25 @@
             <label class="fld" for="netPensionRate">כמה אחוזים יורדים מהעובד?</label>
             <input type="number" id="netPensionRate" inputmode="decimal" step="0.1" min="0" max="25" value="6">
           </div>
-          <div class="net-field">
+          <div class="net-field" id="netPensionVariableBaseWrap">
             <label class="fld" for="netPensionBase">מאיזה שכר מחשבים?</label>
             <select id="netPensionBase" onchange="netSyncContributionHelp()">
               <option value="regular">שכר רגיל בלבד</option>
               <option value="gross">שכר רגיל + שעות נוספות</option>
             </select>
             <p class="net-contribution-help" id="netPensionBaseHelp"></p>
+          </div>
+          <div class="net-field hidden" id="netPensionFixedBaseWrap">
+            <label class="fld" for="netPensionFixedBase">מאיזה שכר מחשבים?</label>
+            <select id="netPensionFixedBase" onchange="netSyncContributionHelp()">
+              <option value="amount">בסיס הפרשה מהתלוש</option>
+              <option value="gross">כל הברוטו החודשי</option>
+            </select>
+            <div id="netPensionBaseAmountWrap" style="margin-top:10px">
+              <label class="fld" for="netPensionBaseAmount">בסיס חודשי לפנסיה (₪)</label>
+              <input type="number" id="netPensionBaseAmount" min="0" step="0.01" inputmode="decimal" placeholder="למשל 7280">
+            </div>
+            <p class="net-contribution-help">השכר שממנו מחשבים את האחוז, כפי שמופיע בתלוש. אינו משתנה לפי שעות הנוכחות.</p>
           </div>
         </div>
       </div>
@@ -1845,7 +1872,7 @@
             <label class="fld" for="netStudyFundRate">כמה אחוזים יורדים מהעובד?</label>
             <input type="number" id="netStudyFundRate" inputmode="decimal" step="0.1" min="0" max="25" value="2.5">
           </div>
-          <div class="net-field">
+          <div class="net-field" id="netStudyFundVariableBaseWrap">
             <label class="fld" for="netStudyFundBase">מאיזה שכר מחשבים?</label>
             <select id="netStudyFundBase" onchange="netSyncContributionHelp()">
               <option value="regular">שכר רגיל בלבד</option>
@@ -1853,10 +1880,22 @@
             </select>
             <p class="net-contribution-help" id="netStudyFundBaseHelp"></p>
           </div>
+          <div class="net-field hidden" id="netStudyFundFixedBaseWrap">
+            <label class="fld" for="netStudyFundFixedBase">מאיזה שכר מחשבים?</label>
+            <select id="netStudyFundFixedBase" onchange="netSyncContributionHelp()">
+              <option value="amount">בסיס הפרשה מהתלוש</option>
+              <option value="gross">כל הברוטו החודשי</option>
+            </select>
+            <div id="netStudyFundBaseAmountWrap" style="margin-top:10px">
+              <label class="fld" for="netStudyFundBaseAmount">בסיס חודשי לקרן השתלמות (₪)</label>
+              <input type="number" id="netStudyFundBaseAmount" min="0" step="0.01" inputmode="decimal" placeholder="למשל 7280">
+            </div>
+            <p class="net-contribution-help">השכר שממנו מחשבים את האחוז, כפי שמופיע בתלוש. אינו משתנה לפי שעות הנוכחות.</p>
+          </div>
         </div>
       </div>
       <div class="net-basis-warning hidden" id="netContributionOtNote">כדי להפריד בין שכר רגיל לשעות נוספות, יש להפעיל למעלה את ״חישוב שעות נוספות״. כרגע כל השעות מחושבות כרגילות.</div>
-      <p class="net-contribution-help" style="margin:0 0 14px">הגדירו לפי תנאי ההעסקה של העובד. כאן מזינים רק את חלק העובד שיורד מהנטו.</p>
+      <p class="net-contribution-help" style="margin:0 0 14px">הגדירו לפי תנאי ההעסקה של העובד. כאן מזינים רק את חלק העובד, שנוכה מהברוטו בחישוב הנטו.</p>
       <div class="net-toggle-row">
         <span class="lbl">פטור מביטוח לאומי <span style="font-weight:500;color:var(--muted);font-size:12px">(18–21 לפני צבא / חייל)</span></span>
         <label class="switch"><input type="checkbox" id="netNiExempt"><span class="sl"></span></label>
@@ -2027,7 +2066,7 @@ function payrollRecord(empId){
 }
 function payrollSettings(emp){
   const result={};
-  for(const key of ['netIsNet','birthDate','creditPoints','pensionOn','pensionRate','pensionBase','studyFundOn','studyFundRate','studyFundBase','niExempt','overtimeEnabled']){
+  for(const key of ['netIsNet','birthDate','creditPoints','pensionOn','pensionRate','pensionBase','pensionBaseAmount','studyFundOn','studyFundRate','studyFundBase','studyFundBaseAmount','niExempt','overtimeEnabled']){
     if(emp[key]!=null) result[key]=emp[key];
     else if(key==='birthDate') result[key]='';
   }
@@ -2047,8 +2086,22 @@ function payrollProfile(empId, monthKey){
 function payrollEmployee(empId, monthKey){
   return {...(employees[empId]||{}), id:empId, ...payrollProfile(empId,monthKey)};
 }
+function isFixedSalary(mode){ return mode==='fixedNet' || mode==='fixedGross'; }
 function payrollWageLabel(cp, emp){
-  return cp.fixedNet?'נטו חודשי קבוע':emp.netIsNet?'שכר נטו לפי שעות':'שכר ברוטו לפי שעות';
+  return cp.fixedGross?'נטו משוער מברוטו קבוע':cp.fixedNet?'נטו חודשי קבוע':emp.netIsNet?'שכר נטו לפי שעות':'שכר ברוטו לפי שעות';
+}
+function fixedSalarySummaryHtml(cp, emp, monthKey){
+  if(!cp.fixedGross) return fixedNetSummaryHtml(cp,emp,monthKey);
+  const ended=monthKey<currentMonthKey();
+  const average=cp.totalH>0?cp.monthlyGross/cp.totalH:null;
+  return `<div class="net-box">
+    <div class="nb-net"><span>ברוטו חודשי קבוע</span><span class="v">₪${cp.monthlyGross.toLocaleString('he-IL',{maximumFractionDigits:2})}</span></div>
+    ${ended?`<div class="nb-net"><span>ממוצע ברוטו לשעת עבודה<br><small>כולל כל רכיבי השכר שהוזנו</small></span><span class="v">${average==null?'—':'₪'+(Math.round((average+1e-9)*100)/100).toFixed(2)}</span></div>
+      <div class="net-note">${average==null?'אין שעות לחישוב.':`₪${cp.monthlyGross.toFixed(2)} ברוטו חלקי ${fmtHours(cp.totalH)} של עבודה בפועל. כל שעה נספרת פעם אחת, גם שעה נוספת. בונוסים ותוספות שכבר נכללו בברוטו מתחלקים גם הם בין השעות.`}${cp.incomplete?' חסרות החתמות או אישורים — החישוב עדיין לא סופי.':''}</div>`:'<div class="net-note">ממוצע הברוטו לשעה יופיע כאן לאחר סיום החודש.</div>'}
+    ${netSummaryHtml(cp.monthlyGross,{...emp,netIsNet:false},monthRefDate(monthKey))}
+    <div class="net-note">נקודות זיכוי: ${emp.creditPoints==null?2.25:Number(emp.creditPoints)||0}<br>${contributionSettingsText(emp,'pension')}<br>${contributionSettingsText(emp,'studyFund')}</div>
+    <div class="net-note">הנטו והיתרה לתשלום הם הערכה לפי ההגדרות. חישוב המס אינו כולל את כל הטבות המס, לרבות זיכוי על הפקדות לפנסיה. ממוצע הברוטו לשעה מבוסס על הסכום שהוזן ואינו משתנה בגלל ניכויים, קניות או מקדמות.</div>
+  </div>`;
 }
 function fixedNetEquivalent(cp, emp, monthKey){
   if(!cp.fixedNet || cp.totalH<=0 || monthKey>=currentMonthKey()) return null;
@@ -3790,9 +3843,9 @@ function renderEmployeeDashboard(){
   const curTk=takingsSumFor(currentEmpId, currentMonthKey());
   const curPaid=cur.paidPay;
   const curLeft=cur.totalPay - curTk - curPaid;
-  $("empOwedLabel").textContent=(cur.ot.fixedNet?'נטו חודשי קבוע · ':'מגיע לך · ')+monthLabel(currentMonthKey());
-  $("empOwed").textContent="₪"+(cur.ot.fixedNet?cur.totalPay:curLeft).toFixed(0);
-  $("empOwedSub").textContent = cur.ot.fixedNet
+  $("empOwedLabel").textContent=(cur.ot.fixedMonthly?payrollWageLabel(cur.ot,payrollEmployee(currentEmpId))+' · ':'מגיע לך · ')+monthLabel(currentMonthKey());
+  $("empOwed").textContent="₪"+(cur.ot.fixedMonthly?cur.totalPay:curLeft).toFixed(0);
+  $("empOwedSub").textContent = cur.ot.fixedMonthly
     ? `${fmtHours(cur.totalH)} · יתרה לאחר תשלומים והקפה: ₪${curLeft.toFixed(0)}`
     : `${fmtHours(cur.totalH)} · ${payrollEmployee(currentEmpId).netIsNet?'נטו':'ברוטו'} ₪${cur.totalPay.toFixed(0)}${curTk>0?` · הקפה −₪${curTk.toFixed(0)}`:''}${curPaid>0?` · שולם −₪${curPaid.toFixed(0)}`:''}`;
 
@@ -3905,9 +3958,9 @@ function renderEmployeeDashboard(){
     $("empPayMonthTitle").textContent="💰 "+monthLabel(empNavMonth);
     const monOt=t.ot||{}; const monOtOn=monOt.otEnabled===true;
     const monEmp=payrollEmployee(currentEmpId,empNavMonth);
-    $("empMonthOwedLabel").textContent=(monOt.fixedNet?'נטו חודשי קבוע · ':'מגיע לך · ')+monthLabel(empNavMonth);
-    $("empMonthOwed").textContent="₪"+(monOt.fixedNet?t.totalPay:monLeft).toFixed(0);
-    $("empMonthOwedSub").textContent = `${fmtHours(t.totalH)} · ${monOt.fixedNet?'יתרה לתשלום':'שכר '+(monEmp.netIsNet?'נטו':'ברוטו')}: ₪${(monOt.fixedNet?monLeft:t.totalPay).toFixed(0)}${monTk>0?` · הקפה −₪${monTk.toFixed(0)}`:''}${monPaid>0?` · שולם −₪${monPaid.toFixed(0)}`:''}`;
+    $("empMonthOwedLabel").textContent=(monOt.fixedMonthly?payrollWageLabel(monOt,monEmp)+' · ':'מגיע לך · ')+monthLabel(empNavMonth);
+    $("empMonthOwed").textContent="₪"+(monOt.fixedMonthly?t.totalPay:monLeft).toFixed(0);
+    $("empMonthOwedSub").textContent = `${fmtHours(t.totalH)} · ${monOt.fixedMonthly?'יתרה לתשלום':'שכר '+(monEmp.netIsNet?'נטו':'ברוטו')}: ₪${(monOt.fixedMonthly?monLeft:t.totalPay).toFixed(0)}${monTk>0?` · הקפה −₪${monTk.toFixed(0)}`:''}${monPaid>0?` · שולם −₪${monPaid.toFixed(0)}`:''}`;
     $("empShifts").innerHTML = t.list.length ? t.list.map(s=>{
       const h=netHoursOf(s); const amt=h*t.rate;
       const night=monOtOn && isNightShift(s);
@@ -3917,7 +3970,7 @@ function renderEmployeeDashboard(){
           <div class="pl-date">${fmtDate(s.clockIn)}${night?' <span class="night-tag">🌙 לילה</span>':''}${hasShortBreak(s)?' <span class="short-break-tag">☕ הפסקה קצרה — ללא ניכוי</span>':''}</div>
           <div class="pl-times">${fmtTime(s.clockIn)} ← ${fmtTime(s.clockOut)} · ${fmtHours(h)}${brkMin>0?` · ☕ ${brkMin}ד`:''}</div>
         </div>
-        ${monOtOn||monOt.fixedNet?'':`<div class="pl-amt">₪${amt.toFixed(0)}</div>`}
+        ${monOtOn||monOt.fixedMonthly?'':`<div class="pl-amt">₪${amt.toFixed(0)}</div>`}
       </div>`;
     }).join("") : `<div class="empty">אין משמרות סגורות ב${monthLabel(empNavMonth)}.</div>`;
     const monPayRows = monPayList.length ? monPayList.map(p=>`<div class="hk-row">
@@ -3927,8 +3980,8 @@ function renderEmployeeDashboard(){
         <div class="ps-row"><span>שעות רגילות (${fmtHours(monOt.regH)})</span><span>₪${(monOt.regH*t.rate).toFixed(0)}</span></div>
         ${monOt.ot125H>0?`<div class="ps-row"><span>נוספות 125% (${fmtHours(monOt.ot125H)})</span><span>₪${(monOt.ot125H*t.rate*1.25).toFixed(0)}</span></div>`:''}
         ${monOt.ot150H>0?`<div class="ps-row"><span>נוספות 150% (${fmtHours(monOt.ot150H)})</span><span>₪${(monOt.ot150H*t.rate*1.5).toFixed(0)}</span></div>`:''}` : '';
-    $("empSummary").innerHTML = t.list.length || monOt.fixedNet ? `
-      ${monOt.fixedNet?fixedNetSummaryHtml(monOt,monEmp,empNavMonth):''}
+    $("empSummary").innerHTML = t.list.length || monOt.fixedMonthly ? `
+      ${monOt.fixedMonthly?fixedSalarySummaryHtml(monOt,monEmp,empNavMonth):''}
       <div class="pay-sum">
         <div class="ps-row"><span>סך שעות החודש</span><span>${fmtHours(t.totalH)}</span></div>
         ${monOtBlock}
@@ -3938,10 +3991,10 @@ function renderEmployeeDashboard(){
         ${monLeft<0
           ? `<div class="ps-row debt"><span>שולם/נוכה יותר ממה שהרווחת</span><span>−₪${Math.abs(monLeft).toFixed(0)}</span></div>`
           : `<div class="ps-row big"><span>נותר לתשלום</span><span class="rem">₪${monLeft.toFixed(0)}</span></div>`}
-        ${monOt.fixedNet?'':`<div style="font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5">⚠️ זוהי הערכה בלבד${monOtOn?' (כולל שעות נוספות)':''}. הסכום הסופי נקבע בתלוש מהרו"ח.</div>`}
+        ${monOt.fixedMonthly?'':`<div style="font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5">⚠️ זוהי הערכה בלבד${monOtOn?' (כולל שעות נוספות)':''}. הסכום הסופי נקבע בתלוש מהרו"ח.</div>`}
       </div>
       ${monPayList.length?`<div class="card" style="margin-top:12px"><div class="section-title" style="margin:0 0 8px">תשלומים שקיבלת החודש</div>${monPayRows}</div>`:''}
-      ${monOt.fixedNet?'':netSummaryHtml(t.totalPay, monEmp, monthRefDate(empNavMonth), monOt.regH*t.rate)}` : '';
+      ${monOt.fixedMonthly?'':netSummaryHtml(t.totalPay, monEmp, monthRefDate(empNavMonth), monOt.regH*t.rate)}` : '';
   }
 
   // --- טפסים לחתימה: התיקייה מופיעה לעובד רק כשיש טופס שממתין לחתימה ---
@@ -4463,7 +4516,7 @@ function empFolderHtml(e, subText, fnName){
 // דף פרטי עובד מלא (תצוגה נקייה עם פעולות)
 function empDetailHtml(e){
   e=payrollEmployee(e.id);
-  const fixed=e.mode==='fixedNet';
+  const fixed=isFixedSalary(e.mode);
   const {hours,pay,regularPay} = monthTotals(e.id, rateOf(e.id));
   const linked = e.linked===true;
   const loginVal = e.username
@@ -4484,7 +4537,7 @@ function empDetailHtml(e){
   const pinVal = clockPinOf(e.id) ? esc(String(clockPinOf(e.id))) : '<span style="color:var(--danger)">לא הוגדר ⚠</span>';
   return `<div class="card">
     <div class="det-row">
-      <div class="det-k"><div class="det-lbl">${fixed?'נטו חודשי קבוע':'תעריף לשעה'}</div><div class="det-val">₪${fixed?e.monthlyNet:rateOf(e.id)}</div></div>
+      <div class="det-k"><div class="det-lbl">${fixed?(e.mode==='fixedGross'?'ברוטו חודשי קבוע':'נטו חודשי קבוע'):'תעריף לשעה'}</div><div class="det-val">₪${fixed?(e.mode==='fixedGross'?e.monthlyGross:e.monthlyNet):rateOf(e.id)}</div></div>
       <button class="btn line sm" onclick="editRate('${e.id}')">שנה</button>
     </div>
     ${loginRow}
@@ -4493,7 +4546,7 @@ function empDetailHtml(e){
       <button class="btn line sm" onclick="setClockPin('${e.id}')">${clockPinOf(e.id)?'שנה':'הגדר'}</button>
     </div>
     <div class="det-row">
-      <div class="det-k"><div class="det-lbl">${fixed?'שכר החודש (נטו קבוע)':'שכר החודש (לפי החתמות)'}</div><div class="det-val">${fmtHours(hours)} · ₪${pay.toFixed(0)}</div></div>
+      <div class="det-k"><div class="det-lbl">${fixed?(e.mode==='fixedGross'?'נטו משוער החודש':'שכר החודש (נטו קבוע)'):'שכר החודש (לפי החתמות)'}</div><div class="det-val">${fmtHours(hours)} · ₪${pay.toFixed(0)}</div></div>
       <button class="btn line sm" onclick="openPayFromEmp('${e.id}')">פירוט שכר</button>
     </div>
     <div class="det-row">
@@ -4508,7 +4561,7 @@ function empDetailHtml(e){
       <button class="btn line sm" onclick="openNetModal('${e.id}')">ערוך</button>
     </div>
     <div class="det-row">
-      <div class="det-k"><div class="det-lbl">${fixed?'הנטו שהוגדר לחודש':'נטו משוער החודש'}</div><div class="det-val">${fixed?'₪'+pay.toFixed(0):pay>0?'₪'+estimateNet(pay,e,new Date(),regularPay).net.toFixed(0):'—'}</div></div>
+      <div class="det-k"><div class="det-lbl">${e.mode==='fixedNet'?'הנטו שהוגדר לחודש':'נטו משוער החודש'}</div><div class="det-val">${fixed?'₪'+pay.toFixed(0):pay>0?'₪'+estimateNet(pay,e,new Date(),regularPay).net.toFixed(0):'—'}</div></div>
     </div>
     <div style="margin-top:18px">
       ${e.active===false
@@ -4526,7 +4579,7 @@ function renderEmpList(){
 
   const folder = e => {
     const p=payrollProfile(e.id);
-    return empFolderHtml(e, `${p.mode==='fixedNet'?'נטו חודשי ₪'+p.monthlyNet:'₪'+p.hourlyRate+'/שעה'}${clockPinOf(e.id)?'':' · ⚠ אין קוד החתמה'}`, "openEmpDetail");
+    return empFolderHtml(e, `${p.mode==='fixedGross'?'ברוטו חודשי ₪'+p.monthlyGross:p.mode==='fixedNet'?'נטו חודשי ₪'+p.monthlyNet:'₪'+p.hourlyRate+'/שעה'}${clockPinOf(e.id)?'':' · ⚠ אין קוד החתמה'}`, "openEmpDetail");
   };
   foldersBox.innerHTML = active.length ? active.map(folder).join("")
     : '<div class="empty">עדיין אין עובדים פעילים. הוסף עובד למעלה כדי להתחיל.</div>';
@@ -4640,7 +4693,7 @@ function incomeTaxMonthly(gross){
 function contributionBasis(emp, kind){
   emp=emp||{};
   const value=emp[kind+'Base'];
-  if(value==='regular' || value==='gross') return value;
+  if(value==='regular' || value==='gross' || value==='amount') return value;
   return kind==='pension' && emp.pensionOn===true ? 'gross' : 'regular';
 }
 function contributionRate(emp, kind){
@@ -4650,12 +4703,13 @@ function contributionRate(emp, kind){
   return Number.isFinite(rate) && rate>=0 && rate<=25 ? rate : fallback;
 }
 function contributionBasisLabel(basis){
-  return basis==='regular'?'שכר רגיל בלבד':'שכר רגיל + שעות נוספות';
+  return basis==='amount'?'בסיס חודשי מהתלוש':basis==='regular'?'שכר רגיל בלבד':'כל הברוטו';
 }
 function contributionSettingsText(emp, kind){
   const label=kind==='pension'?'פנסיה':'קרן השתלמות';
   if(!emp || !emp[kind+'On']) return label+': ללא ניכוי';
-  return label+': '+contributionRate(emp,kind)+'% · '+contributionBasisLabel(contributionBasis(emp,kind));
+  const basis=contributionBasis(emp,kind);
+  return label+': '+contributionRate(emp,kind)+'% · '+contributionBasisLabel(basis)+(basis==='amount'?' · ₪'+(Number(emp[kind+'BaseAmount'])||0):'');
 }
 // regularGross comes from the same month/overtime calculation as gross.
 // It excludes the entire overtime payment, not just the 25%/50% premium.
@@ -4669,8 +4723,11 @@ function estimateNet(gross, emp, asOf, regularGross){
   const age=ageAtDate(emp.birthDate, asOf);
   const isMinor = (age!=null && age<18);
   let incomeTax=0, ni=0, health=0, pension=0, studyFund=0;
-  const pensionBaseAmount=contributionBasis(emp,'pension')==='regular'?regularGross:gross;
-  const studyFundBaseAmount=contributionBasis(emp,'studyFund')==='regular'?regularGross:gross;
+  const baseFor=kind=>contributionBasis(emp,kind)==='amount'
+    ? Math.min(gross,Math.max(0,Number(emp[kind+'BaseAmount'])||0))
+    : contributionBasis(emp,kind)==='regular'?regularGross:gross;
+  const pensionBaseAmount=baseFor('pension');
+  const studyFundBaseAmount=baseFor('studyFund');
   if(!isMinor){
     const T = txParams();
     const points = (emp.creditPoints!=null ? Number(emp.creditPoints) : 2.25);
@@ -4747,8 +4804,9 @@ function openNetModal(empId){
 function loadNetMonth(){
   if(!netEditEmpId) return;
   const e=payrollEmployee(netEditEmpId,$("netEffectiveMonth").value);
-  $("netPayMode").value=e.mode==='fixedNet'?'fixedNet':'hourly';
-  $("netMonthlyAmount").value=e.monthlyNet!=null?e.monthlyNet:'';
+  $("netPayMode").value=isFixedSalary(e.mode)?'fixed':'hourly';
+  $("netFixedKind").value=e.mode==='fixedGross'?'fixedGross':'fixedNet';
+  $("netMonthlyAmount").value=e.mode==='fixedGross'?(e.monthlyGross??''):(e.monthlyNet??'');
   $("netHourlyRate").value=e.hourlyRate||0;
   const raw=payrollRecord(netEditEmpId);
   const upcoming=raw && raw.history?Object.keys(raw.history).filter(k=>k>$("netEffectiveMonth").value).sort():[];
@@ -4758,10 +4816,14 @@ function loadNetMonth(){
   $("netPoints").value = (e.creditPoints!=null ? e.creditPoints : 2.25);
   $("netPension").checked = e.pensionOn===true;
   $("netPensionRate").value = contributionRate(e,'pension');
-  $("netPensionBase").value = contributionBasis(e,'pension');
+  $("netPensionBase").value = contributionBasis(e,'pension')==='gross'?'gross':'regular';
+  $("netPensionFixedBase").value = contributionBasis(e,'pension')==='gross'?'gross':'amount';
+  $("netPensionBaseAmount").value = e.pensionBaseAmount??'';
   $("netStudyFund").checked = e.studyFundOn===true;
   $("netStudyFundRate").value = contributionRate(e,'studyFund');
-  $("netStudyFundBase").value = contributionBasis(e,'studyFund');
+  $("netStudyFundBase").value = contributionBasis(e,'studyFund')==='gross'?'gross':'regular';
+  $("netStudyFundFixedBase").value = contributionBasis(e,'studyFund')==='gross'?'gross':'amount';
+  $("netStudyFundBaseAmount").value = e.studyFundBaseAmount??'';
   $("netNiExempt").checked = e.niExempt===true;
   $("netOvertime").checked = e.overtimeEnabled===true;
   $("netUnpaidBreak").checked = e.unpaidBreak===true;
@@ -4778,8 +4840,20 @@ function netSyncStudyFund(){
   $("netStudyFundFields").classList.toggle("hidden", !$("netStudyFund").checked);
   netSyncContributionHelp();
 }
+function netSelectedMode(){
+  return $("netPayMode").value==='fixed'?$("netFixedKind").value:$("netPayMode").value==='hourly'?'hourly':'';
+}
+function netChangeFixedKind(){
+  // Net and gross are different amounts: do not silently reuse the previous number.
+  $("netMonthlyAmount").value='';
+  netSyncMode();
+}
 function netSyncContributionHelp(){
+  const gross=netSelectedMode()==='fixedGross';
   for(const prefix of ['netPension','netStudyFund']){
+    $(prefix+'VariableBaseWrap').classList.toggle('hidden',gross);
+    $(prefix+'FixedBaseWrap').classList.toggle('hidden',!gross);
+    $(prefix+'BaseAmountWrap').classList.toggle('hidden',$(prefix+'FixedBase').value!=='amount');
     const regular=$(prefix+'Base').value==='regular';
     $(prefix+'BaseHelp').textContent=regular
       ? 'ההפרשה תחושב בלי התשלום על שעות נוספות.'
@@ -4787,14 +4861,20 @@ function netSyncContributionHelp(){
   }
   const needsOt=($("netPension").checked && $("netPensionBase").value==='regular') ||
     ($("netStudyFund").checked && $("netStudyFundBase").value==='regular');
-  $("netContributionOtNote").classList.toggle('hidden', $("netPayMode").value==='fixedNet' || !needsOt || $("netOvertime").checked);
+  $("netContributionOtNote").classList.toggle('hidden', isFixedSalary(netSelectedMode()) || !needsOt || $("netOvertime").checked);
 }
 function netSyncOt(){
   $("netOtNote").classList.toggle("hidden", !$("netOvertime").checked);
   netSyncContributionHelp();
 }
 function netSyncMode(){
-  const fixed=$("netPayMode").value==='fixedNet';
+  const fixed=isFixedSalary(netSelectedMode());
+  const gross=netSelectedMode()==='fixedGross';
+  $("netMonthlyLabel").textContent=gross?'הברוטו הקבוע לחודש (₪)':'הנטו הקבוע לחודש (₪)';
+  $("netMonthlyAmount").placeholder=gross?'למשל 10314':'למשל 9048';
+  $("netMonthlyHelp").textContent=gross
+    ? 'הזינו את כל הברוטו החודשי, כולל בונוסים ותוספות שכבר נכללו בו. הנטו המשוער יחושב לפי הניכויים והזיכויים. השעות אינן משנות את הברוטו שהוזן; לאחר סיום החודש נחלק אותו בשעות העבודה בפועל.'
+    : 'הזינו את כל הנטו החודשי, כולל בונוסים ותוספות שכבר נכללו בו. הנטו נשאר קבוע — אין ניכוי נוסף של פנסיה או קרן השתלמות. לאחר סיום החודש נאמוד את הברוטו ונחלק אותו בשעות העבודה בפועל.';
   const on=$("netIsNet").checked;
   $("netFixedFields").classList.toggle('hidden', !fixed);
   $("netHourlyFields").classList.toggle('hidden', fixed);
@@ -4804,18 +4884,18 @@ function netSyncMode(){
 }
 function saveNetSettings(){
   const empId=netEditEmpId; if(!empId || !employees[empId]) return;
-  const mode=$("netPayMode").value;
+  const mode=netSelectedMode();
   const monthlyText=String($("netMonthlyAmount").value).trim();
-  const monthlyNet=Number(monthlyText);
+  const monthlyAmount=Number(monthlyText);
   const hourlyText=String($("netHourlyRate").value).trim();
   const hourlyRate=Number(hourlyText);
   const effectiveMonth=$("netEffectiveMonth").value;
-  if(!['hourly','fixedNet'].includes(mode)){ toast('יש לבחור מסלול שכר'); return; }
+  if(!['hourly','fixedNet','fixedGross'].includes(mode)){ toast('יש לבחור מסלול שכר'); return; }
   if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(effectiveMonth) || effectiveMonth<currentMonthKey()){
     toast('בחר את החודש הנוכחי או חודש עתידי. חודשים קודמים נשמרים.'); return;
   }
-  if(mode==='fixedNet' && (!monthlyText || !Number.isFinite(monthlyNet) || monthlyNet<0)){
-    toast('יש להזין סכום נטו חודשי תקין'); return;
+  if(isFixedSalary(mode) && (!monthlyText || !Number.isFinite(monthlyAmount) || monthlyAmount<0)){
+    toast('יש להזין סכום חודשי תקין'); return;
   }
   if(mode==='hourly' && (!hourlyText || !Number.isFinite(hourlyRate) || hourlyRate<0)){
     toast('יש להזין תעריף שעתי תקין'); return;
@@ -4825,19 +4905,32 @@ function saveNetSettings(){
   let points=parseFloat($("netPoints").value);
   const pensionOn=$("netPension").checked;
   let rate=parseFloat($("netPensionRate").value);
-  const pensionBase=$("netPensionBase").value;
+  const pensionBase=$(mode==='fixedGross'?'netPensionFixedBase':'netPensionBase').value;
+  const pensionBaseAmount=Number($("netPensionBaseAmount").value);
   const studyFundOn=$("netStudyFund").checked;
   let studyFundRate=parseFloat($("netStudyFundRate").value);
-  const studyFundBase=$("netStudyFundBase").value;
+  const studyFundBase=$(mode==='fixedGross'?'netStudyFundFixedBase':'netStudyFundBase').value;
+  const studyFundBaseAmount=Number($("netStudyFundBaseAmount").value);
   const niExempt=$("netNiExempt").checked;
   const overtime=$("netOvertime").checked;
   const unpaidBreak=$("netUnpaidBreak").checked;
-  if(!netIsNet || mode==='fixedNet'){
+  if(!netIsNet || isFixedSalary(mode)){
     if(!Number.isFinite(points) || points<0){ toast("מספר נקודות זיכוי לא תקין"); return; }
     if(pensionOn && (!Number.isFinite(rate)||rate<0||rate>25)){ toast("אחוז פנסיה לא תקין (0–25)"); return; }
     if(studyFundOn && (!Number.isFinite(studyFundRate)||studyFundRate<0||studyFundRate>25)){ toast("אחוז קרן השתלמות לא תקין (0–25)"); return; }
-    if((pensionOn && !['regular','gross'].includes(pensionBase)) ||
-       (studyFundOn && !['regular','gross'].includes(studyFundBase))){ toast("יש לבחור מאיזה שכר מחשבים את ההפרשה"); return; }
+    const allowedBases=mode==='fixedGross'?['amount','gross']:['regular','gross'];
+    if((pensionOn && !allowedBases.includes(pensionBase)) ||
+       (studyFundOn && !allowedBases.includes(studyFundBase))){ toast("יש לבחור מאיזה שכר מחשבים את ההפרשה"); return; }
+    if(mode==='fixedGross'){
+      for(const [prefix,on,base,amount,label] of [
+        ['netPension',pensionOn,pensionBase,pensionBaseAmount,'פנסיה'],
+        ['netStudyFund',studyFundOn,studyFundBase,studyFundBaseAmount,'קרן השתלמות']
+      ]){
+        if(on && base==='amount' && (!String($(prefix+'BaseAmount').value).trim() || !Number.isFinite(amount) || amount<0 || amount>monthlyAmount)){
+          toast('בסיס '+label+' חייב להיות סכום בין 0 לברוטו החודשי'); return;
+        }
+      }
+    }
   }
   if(isNaN(points)) points=2.25;
   if(!Number.isFinite(rate) || rate<0 || rate>25) rate=6;
@@ -4845,7 +4938,9 @@ function saveNetSettings(){
   const fields={
     netIsNet:netIsNet, birthDate:birth, creditPoints:points,
     pensionOn:pensionOn, pensionRate:rate, pensionBase:pensionBase,
+    pensionBaseAmount:mode==='fixedGross' && pensionBase==='amount' && Number.isFinite(pensionBaseAmount)?pensionBaseAmount:0,
     studyFundOn:studyFundOn, studyFundRate:studyFundRate, studyFundBase:studyFundBase,
+    studyFundBaseAmount:mode==='fixedGross' && studyFundBase==='amount' && Number.isFinite(studyFundBaseAmount)?studyFundBaseAmount:0,
     niExempt:niExempt, overtimeEnabled:overtime, unpaidBreak:unpaidBreak
   };
   // Use a transaction so simultaneous edits cannot erase another month's history.
@@ -4856,7 +4951,8 @@ function saveNetSettings(){
     const baseline=record.baseline||{...payrollSettings(employees[empId]), mode:'hourly', hourlyRate:oldRate};
     return {...record, baseline, history:{...(record.history||{}), [effectiveMonth]:{
       ...payrollSettings(fields), mode, hourlyRate:Number.isFinite(hourlyRate)?hourlyRate:baseline.hourlyRate,
-      monthlyNet:mode==='fixedNet'?Math.round(monthlyNet*100)/100:0
+      monthlyNet:mode==='fixedNet'?Math.round(monthlyAmount*100)/100:0,
+      monthlyGross:mode==='fixedGross'?Math.round(monthlyAmount*100)/100:0
     }}};
   }).then(result=>{
     if(!result.committed) throw new Error('Salary update not committed');
@@ -4939,10 +5035,13 @@ function isNightShift(s){ return nightHoursInShift(s.clockIn, s.clockOut)>=2; }
 // אחרת — שעות × תעריף פשוט. מחזיר פירוט מלא.
 function computeEmpPay(empId, monthKey, equivalentHours){
   const e=payrollEmployee(empId,monthKey); const rate=equivalentHours?1:rateOf(empId,monthKey);
-  if(e.mode==='fixedNet' && !equivalentHours){
+  if(isFixedSalary(e.mode) && !equivalentHours){
     const hours=computeEmpPay(empId,monthKey,true);
     const incomplete=Object.values(shifts).some(s=>s.employeeId===empId && s.clockIn && monthKeyOf(s.clockIn)===monthKey && (!s.clockOut || s.pendingReview));
-    return {...hours,totalPay:Math.max(0,Number(e.monthlyNet)||0),otPay:0,otEnabled:false,rate:0,fixedNet:true,incomplete};
+    const fixedGross=e.mode==='fixedGross';
+    const monthlyGross=Math.max(0,Number(e.monthlyGross)||0);
+    const net=fixedGross?estimateNet(monthlyGross,{...e,netIsNet:false},monthRefDate(monthKey)).net:Math.max(0,Number(e.monthlyNet)||0);
+    return {...hours,totalPay:fixedGross?Math.round(net*100)/100:net,monthlyGross,otPay:0,otEnabled:false,rate:0,fixedMonthly:true,fixedNet:!fixedGross,fixedGross,incomplete};
   }
   const otOn = equivalentHours || (e && e.overtimeEnabled===true);
   const allShifts=Object.values(shifts).filter(s=> s.employeeId===empId && s.clockIn && s.clockOut && !s.pendingReview)
@@ -4986,7 +5085,7 @@ function computeEmpPay(empId, monthKey, equivalentHours){
 function monthsForEmp(empId){
   const set={};
   // Include fixed salary months even when no attendance was recorded.
-  last12MonthKeys().forEach(k=>{ if(payrollProfile(empId,k).mode==='fixedNet') set[k]=true; });
+  last12MonthKeys().forEach(k=>{ if(isFixedSalary(payrollProfile(empId,k).mode)) set[k]=true; });
   Object.values(shifts).forEach(s=>{ if(s.employeeId===empId && s.clockIn) set[monthKeyOf(s.clockIn)]=true; });
   const paymentSrc=(currentRole==="employee"&&empId===currentEmpId) ? (myPayments||{}) : ((allPayments&&allPayments[empId])||{});
   const takingSrc=(currentRole==="employee"&&empId===currentEmpId) ? (myTakings||{}) : ((allTakings&&allTakings[empId])||{});
@@ -5051,7 +5150,7 @@ function payEmployeeSummaryHtml(e, monthKey, openFn){
   const s=payBalanceSnapshot(e.id, monthKey);
   const hasActivity=Math.abs(s.hours)+Math.abs(s.wage)+Math.abs(s.paid)+Math.abs(s.takings)>0.005;
   const p=payBalancePresentation(s.balance, false, hasActivity);
-  const balanceHint=s.cp.fixedNet || e.netIsNet ? "אחרי תשלומים והקפות" : "אחרי תשלומים והקפות · לפני ניכויי חובה";
+  const balanceHint=s.cp.fixedMonthly || e.netIsNet ? "אחרי תשלומים והקפות" : "אחרי תשלומים והקפות · לפני ניכויי חובה";
   return `<button class="pay-emp-card ${p.cls}" onclick="${openFn}('${e.id}')" aria-label="פתיחת פירוט השכר של ${esc(e.name)}">
     <span class="pec-head">
       <span class="pec-avatar">👤</span>
@@ -5203,7 +5302,7 @@ function renderPayDetail(){
         <div class="pl-date">${fmtDate(s.clockIn)}${night?' <span class="night-tag">🌙 לילה</span>':''}${hasShortBreak(s)?' <span class="short-break-tag">☕ הפסקה קצרה — ללא ניכוי</span>':''}</div>
         <div class="pl-times">${fmtTime(s.clockIn)} ← ${fmtTime(s.clockOut)} · ${fmtHours(h)}${brkMin>0?` · ☕ ${brkMin}ד`:''}</div>
       </div>
-      ${otOn||cp.fixedNet?'':`<div class="pl-amt">₪${fmtPayMoney(amt)}</div>`}
+      ${otOn||cp.fixedMonthly?'':`<div class="pl-amt">₪${fmtPayMoney(amt)}</div>`}
     </div>`;
   }).join("") : `<div class="empty">אין משמרות סגורות שנכללות בשכר של ${monthLabel(paySelMonthKey)}. תשלומים והקפה שנרשמו בחודש עדיין מוצגים למעלה.</div>`;
   const totalPay=cp.totalPay;
@@ -5222,11 +5321,11 @@ function renderPayDetail(){
   const hasActivity=Math.abs(totalH)+Math.abs(totalPay)+Math.abs(payTk)+Math.abs(paidNow)>0.005;
   const balanceView=payBalancePresentation(leftToPay, false, hasActivity);
   const wageLabel=payrollWageLabel(cp,e);
-  const balanceBasis=cp.fixedNet ? 'החישוב מבוסס על הנטו החודשי הקבוע, ללא ניכוי נוסף של הפרשות ומסים.' : e.netIsNet
+  const balanceBasis=cp.fixedGross ? 'היתרה מבוססת על נטו משוער שחושב מהברוטו הקבוע, לאחר ניכויים ולפני תשלומים והקפות. הנטו הסופי נקבע בתלוש.' : cp.fixedNet ? 'החישוב מבוסס על הנטו החודשי הקבוע, ללא ניכוי נוסף של הפרשות ומסים.' : e.netIsNet
     ? "החישוב מבוסס על תעריף נטו לשעה."
     : "החישוב מבוסס על ברוטו לפי שעות, לפני ניכויי חובה; הערכת הנטו מוצגת בהמשך.";
   const currentMonthNote=paySelMonthKey===currentMonthKey()
-    ? (cp.fixedNet?' החודש עדיין פתוח. ממוצע הברוטו לשעה יוצג לאחר סיומו.':" החודש עדיין פתוח והסכומים יתעדכנו עם המשמרות הבאות.")
+    ? (cp.fixedMonthly?' החודש עדיין פתוח. ממוצע הברוטו לשעה יוצג לאחר סיומו.':" החודש עדיין פתוח והסכומים יתעדכנו עם המשמרות הבאות.")
     : "";
   const balanceDetail=balanceView.note+(hasActivity?" "+balanceBasis:"")+currentMonthNote;
   const paymentsRows = payList.length ? payList.map(p=>`<div class="hk-row">
@@ -5234,7 +5333,7 @@ function renderPayDetail(){
     <div class="hk-acts"><button class="btn line sm" onclick="delPayment('${paySubEmpId}','${p.id}')">🗑️</button></div>
   </div>`).join("") : '<div class="empty" style="padding:10px">עדיין לא שולם דבר בחודש הזה.</div>';
   box.innerHTML=`
-    <div class="section-title" style="margin:0 0 10px">${monthLabel(paySelMonthKey)} · ${cp.fixedNet?'נטו חודשי קבוע':'₪'+rate+'/שעה'+(e.netIsNet?' נטו':' ברוטו')}${otOn?' · <span class="night-tag">שעות נוספות פעילות</span>':''}</div>
+    <div class="section-title" style="margin:0 0 10px">${monthLabel(paySelMonthKey)} · ${cp.fixedMonthly?(cp.fixedGross?'ברוטו חודשי קבוע':'נטו חודשי קבוע'):'₪'+rate+'/שעה'+(e.netIsNet?' נטו':' ברוטו')}${otOn?' · <span class="night-tag">שעות נוספות פעילות</span>':''}</div>
     <div class="pay-detail-summary ${balanceView.cls}">
       <div class="pds-kicker">סיכום של ${esc(e.name)} · ${monthLabel(paySelMonthKey)}</div>
       <div class="pds-result"><span class="pds-label">${balanceView.label}</span><span class="pds-value">₪${fmtPayMoney(balanceView.amount)}</span></div>
@@ -5260,7 +5359,7 @@ function renderPayDetail(){
       <div class="pay-total-row"><span>סך התשלומים שנרשמו החודש</span><strong>₪${fmtPayMoney(paidNow)}</strong></div>
     </div>
 
-    ${cp.fixedNet?fixedNetSummaryHtml(cp,e,paySelMonthKey):`<div class="pay-wage-breakdown">
+    ${cp.fixedMonthly?fixedSalarySummaryHtml(cp,e,paySelMonthKey):`<div class="pay-wage-breakdown">
       <div class="pay-section-head" style="margin:0 0 10px">איך חושב השכר לפי ההחתמות?</div>
       <div class="pay-sum">
         <div class="ps-row"><span>סך שעות שנכללו</span><span>${fmtHours(totalH)}</span></div>
@@ -5275,7 +5374,7 @@ function renderPayDetail(){
       <div class="pay-extra-body"><div class="pay-extra-lead">רק משמרות סגורות שאינן ממתינות לאישור נכללות בחישוב.</div>${rows}</div>
     </details>
 
-    ${cp.fixedNet?'':`<details class="pay-extra-fold">
+    ${cp.fixedMonthly?'':`<details class="pay-extra-fold">
       <summary><span>${e.netIsNet?'הסבר על תעריף הנטו':'הערכת נטו וניכויי חובה'}</span><span class="pay-extra-chevron">⌄</span></summary>
       <div class="pay-extra-body">
         <div class="pay-extra-lead">מידע בלבד — הערכת הנטו אינה כוללת הקפה או תשלומים שכבר נרשמו, ואינה משנה את היתרה שמופיעה בראש העמוד.</div>
@@ -5283,7 +5382,7 @@ function renderPayDetail(){
       </div>
     </details>`}
 
-    ${list.length||cp.fixedNet?`<div class="pay-export">
+    ${list.length||cp.fixedMonthly?`<div class="pay-export">
       <div class="pay-section-head" style="margin:0 0 10px">דוחות וייצוא לרואה החשבון</div>
       <div class="pay-export-actions">
         <button class="btn" style="flex:1" onclick="imagePayrollAccountant()">📷 דוח לרו"ח (תמונה)</button>
@@ -5325,7 +5424,7 @@ function payReportData(){
   const e=payrollEmployee(paySubEmpId,paySelMonthKey);
   const rate=rateOf(paySubEmpId,paySelMonthKey);
   const list=payShiftsFor(paySubEmpId, paySelMonthKey);
-  if(list.length===0 && e.mode!=='fixedNet'){ toast("אין משמרות לייצוא"); return null; }
+  if(list.length===0 && !isFixedSalary(e.mode)){ toast("אין משמרות לייצוא"); return null; }
   const days=["א","ב","ג","ד","ה","ו","ש"];
   let totalH=0;
   const rows=list.map(s=>{
@@ -5366,8 +5465,8 @@ function accountantReportHtml(D){
   return `<div class="pr-wrap">
     <div class="pr-h1">דוח לרואה החשבון — ${esc(D.e.name)}</div>
     <div class="pr-meta">חודש: ${monthLabel(paySelMonthKey)}<br>הופק בתאריך: ${D.genDate}</div>
-    <div style="margin:0 0 16px;padding:11px 16px;border:2px solid #000;border-radius:8px;display:inline-block;font-weight:800;font-size:17px">${D.ot.fixedNet?'נטו חודשי קבוע: ₪'+D.totalPay:'תעריף לשעה: ₪'+D.rate}</div>
-    ${D.ot.fixedNet?`<div class="pr-meta">נקודות זיכוי: ${D.e.creditPoints==null?2.25:D.e.creditPoints}<br>${contributionSettingsText(D.e,'pension')}<br>${contributionSettingsText(D.e,'studyFund')}<br>הסכום הוא נטו מוסכם. אין להפחית ממנו שוב ניכויי חובה.</div>`:''}
+    <div style="margin:0 0 16px;padding:11px 16px;border:2px solid #000;border-radius:8px;display:inline-block;font-weight:800;font-size:17px">${D.ot.fixedGross?'ברוטו חודשי קבוע: ₪'+D.ot.monthlyGross:D.ot.fixedNet?'נטו חודשי קבוע: ₪'+D.totalPay:'תעריף לשעה: ₪'+D.rate}</div>
+    ${D.ot.fixedMonthly?`<div class="pr-meta">נקודות זיכוי: ${D.e.creditPoints==null?2.25:D.e.creditPoints}<br>${contributionSettingsText(D.e,'pension')}<br>${contributionSettingsText(D.e,'studyFund')}<br>${D.ot.fixedGross?'נטו משוער: ₪'+D.totalPay.toFixed(2)+' — הנטו הסופי נקבע בתלוש.':'הסכום הוא נטו מוסכם. אין להפחית ממנו שוב ניכויי חובה.'}</div>`:''}
     <table class="pr-table">
       <thead><tr><th>תאריך</th><th>יום</th><th>כניסה</th><th>יציאה</th><th>שעות</th></tr></thead>
       <tbody>${rows}</tbody>
@@ -5464,16 +5563,24 @@ function pdfSignedForm(empId, formId){
 /* ============================================================
    11. פעולות מנהל
    ============================================================ */
+function newEmpSyncPayMode(clearAmount){
+  const fixed=$("newEmpPayMode").value==='fixed';
+  $("newEmpFixedFields").classList.toggle('hidden',!fixed);
+  const gross=$("newEmpFixedKind").value==='fixedGross';
+  $("newEmpRateLabel").textContent=fixed?(gross?'ברוטו קבוע לחודש (₪)':'נטו קבוע לחודש (₪)'):'תעריף לשעה (₪)';
+  if(clearAmount) $("newEmpRate").value='';
+}
 function addEmployee(){
   const name=$("newEmpName").value.trim();
-  const rate=parseFloat($("newEmpRate").value);
-  const mode=$("newEmpPayMode").value;
+  const salaryText=String($("newEmpRate").value).trim();
+  const rate=salaryText?Number(salaryText):NaN;
+  const mode=$("newEmpPayMode").value==='fixed'?$("newEmpFixedKind").value:$("newEmpPayMode").value;
   const user=$("newEmpUser").value.trim().toLowerCase();
   const pass=$("newEmpPass").value;
   const pin=$("newEmpPin").value.trim();
   const birth=$("newEmpBirth").value || null;
   if(!name){ toast("יש להזין שם עובד"); return; }
-  if(!Number.isFinite(rate)||rate<0 || !['hourly','fixedNet'].includes(mode)){ toast("יש להזין סכום שכר תקין"); return; }
+  if(!Number.isFinite(rate)||rate<0 || !['hourly','fixedNet','fixedGross'].includes(mode)){ toast("יש להזין סכום שכר תקין"); return; }
   if(!user){ toast("יש להזין שם משתמש לעובד"); return; }
   if(!/^[a-zA-Z0-9._-]+$/.test(user)){ toast("שם המשתמש: אותיות אנגלית, ספרות, . _ - בלבד"); return; }
   if(!pass || pass.length<6){ toast("הסיסמה חייבת להיות לפחות 6 תווים"); return; }
@@ -5488,14 +5595,14 @@ function addEmployee(){
     name, active:true, openShiftId:null, createdAt:TS,
     username:user, tempPassword:pass, authUid:null, linked:false, birthDate:birth
   };
-  updates["secure/rates/"+newId]=mode==='fixedNet'
-    ? {baseline:{mode:'hourly',hourlyRate:0},history:{[currentMonthKey()]:{mode:'fixedNet',hourlyRate:0,monthlyNet:Math.round(rate*100)/100,creditPoints:2.25}}}
+  updates["secure/rates/"+newId]=isFixedSalary(mode)
+    ? {baseline:{mode:'hourly',hourlyRate:0},history:{[currentMonthKey()]:{mode,hourlyRate:0,monthlyNet:mode==='fixedNet'?Math.round(rate*100)/100:0,monthlyGross:mode==='fixedGross'?Math.round(rate*100)/100:0,creditPoints:2.25}}}
     : rate;
   updates["secure/clockPins/"+newId]=pin;
   db.ref().update(updates).then(()=>{
     $("newEmpName").value=""; $("newEmpRate").value="";
     $("newEmpUser").value=""; $("newEmpPass").value=""; $("newEmpPin").value=""; $("newEmpBirth").value="";
-    $("newEmpPayMode").value='hourly'; $("newEmpRateLabel").textContent='תעריף לשעה (₪)';
+    $("newEmpPayMode").value='hourly'; $("newEmpFixedKind").value='fixedNet'; newEmpSyncPayMode(false);
     toast("העובד נוסף ✓ — מסור לו שם משתמש, סיסמה וקוד החתמה");
   });
 }
