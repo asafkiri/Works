@@ -29,14 +29,22 @@ function harness(employee = {}) {
     Date, console, employees: { sample: { name: "עובד לדוגמה", ...employee }, other: { hourlyRate: 40 } },
     shifts: {}, currentRole: "manager", currentEmpId: null, myRate: null, secureRates: {},
     $: element, openModal() {}, closeModal() {}, toast: s => messages.push(s),
-    currentMonthKey: () => "2026-07",
-    db: { ref: key => ({ update: async value => { writes.push({ key, value }); Object.assign(context.employees[key.split("/")[1]], value); } }) },
+    currentMonthKey: () => "2026-07", fmtHours: h => h.toFixed(2),
+    db: { ref: key => ({
+      update: async value => { writes.push({ key, value }); Object.assign(context.employees[key.split("/")[1]], value); },
+      transaction: async updater => {
+        const id=key.split('/')[2];
+        const value=updater(context.secureRates[id]??null);
+        writes.push({key,value}); context.secureRates[id]=value;
+        return {committed:true};
+      },
+    }) },
   });
   const chunks = [
-    section("function rateOf(empId){", "// קוד החתמה לפי עובד"),
+    section("function rateOf(empId, monthKey){", "// קוד החתמה לפי עובד"),
     section("const MIN_DEDUCT_MS =", "function fmtHours(h)"),
     section("function monthTotals(empId, rate){", "// 10ג. משמרות אחרונות"),
-    section("function weekKeyOf(ts){", "// רשימת חודשים שבהם יש לעובד פעילות"),
+    section("function payShiftsFor(empId, monthKey){", "// רשימת חודשים שבהם יש לעובד פעילות"),
   ];
   for (const name of ["pad", "monthKeyOf", "parseIso"]) {
     chunks.push(html.match(new RegExp("^function " + name + "\\([^\\n]*", "m"))[0]);
@@ -144,8 +152,10 @@ test("saving and reopening settings keeps separate bases and only updates the se
   c.netSyncOt();
   assert.equal(el("netContributionOtNote").classList.contains("hidden"), true);
   await c.saveNetSettings();
-  assert.equal(writes.length, 1);
-  assert.equal(writes[0].key, "employees/sample");
+  assert.equal(writes.length, 2);
+  assert.equal(writes[0].key, "secure/rates/sample");
+  assert.equal(writes[1].key, "employees/sample");
+  assert.deepEqual(Object.keys(writes[1].value), ['unpaidBreak']);
   assert.equal(c.employees.other.studyFundOn, undefined);
   c.openNetModal("other");
   assert.equal(el("netStudyFund").checked, false);
@@ -166,4 +176,164 @@ test("invalid active fund rates are rejected without writing employee data", asy
   assert.equal(writes.length, 0);
   assert.equal(messages.length, 4);
   assert.ok(messages.every(m => m.includes("קרן השתלמות")));
+});
+
+async function fixedHarness(amount=10000) {
+  const h=harness(profile);
+  h.context.openNetModal('sample');
+  h.element('netPayMode').value='fixedNet';
+  h.element('netMonthlyAmount').value=String(amount);
+  h.context.netSyncMode();
+  await h.context.saveNetSettings();
+  return h;
+}
+function addRoutine(c,month=6) {
+  for (const [d,start,hours] of [[5,11,9],[6,8,8],[7,11,9],[8,8,8],[9,11,9],[10,8.5,7]]) {
+    const at=+new Date(2026,month,d,Math.floor(start),(start%1)*60);
+    c.shifts[d]={employeeId:'sample',clockIn:at,clockOut:at+hours*3600000};
+  }
+}
+
+test('fixed salary never deducts pension or study fund again, regardless of attendance',async()=>{
+  const {context:c,element:el}=await fixedHarness();
+  assert.equal(el('netCalcFields').classList.contains('hidden'),false);
+  assert.equal(el('netHourlyFields').classList.contains('hidden'),true);
+  assert.equal(c.computeEmpPay('sample','2026-07').totalPay,10000);
+  addRoutine(c);
+  const pay=c.computeEmpPay('sample','2026-07');
+  assert.equal(pay.totalPay,10000);
+  assert.equal(pay.totalH,50);
+  assert.equal(pay.regH,42);
+  assert.equal(pay.ot125H,5);
+  assert.equal(pay.ot150H,3);
+  assert.equal(pay.fixedNet,true);
+  assert.equal(c.fixedNetEquivalent(pay,c.payrollEmployee('sample'),'2026-07'),null);
+  assert.match(c.fixedNetSummaryHtml(pay,c.payrollEmployee('sample'),'2026-07'),/לאחר סיום החודש/);
+  assert.doesNotMatch(c.fixedNetSummaryHtml(pay,c.payrollEmployee('sample'),'2026-07'),/ברוטו משוער|−₪/);
+});
+
+test('inverse hourly gross reproduces the known wage with overtime and both employee funds',async()=>{
+  const {context:c}=await fixedHarness(10058.568825);
+  c.currentMonthKey=()=> '2026-08';
+  const pay={fixedNet:true,totalPay:10058.568825,totalH:50*52/12,regH:42*52/12,ot125H:5*52/12,ot150H:3*52/12};
+  const e=c.payrollEmployee('sample','2026-07');
+  const result=c.fixedNetEquivalent(pay,e,'2026-07');
+  close(result.rate,51);
+  close(result.gross,11657.75);
+  close(result.pension,556.92);
+  close(result.studyFund,232.05);
+  close(result.net,pay.totalPay);
+  const summary=c.fixedNetSummaryHtml(pay,e,'2026-07');
+  assert.match(summary,/שכר בסיס מקביל לשעה/);
+  assert.match(summary,/₪51.00/);
+  assert.doesNotMatch(summary,/ממוצע נטו לשעה/);
+});
+
+test('inverse estimate round-trips tax brackets and independent fund bases',async()=>{
+  const {context:c}=await fixedHarness();
+  c.currentMonthKey=()=> '2026-08';
+  const cp={fixedNet:true,totalH:220,regH:182,ot125H:25,ot150H:13};
+  for(const target of [0,8000,10000,18000]) {
+    for(const pensionBase of ['regular','gross']) {
+      for(const studyFundBase of ['regular','gross']) {
+        const e={...profile,pensionBase,studyFundBase,creditPoints:2.25};
+        const n=c.fixedNetEquivalent({...cp,totalPay:target},e,'2026-07');
+        close(n.net,target);
+        close(n.pension,(pensionBase==='regular'?n.regularGross:n.gross)*.06);
+        close(n.studyFund,(studyFundBase==='regular'?n.regularGross:n.gross)*.025);
+      }
+    }
+  }
+});
+
+test('a new month preserves salary, rate, points and funds from previous months and supports switching back',async()=>{
+  const {context:c,element:el}=await fixedHarness();
+  addRoutine(c);
+  const july=c.computeEmpPay('sample','2026-07');
+  const julyProfile=JSON.stringify(c.payrollProfile('sample','2026-07'));
+  c.currentMonthKey=()=> '2026-08';
+  c.openNetModal('sample');
+  el('netMonthlyAmount').value='12000'; el('netPoints').value='2.25';
+  el('netStudyFund').checked=false;
+  await c.saveNetSettings();
+  assert.equal(JSON.stringify(c.payrollProfile('sample','2026-07')),julyProfile);
+  assert.equal(c.computeEmpPay('sample','2026-07').totalPay,july.totalPay);
+  assert.equal(c.computeEmpPay('sample','2026-08').totalPay,12000);
+  el('netEffectiveMonth').value='2026-09'; c.loadNetMonth();
+  el('netPayMode').value='hourly'; el('netHourlyRate').value='60';
+  await c.saveNetSettings();
+  assert.equal(c.payrollProfile('sample','2026-09').mode,'hourly');
+  assert.equal(c.rateOf('sample','2026-09'),60);
+  assert.equal(c.rateOf('sample','2026-06'),51);
+  assert.equal(c.payrollProfile('sample','2026-06').studyFundOn,true);
+  assert.equal(c.payrollProfile('sample','2026-07').mode,'fixedNet');
+  assert.equal(c.payrollProfile('sample','2026-08').studyFundOn,false);
+  // Editing the current month keeps an independently scheduled future change.
+  c.openNetModal('sample'); el('netMonthlyAmount').value='12500';
+  await c.saveNetSettings();
+  assert.equal(c.rateOf('sample','2026-09'),60);
+});
+
+test('no hours and incomplete attendance produce clear messages without invalid rates',async()=>{
+  const {context:c}=await fixedHarness();
+  c.currentMonthKey=()=> '2026-08';
+  const e=c.payrollEmployee('sample','2026-07');
+  let cp=c.computeEmpPay('sample','2026-07');
+  assert.equal(c.fixedNetEquivalent(cp,e,'2026-07'),null);
+  assert.match(c.fixedNetSummaryHtml(cp,e,'2026-07'),/אין שעות לחישוב/);
+  addRoutine(c);
+  c.shifts[5].pendingReview=true;
+  c.shifts[6].clockOut=null;
+  cp=c.computeEmpPay('sample','2026-07');
+  assert.equal(cp.totalH,33);
+  assert.equal(cp.incomplete,true);
+  assert.equal(cp.totalPay,10000);
+  assert.match(c.fixedNetSummaryHtml(cp,e,'2026-07'),/עדיין לא סופי/);
+});
+
+test('private salary history works in the employee account without storing pay in public employee records',async()=>{
+  const {context:c,writes}=await fixedHarness();
+  const record=c.secureRates.sample;
+  assert.equal(c.employees.sample.monthlyNet,undefined);
+  assert.ok(writes.filter(w=>w.key.startsWith('employees/')).every(w=>!('monthlyNet' in w.value)));
+  c.currentRole='employee'; c.currentEmpId='sample'; c.myRate=record; c.secureRates={};
+  assert.equal(c.computeEmpPay('sample','2026-07').totalPay,10000);
+  assert.equal(c.rateOf('sample','2026-06'),51);
+});
+
+test('invalid monthly amounts and retroactive edits are rejected before any write',()=>{
+  const {context:c,element:el,writes}=harness(profile);
+  c.openNetModal('sample'); el('netPayMode').value='fixedNet';
+  for(const value of ['', '-1','Infinity','10000abc']){
+    el('netMonthlyAmount').value=value; c.saveNetSettings();
+  }
+  el('netMonthlyAmount').value='10000'; el('netEffectiveMonth').value='2026-06'; c.saveNetSettings();
+  assert.equal(writes.length,0);
+});
+
+test('manager view, balances and accountant report use the fixed net without phantom shift wages',async()=>{
+  const {context:c,element:el}=await fixedHarness();
+  addRoutine(c); c.currentMonthKey=()=> '2026-08';
+  Object.assign(c,{
+    paySubEmpId:'sample', paySelMonthKey:'2026-07',
+    takingsListFor:()=>[{chargeCents:50000}], paymentsListFor:()=>[{amount:2000,createdAt:1}],
+    takingsSumFor:()=>500, paymentsSumFor:()=>2000,
+    fmtDate:()=> '05/07/2026', fmtTime:()=> '08:00', monthLabel:k=>k,
+    esc:s=>s, hakafaDataReady:()=>true, giftMoney:n=>(n/100).toFixed(2),StoreGifts:{cents:n=>n*100},
+  });
+  vm.runInContext([
+    section('function payBalanceSnapshot(empId, monthKey){','function payEmployeeSummaryHtml('),
+    section('function renderPayDetail(){','let payFullMonthBusy='),
+    section('function payReportData(){','// ---------- PDF (הדפסה)'),
+  ].join('\n'),c);
+  const balance=c.payBalanceSnapshot('sample','2026-07');
+  assert.equal(balance.wage,10000); assert.equal(balance.balance,7500);
+  c.renderPayDetail();
+  assert.match(el('payBody').innerHTML,/נטו חודשי קבוע/);
+  assert.doesNotMatch(el('payBody').innerHTML,/class="pl-amt"|שכר ברוטו לפי שעות/);
+  const report=c.accountantReportHtml(c.payReportData());
+  assert.match(report,/נטו חודשי קבוע: ₪10000/);
+  assert.doesNotMatch(report,/תעריף לשעה/);
+  c.shifts={};
+  assert.equal(c.payReportData().totalPay,10000);
 });
