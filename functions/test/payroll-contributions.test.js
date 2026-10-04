@@ -450,7 +450,8 @@ test('gross salary and contribution bases stay private and monthly history prese
   el('netEffectiveMonth').value='2026-09'; c.loadNetMonth();
   el('netPayMode').value='hourly'; el('netHourlyRate').value='60'; await c.saveNetSettings();
   assert.equal(c.rateOf('sample','2026-09'),60);
-  assert.equal(c.payrollProfile('sample','2026-09').pensionBase,'regular');
+  assert.equal(c.payrollProfile('sample','2026-09').pensionBase,'amount');
+  assert.equal(c.payrollProfile('sample','2026-09').pensionBaseAmount,7280);
   assert.equal(JSON.stringify(c.payrollProfile('sample','2026-07')),july);
   assert.equal(c.rateOf('sample','2026-06'),51);
   assert.equal(c.employees.sample.monthlyGross,undefined);
@@ -522,4 +523,96 @@ test('creating a monthly gross employee uses the nested option and writes the gr
   assert.equal(record.history['2026-07'].monthlyGross,10314);
   assert.equal(el('newEmpPayMode').value,'hourly');
   assert.equal(el('newEmpFixedFields').classList.contains('hidden'),true);
+});
+
+async function hourlyPayslipHarness() {
+  const h=harness({...profile,hourlyRate:50,creditPoints:2.25});
+  const {context:c,element:el}=h;
+  c.openNetModal('sample');
+  el('netStudyFundBase').value='amount';
+  el('netStudyFundBaseAmount').value='7280';
+  c.netSyncContributionHelp();
+  await c.saveNetSettings();
+  return h;
+}
+
+test('hourly employee can save the payslip study-fund base independently of regular-pay pension',async()=>{
+  const {context:c,element:el,writes}=await hourlyPayslipHarness();
+  const emp=c.payrollEmployee('sample');
+  assert.equal(emp.mode,'hourly'); assert.equal(emp.hourlyRate,50);
+  assert.equal(emp.pensionBase,'regular'); assert.equal(emp.studyFundBase,'amount');
+  assert.equal(emp.studyFundBaseAmount,7280);
+  assert.equal(el('netStudyFundFixedBaseWrap').classList.contains('hidden'),true);
+  assert.equal(el('netStudyFundBaseAmountWrap').classList.contains('hidden'),false);
+  assert.equal(el('netPensionBaseAmountWrap').classList.contains('hidden'),true);
+  const net=c.estimateNet(11350,emp,new Date(2026,6,15),9100);
+  close(net.pension,546); close(net.studyFund,182);
+  assert.match(c.netSummaryHtml(11350,emp,new Date(2026,6,15),9100),/בסיס חודשי מהתלוש · ₪7280/);
+  c.openNetModal('sample');
+  assert.equal(el('netStudyFundBase').value,'amount');
+  assert.equal(el('netStudyFundBaseAmount').value,7280);
+  assert.equal(el('netStudyFundBaseAmountWrap').classList.contains('hidden'),false);
+  addRoutine(c);
+  assert.equal(c.computeEmpPay('sample','2026-07').totalPay,2637.5);
+  assert.equal(c.employees.sample.studyFundBaseAmount,undefined);
+  assert.ok(writes.filter(w=>w.key.startsWith('employees/')).every(w=>Object.keys(w.value).join()==='unpaidBreak'));
+  c.currentRole='employee'; c.currentEmpId='sample'; c.myRate=c.secureRates.sample; c.secureRates={};
+  assert.equal(c.payrollEmployee('sample').studyFundBaseAmount,7280);
+});
+
+test('hourly contribution bases validate each enabled amount and allow zero',async()=>{
+  const {context:c,element:el,writes}=await hourlyPayslipHarness();
+  c.openNetModal('sample');
+  el('netPensionBase').value='amount'; el('netPensionBaseAmount').value='9100';
+  const count=writes.length;
+  for(const [id,valid] of [['netPensionBaseAmount','9100'],['netStudyFundBaseAmount','7280']]){
+    for(const value of ['', '-1', 'Infinity', '7280abc']){
+      el(id).value=value; await c.saveNetSettings(); assert.equal(writes.length,count);
+    }
+    el(id).value=valid;
+  }
+  el('netStudyFundBaseAmount').value='0'; await c.saveNetSettings();
+  const emp=c.payrollEmployee('sample');
+  close(c.estimateNet(11350,emp,new Date(2026,6,15),9100).pension,546);
+  assert.equal(c.estimateNet(11350,emp,new Date(2026,6,15),9100).studyFund,0);
+  el('netStudyFundBase').value='regular'; c.netSyncContributionHelp();
+  assert.equal(el('netStudyFundBaseAmountWrap').classList.contains('hidden'),true);
+});
+
+test('entered monthly bases are capped to calculated gross and an empty hourly month has no fund deductions',async()=>{
+  const {context:c}=await hourlyPayslipHarness(); const emp=c.payrollEmployee('sample');
+  const partial=c.estimateNet(2000,emp,new Date(2026,6,15),1500);
+  close(partial.pension,90); close(partial.studyFund,50);
+  const empty=c.estimateNet(0,emp,new Date(2026,6,15),0);
+  assert.equal(empty.deductions,0); assert.equal(empty.net,0);
+  const off=c.estimateNet(11350,{...emp,studyFundOn:false},new Date(2026,6,15),9100);
+  assert.equal(off.studyFund,0);
+});
+
+test('changing an hourly monthly contribution base preserves earlier months and scheduled future settings',async()=>{
+  const {context:c,element:el}=await hourlyPayslipHarness();
+  const july=JSON.stringify(c.payrollProfile('sample','2026-07'));
+  c.currentMonthKey=()=> '2026-08'; c.openNetModal('sample');
+  el('netStudyFundBaseAmount').value='8000'; await c.saveNetSettings();
+  el('netEffectiveMonth').value='2026-09'; c.loadNetMonth();
+  el('netStudyFundBase').value='gross'; await c.saveNetSettings();
+  c.openNetModal('sample'); el('netStudyFundBaseAmount').value='7500'; await c.saveNetSettings();
+  assert.equal(JSON.stringify(c.payrollProfile('sample','2026-07')),july);
+  assert.equal(c.payrollProfile('sample','2026-08').studyFundBaseAmount,7500);
+  assert.equal(c.payrollProfile('sample','2026-09').studyFundBase,'gross');
+  assert.equal(c.payrollProfile('sample','2026-06').studyFundBase,'regular');
+});
+
+test('an entered contribution base stays usable when switching from hourly to fixed net',async()=>{
+  const {context:c,element:el}=await hourlyPayslipHarness();
+  c.currentMonthKey=()=> '2026-08'; c.openNetModal('sample');
+  el('netPayMode').value='fixed'; el('netFixedKind').value='fixedNet';
+  el('netMonthlyAmount').value='9048'; c.netSyncMode(); await c.saveNetSettings();
+  assert.equal(c.computeEmpPay('sample','2026-08').totalPay,9048);
+  const emp=c.payrollEmployee('sample','2026-08');
+  assert.equal(emp.studyFundBaseAmount,7280);
+  c.currentMonthKey=()=> '2026-09';
+  const result=c.fixedNetEquivalent({fixedNet:true,totalPay:9048,totalH:215,regH:182,ot125H:20,ot150H:13},emp,'2026-08');
+  close(result.net,9048); close(result.studyFund,182);
+  assert.equal(c.payrollProfile('sample','2026-07').mode,'hourly');
 });
