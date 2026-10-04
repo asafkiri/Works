@@ -181,7 +181,8 @@ test("invalid active fund rates are rejected without writing employee data", asy
 async function fixedHarness(amount=10000) {
   const h=harness(profile);
   h.context.openNetModal('sample');
-  h.element('netPayMode').value='fixedNet';
+  h.element('netPayMode').value='fixed';
+  h.element('netFixedKind').value='fixedNet';
   h.element('netMonthlyAmount').value=String(amount);
   h.context.netSyncMode();
   await h.context.saveNetSettings();
@@ -321,7 +322,7 @@ test('private salary history works in the employee account without storing pay i
 
 test('invalid monthly amounts and retroactive edits are rejected before any write',()=>{
   const {context:c,element:el,writes}=harness(profile);
-  c.openNetModal('sample'); el('netPayMode').value='fixedNet';
+  c.openNetModal('sample'); el('netPayMode').value='fixed'; el('netFixedKind').value='fixedNet';
   for(const value of ['', '-1','Infinity','10000abc']){
     el('netMonthlyAmount').value=value; c.saveNetSettings();
   }
@@ -354,4 +355,171 @@ test('manager view, balances and accountant report use the fixed net without pha
   assert.doesNotMatch(report,/תעריף לשעה/);
   c.shifts={};
   assert.equal(c.payReportData().totalPay,10000);
+});
+
+async function grossHarness() {
+  const h=harness({...profile,creditPoints:4.75});
+  const {context:c,element:el}=h;
+  c.openNetModal('sample');
+  el('netPayMode').value='fixed'; el('netFixedKind').value='fixedGross';
+  c.netChangeFixedKind();
+  el('netMonthlyAmount').value='10314';
+  el('netPensionFixedBase').value='amount'; el('netPensionBaseAmount').value='7280';
+  el('netStudyFundFixedBase').value='amount'; el('netStudyFundBaseAmount').value='7280';
+  c.netSyncMode();
+  await c.saveNetSettings();
+  assert.equal(c.payrollProfile('sample').mode,'fixedGross');
+  return h;
+}
+
+test('fixed gross uses the supplied payslip bases and is independent of attendance',async()=>{
+  const {context:c,element:el}=await grossHarness();
+  const emp=c.payrollEmployee('sample');
+  const n=c.estimateNet(10314,emp,new Date(2026,6,15));
+  close(n.pension,436.8); close(n.studyFund,182);
+  close(n.ni,262.8812); close(n.health,383.7956);
+  // The existing estimator does not include the pension income-tax credit.
+  // Do not falsely assert an exact match to the payslip's 9048 net.
+  close(n.incomeTax,29.3); close(n.net,9019.2232);
+  const empty=c.computeEmpPay('sample','2026-07');
+  close(empty.totalPay,9019.22); assert.equal(empty.monthlyGross,10314);
+  assert.equal(empty.fixedGross,true); assert.equal(empty.fixedNet,false);
+  addRoutine(c);
+  const worked=c.computeEmpPay('sample','2026-07');
+  assert.equal(worked.totalPay,empty.totalPay); assert.equal(worked.totalH,50);
+  assert.equal(worked.monthlyGross,10314);
+  assert.equal(el('netHourlyFields').classList.contains('hidden'),true);
+  assert.equal(el('netPensionVariableBaseWrap').classList.contains('hidden'),true);
+  assert.equal(el('netPensionFixedBaseWrap').classList.contains('hidden'),false);
+  assert.equal(el('netContributionOtNote').classList.contains('hidden'),true);
+  const open=c.fixedSalarySummaryHtml(worked,emp,'2026-07');
+  assert.match(open,/לאחר סיום החודש/); assert.match(open,/נטו משוער/);
+  assert.doesNotMatch(open,/ממוצע ברוטו לשעת עבודה/);
+  c.currentMonthKey=()=> '2026-08';
+  const summary=c.fixedSalarySummaryHtml({...worked,totalH:200},emp,'2026-07');
+  assert.match(summary,/₪51.57/); assert.match(summary,/בונוסים ותוספות/);
+  assert.match(summary,/זיכוי על הפקדות לפנסיה/);
+  assert.doesNotMatch(summary,/כל הברוטו המשוער|ברוטו נאמד/);
+  assert.match(c.fixedSalarySummaryHtml({...worked,totalH:0},emp,'2026-07'),/אין שעות לחישוב/);
+  assert.match(c.fixedSalarySummaryHtml({...worked,incomplete:true},emp,'2026-07'),/עדיין לא סופי/);
+});
+
+test('credit and contribution changes affect fixed-gross net, never gross or average per actual hour',async()=>{
+  const {context:c,element:el}=await grossHarness(); addRoutine(c);
+  const before=c.computeEmpPay('sample','2026-07');
+  c.openNetModal('sample'); el('netPoints').value='9'; await c.saveNetSettings();
+  const after=c.computeEmpPay('sample','2026-07');
+  close(after.totalPay-before.totalPay,29.3);
+  assert.equal(after.monthlyGross,before.monthlyGross);
+  const emp=c.payrollEmployee('sample');
+  c.currentMonthKey=()=> '2026-08';
+  assert.match(c.fixedSalarySummaryHtml(after,emp,'2026-07'),/₪206.28/);
+  assert.match(c.fixedSalarySummaryHtml(before,emp,'2026-07'),/₪206.28/);
+  const full=c.estimateNet(10314,{...emp,pensionBase:'gross'},new Date(2026,6,15));
+  close(full.pension,618.84); close(full.studyFund,182);
+  const mixed=c.estimateNet(10314,{...emp,studyFundBase:'amount',studyFundBaseAmount:6000},new Date(2026,6,15));
+  close(mixed.pension,436.8); close(mixed.studyFund,150);
+  const off=c.estimateNet(10314,{...emp,pensionOn:false,studyFundOn:false},new Date(2026,6,15));
+  assert.equal(off.pension,0); assert.equal(off.studyFund,0);
+});
+
+test('saved fixed-net records reopen under the nested choice and switching type requires a new amount',async()=>{
+  const {context:c,element:el,writes}=await fixedHarness(9048);
+  c.openNetModal('sample');
+  assert.equal(el('netPayMode').value,'fixed'); assert.equal(el('netFixedKind').value,'fixedNet');
+  assert.equal(el('netMonthlyAmount').value,9048);
+  el('netFixedKind').value='fixedGross'; c.netChangeFixedKind();
+  assert.equal(el('netMonthlyAmount').value,'');
+  const count=writes.length;
+  await c.saveNetSettings(); assert.equal(writes.length,count);
+  el('netFixedKind').value='fixedNet'; c.netChangeFixedKind();
+  el('netMonthlyAmount').value='9048'; await c.saveNetSettings();
+  assert.equal(c.computeEmpPay('sample','2026-07').totalPay,9048);
+});
+
+test('gross salary and contribution bases stay private and monthly history preserves all three salary modes',async()=>{
+  const {context:c,element:el,writes}=await grossHarness();
+  const july=JSON.stringify(c.payrollProfile('sample','2026-07'));
+  c.currentMonthKey=()=> '2026-08'; c.openNetModal('sample');
+  assert.equal(el('netFixedKind').value,'fixedGross');
+  assert.equal(el('netPensionBaseAmount').value,7280);
+  el('netFixedKind').value='fixedNet'; c.netChangeFixedKind(); el('netMonthlyAmount').value='9048';
+  await c.saveNetSettings();
+  assert.equal(c.payrollProfile('sample','2026-08').mode,'fixedNet');
+  assert.equal(c.computeEmpPay('sample','2026-08').totalPay,9048);
+  el('netEffectiveMonth').value='2026-09'; c.loadNetMonth();
+  el('netPayMode').value='hourly'; el('netHourlyRate').value='60'; await c.saveNetSettings();
+  assert.equal(c.rateOf('sample','2026-09'),60);
+  assert.equal(c.payrollProfile('sample','2026-09').pensionBase,'regular');
+  assert.equal(JSON.stringify(c.payrollProfile('sample','2026-07')),july);
+  assert.equal(c.rateOf('sample','2026-06'),51);
+  assert.equal(c.employees.sample.monthlyGross,undefined);
+  assert.equal(c.employees.sample.pensionBaseAmount,undefined);
+  assert.ok(writes.filter(w=>w.key.startsWith('employees/')).every(w=>Object.keys(w.value).join()==='unpaidBreak'));
+  c.currentRole='employee'; c.currentEmpId='sample'; c.myRate=c.secureRates.sample; c.secureRates={};
+  assert.equal(c.computeEmpPay('sample','2026-07').monthlyGross,10314);
+  assert.equal(c.payrollEmployee('sample','2026-07').pensionBaseAmount,7280);
+});
+
+test('missing, negative, non-finite and oversized contribution bases cannot be saved',async()=>{
+  const {context:c,element:el,writes}=await grossHarness();
+  c.openNetModal('sample'); const count=writes.length;
+  for(const id of ['netPensionBaseAmount','netStudyFundBaseAmount']){
+    for(const value of ['', '-1', 'Infinity', '7280abc', '10315']){
+      el(id).value=value; await c.saveNetSettings(); assert.equal(writes.length,count);
+    }
+    el(id).value='7280';
+  }
+  el('netPensionFixedBase').value='gross'; c.netSyncContributionHelp();
+  assert.equal(el('netPensionBaseAmountWrap').classList.contains('hidden'),true);
+  el('netPensionBaseAmount').value=''; await c.saveNetSettings();
+  assert.equal(writes.length,count+2);
+  assert.equal(c.payrollEmployee('sample').pensionBase,'gross');
+});
+
+test('fixed-gross balances and manager report use estimated net once and retain the entered gross',async()=>{
+  const {context:c,element:el}=await grossHarness(); addRoutine(c);
+  Object.assign(c,{
+    paySubEmpId:'sample',paySelMonthKey:'2026-07',
+    takingsListFor:()=>[{chargeCents:50000}],paymentsListFor:()=>[{amount:2000,createdAt:1}],
+    takingsSumFor:()=>500,paymentsSumFor:()=>2000,
+    fmtDate:()=> '05/07/2026',fmtTime:()=> '08:00',monthLabel:k=>k,
+    esc:s=>s,hakafaDataReady:()=>true,giftMoney:n=>(n/100).toFixed(2),StoreGifts:{cents:n=>n*100},
+  });
+  vm.runInContext([
+    section('function payBalanceSnapshot(empId, monthKey){','function payEmployeeSummaryHtml('),
+    section('function renderPayDetail(){','let payFullMonthBusy='),
+    section('function payReportData(){','// ---------- PDF (הדפסה)'),
+  ].join('\n'),c);
+  const balance=c.payBalanceSnapshot('sample','2026-07');
+  close(balance.wage,9019.22); close(balance.balance,6519.22);
+  c.renderPayDetail();
+  assert.match(el('payBody').innerHTML,/ברוטו חודשי קבוע/);
+  assert.match(el('payBody').innerHTML,/נטו משוער מברוטו קבוע/);
+  assert.doesNotMatch(el('payBody').innerHTML,/class="pl-amt"|שכר ברוטו לפי שעות/);
+  const report=c.accountantReportHtml(c.payReportData());
+  assert.match(report,/ברוטו חודשי קבוע: ₪10314/); assert.match(report,/נטו משוער: ₪9019.22/);
+  assert.match(report,/בסיס חודשי מהתלוש · ₪7280/); assert.doesNotMatch(report,/נטו מוסכם|תעריף לשעה/);
+  c.shifts={}; assert.equal(c.payReportData().ot.monthlyGross,10314);
+});
+
+test('creating a monthly gross employee uses the nested option and writes the gross only to the private node',async()=>{
+  const {context:c,element:el}=harness();
+  const saved=[];
+  Object.assign(c,{TS:123,db:{ref:()=>({push:()=>({key:'created'}),update:async value=>saved.push(value)})}});
+  vm.runInContext(section('function newEmpSyncPayMode(clearAmount){','// הגדרה/שינוי של קוד החתמה'),c);
+  el('newEmpPayMode').value='fixed'; el('newEmpFixedKind').value='fixedGross';
+  c.newEmpSyncPayMode(true);
+  assert.equal(el('newEmpFixedFields').classList.contains('hidden'),false);
+  assert.equal(el('newEmpRateLabel').textContent,'ברוטו קבוע לחודש (₪)');
+  el('newEmpName').value='Test'; el('newEmpRate').value='10314'; el('newEmpUser').value='test';
+  el('newEmpPass').value='example-only'; el('newEmpPin').value='1234';
+  c.addEmployee(); await Promise.resolve();
+  assert.equal(saved.length,1);
+  assert.equal(saved[0]['employees/created'].monthlyGross,undefined);
+  const record=saved[0]['secure/rates/created'];
+  assert.equal(record.history['2026-07'].mode,'fixedGross');
+  assert.equal(record.history['2026-07'].monthlyGross,10314);
+  assert.equal(el('newEmpPayMode').value,'hourly');
+  assert.equal(el('newEmpFixedFields').classList.contains('hidden'),true);
 });
