@@ -851,7 +851,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v85</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v86</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -876,7 +876,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v85</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v86</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -1845,6 +1845,7 @@
             <select id="netPensionBase" onchange="netSyncContributionHelp()">
               <option value="regular">שכר רגיל בלבד</option>
               <option value="gross">שכר רגיל + שעות נוספות</option>
+              <option value="amount">בסיס הפרשה מהתלוש</option>
             </select>
             <p class="net-contribution-help" id="netPensionBaseHelp"></p>
           </div>
@@ -1854,11 +1855,11 @@
               <option value="amount">בסיס הפרשה מהתלוש</option>
               <option value="gross">כל הברוטו החודשי</option>
             </select>
-            <div id="netPensionBaseAmountWrap" style="margin-top:10px">
-              <label class="fld" for="netPensionBaseAmount">בסיס חודשי לפנסיה (₪)</label>
-              <input type="number" id="netPensionBaseAmount" min="0" step="0.01" inputmode="decimal" placeholder="למשל 7280">
-            </div>
-            <p class="net-contribution-help">השכר שממנו מחשבים את האחוז, כפי שמופיע בתלוש. אינו משתנה לפי שעות הנוכחות.</p>
+          </div>
+          <div class="net-field hidden" id="netPensionBaseAmountWrap">
+            <label class="fld" for="netPensionBaseAmount">בסיס חודשי לפנסיה (₪)</label>
+            <input type="number" id="netPensionBaseAmount" min="0" step="0.01" inputmode="decimal" placeholder="למשל 7280">
+            <p class="net-contribution-help">הזינו את השכר שממנו מחשבים את האחוז בתלוש, ולא את סכום הניכוי. זהו בסיס לחודש שלם; בחישוב ההפרשה הוא לא יעלה על הברוטו שחושב לחודש.</p>
           </div>
         </div>
       </div>
@@ -1877,6 +1878,7 @@
             <select id="netStudyFundBase" onchange="netSyncContributionHelp()">
               <option value="regular">שכר רגיל בלבד</option>
               <option value="gross">שכר רגיל + שעות נוספות</option>
+              <option value="amount">בסיס הפרשה מהתלוש</option>
             </select>
             <p class="net-contribution-help" id="netStudyFundBaseHelp"></p>
           </div>
@@ -1886,11 +1888,11 @@
               <option value="amount">בסיס הפרשה מהתלוש</option>
               <option value="gross">כל הברוטו החודשי</option>
             </select>
-            <div id="netStudyFundBaseAmountWrap" style="margin-top:10px">
-              <label class="fld" for="netStudyFundBaseAmount">בסיס חודשי לקרן השתלמות (₪)</label>
-              <input type="number" id="netStudyFundBaseAmount" min="0" step="0.01" inputmode="decimal" placeholder="למשל 7280">
-            </div>
-            <p class="net-contribution-help">השכר שממנו מחשבים את האחוז, כפי שמופיע בתלוש. אינו משתנה לפי שעות הנוכחות.</p>
+          </div>
+          <div class="net-field hidden" id="netStudyFundBaseAmountWrap">
+            <label class="fld" for="netStudyFundBaseAmount">בסיס חודשי לקרן השתלמות (₪)</label>
+            <input type="number" id="netStudyFundBaseAmount" min="0" step="0.01" inputmode="decimal" placeholder="למשל 7280">
+            <p class="net-contribution-help">הזינו את השכר שממנו מחשבים את האחוז בתלוש, ולא את סכום הניכוי. זהו בסיס לחודש שלם; בחישוב ההפרשה הוא לא יעלה על הברוטו שחושב לחודש.</p>
           </div>
         </div>
       </div>
@@ -4816,12 +4818,12 @@ function loadNetMonth(){
   $("netPoints").value = (e.creditPoints!=null ? e.creditPoints : 2.25);
   $("netPension").checked = e.pensionOn===true;
   $("netPensionRate").value = contributionRate(e,'pension');
-  $("netPensionBase").value = contributionBasis(e,'pension')==='gross'?'gross':'regular';
+  $("netPensionBase").value = contributionBasis(e,'pension');
   $("netPensionFixedBase").value = contributionBasis(e,'pension')==='gross'?'gross':'amount';
   $("netPensionBaseAmount").value = e.pensionBaseAmount??'';
   $("netStudyFund").checked = e.studyFundOn===true;
   $("netStudyFundRate").value = contributionRate(e,'studyFund');
-  $("netStudyFundBase").value = contributionBasis(e,'studyFund')==='gross'?'gross':'regular';
+  $("netStudyFundBase").value = contributionBasis(e,'studyFund');
   $("netStudyFundFixedBase").value = contributionBasis(e,'studyFund')==='gross'?'gross':'amount';
   $("netStudyFundBaseAmount").value = e.studyFundBaseAmount??'';
   $("netNiExempt").checked = e.niExempt===true;
@@ -4853,10 +4855,11 @@ function netSyncContributionHelp(){
   for(const prefix of ['netPension','netStudyFund']){
     $(prefix+'VariableBaseWrap').classList.toggle('hidden',gross);
     $(prefix+'FixedBaseWrap').classList.toggle('hidden',!gross);
-    $(prefix+'BaseAmountWrap').classList.toggle('hidden',$(prefix+'FixedBase').value!=='amount');
-    const regular=$(prefix+'Base').value==='regular';
-    $(prefix+'BaseHelp').textContent=regular
-      ? 'ההפרשה תחושב בלי התשלום על שעות נוספות.'
+    const basis=$(prefix+(gross?'FixedBase':'Base')).value;
+    $(prefix+'BaseAmountWrap').classList.toggle('hidden',basis!=='amount');
+    $(prefix+'BaseHelp').textContent=basis==='amount'
+      ? 'ההפרשה תחושב מהבסיס החודשי שתזינו למטה.'
+      : basis==='regular'?'ההפרשה תחושב בלי התשלום על שעות נוספות.'
       : 'ההפרשה תחושב גם מהתשלום על שעות נוספות.';
   }
   const needsOt=($("netPension").checked && $("netPensionBase").value==='regular') ||
@@ -4918,17 +4921,19 @@ function saveNetSettings(){
     if(!Number.isFinite(points) || points<0){ toast("מספר נקודות זיכוי לא תקין"); return; }
     if(pensionOn && (!Number.isFinite(rate)||rate<0||rate>25)){ toast("אחוז פנסיה לא תקין (0–25)"); return; }
     if(studyFundOn && (!Number.isFinite(studyFundRate)||studyFundRate<0||studyFundRate>25)){ toast("אחוז קרן השתלמות לא תקין (0–25)"); return; }
-    const allowedBases=mode==='fixedGross'?['amount','gross']:['regular','gross'];
+    const allowedBases=mode==='fixedGross'?['amount','gross']:['regular','gross','amount'];
     if((pensionOn && !allowedBases.includes(pensionBase)) ||
        (studyFundOn && !allowedBases.includes(studyFundBase))){ toast("יש לבחור מאיזה שכר מחשבים את ההפרשה"); return; }
-    if(mode==='fixedGross'){
-      for(const [prefix,on,base,amount,label] of [
-        ['netPension',pensionOn,pensionBase,pensionBaseAmount,'פנסיה'],
-        ['netStudyFund',studyFundOn,studyFundBase,studyFundBaseAmount,'קרן השתלמות']
-      ]){
-        if(on && base==='amount' && (!String($(prefix+'BaseAmount').value).trim() || !Number.isFinite(amount) || amount<0 || amount>monthlyAmount)){
-          toast('בסיס '+label+' חייב להיות סכום בין 0 לברוטו החודשי'); return;
-        }
+    for(const [prefix,on,base,amount,label] of [
+      ['netPension',pensionOn,pensionBase,pensionBaseAmount,'פנסיה'],
+      ['netStudyFund',studyFundOn,studyFundBase,studyFundBaseAmount,'קרן השתלמות']
+    ]){
+      if(!on || base!=='amount') continue;
+      if(!String($(prefix+'BaseAmount').value).trim() || !Number.isFinite(amount) || amount<0){
+        toast('יש להזין בסיס חודשי תקין ל'+label+' (0 ומעלה)'); return;
+      }
+      if(mode==='fixedGross' && amount>monthlyAmount){
+        toast('בסיס '+label+' חייב להיות סכום בין 0 לברוטו החודשי'); return;
       }
     }
   }
@@ -4938,9 +4943,9 @@ function saveNetSettings(){
   const fields={
     netIsNet:netIsNet, birthDate:birth, creditPoints:points,
     pensionOn:pensionOn, pensionRate:rate, pensionBase:pensionBase,
-    pensionBaseAmount:mode==='fixedGross' && pensionBase==='amount' && Number.isFinite(pensionBaseAmount)?pensionBaseAmount:0,
+    pensionBaseAmount:pensionBase==='amount' && Number.isFinite(pensionBaseAmount)?pensionBaseAmount:0,
     studyFundOn:studyFundOn, studyFundRate:studyFundRate, studyFundBase:studyFundBase,
-    studyFundBaseAmount:mode==='fixedGross' && studyFundBase==='amount' && Number.isFinite(studyFundBaseAmount)?studyFundBaseAmount:0,
+    studyFundBaseAmount:studyFundBase==='amount' && Number.isFinite(studyFundBaseAmount)?studyFundBaseAmount:0,
     niExempt:niExempt, overtimeEnabled:overtime, unpaidBreak:unpaidBreak
   };
   // Use a transaction so simultaneous edits cannot erase another month's history.
