@@ -64,17 +64,14 @@ test("gross cost is exact for gross-based salaries and grossed up for net-based 
   const { context: c } = harness();
   addShifts(c, "grossHourly"); addShifts(c, "netHourly");
   const grossHourly = c.empGrossCost("grossHourly", "2026-07");
-  sameCost(grossHourly, { gross: 4000, regularGross: 4000, estimated: false, unknown: false });
+  sameCost(grossHourly, { gross: 4000, regularGross: 4000, estimated: false, unknown: false, netOnly: false });
 
+  // "Net is net": nothing is defined for the employee, so the net itself is the cost — no gross-up.
   const netHourly = c.empGrossCost("netHourly", "2026-07");
-  assert.equal(netHourly.estimated, true);
-  assert.equal(netHourly.unknown, false);
-  assert.ok(netHourly.gross > 4000, "net hourly must gross up above the net pay");
-  const emp = { ...c.payrollEmployee("netHourly", "2026-07"), netIsNet: false };
-  close(c.estimateNet(netHourly.gross, emp, new Date(2026, 6, 15)).net, 4000, 0.001);
+  sameCost(netHourly, { gross: 4000, regularGross: 4000, estimated: false, unknown: false, netOnly: true });
 
   const fixedGross = c.empGrossCost("fixedGross", "2026-07");
-  sameCost(fixedGross, { gross: 10314, regularGross: 10314, estimated: false, unknown: false });
+  sameCost(fixedGross, { gross: 10314, regularGross: 10314, estimated: false, unknown: false, netOnly: false });
   const fixedGrossNet = c.computeEmpPay("fixedGross", "2026-07").totalPay;
   assert.ok(fixedGrossNet < 10314 && fixedGrossNet > 9000, "fixed gross pays an estimated net below the entered gross");
 
@@ -87,8 +84,8 @@ test("gross cost is exact for gross-based salaries and grossed up for net-based 
 
 test("an empty month costs nothing and the gross-up helper agrees with the per-hour equivalent", () => {
   const { context: c } = harness();
-  sameCost(c.empGrossCost("netHourly", "2026-07"), { gross: 0, regularGross: 0, estimated: false, unknown: false });
-  sameCost(c.empGrossCost("grossHourly", "2026-07"), { gross: 0, regularGross: 0, estimated: false, unknown: false });
+  sameCost(c.empGrossCost("netHourly", "2026-07"), { gross: 0, regularGross: 0, estimated: false, unknown: false, netOnly: true });
+  sameCost(c.empGrossCost("grossHourly", "2026-07"), { gross: 0, regularGross: 0, estimated: false, unknown: false, netOnly: false });
   const emp = c.payrollEmployee("fixedNet", "2026-07");
   const cp = { fixedNet: true, totalPay: 9000, totalH: 180, regH: 160, ot125H: 15, ot150H: 5 };
   const equivalent = c.fixedNetEquivalent(cp, emp, "2026-07");
@@ -106,18 +103,23 @@ test("team totals report the gross cost separately from the balance due and skip
   const t = c.teamMonthTotals("2026-07");
   const expectedGross = ["grossHourly", "netHourly", "fixedNet", "fixedGross"].reduce((s, id) => s + c.empGrossCost(id, "2026-07").gross, 0);
   close(t.grossCost, expectedGross, 0.000001);
-  assert.equal(t.grossEstimatedCount, 2);
+  assert.equal(t.grossEstimatedCount, 1);
   assert.equal(t.grossUnknownCount, 0);
+  assert.equal(t.netOnlyCount, 1);
   assert.equal(t.count, 4);
   close(t.gross, 4000 + 4000 + 9000 + c.computeEmpPay("fixedGross", "2026-07").totalPay);
   close(t.due, t.gross - 1300);
-  assert.ok(t.grossCost > t.gross, "gross cost includes the grossed-up net salaries");
+  assert.ok(t.grossCost > t.gross, "gross cost includes the grossed-up fixed net salary");
+  // Only the fixed-net gross-up and the fixed-gross employee's entered gross lift the gross above the pay totals.
+  const fixedGrossNet = c.computeEmpPay("fixedGross", "2026-07").totalPay;
+  close(t.grossCost - t.gross, (c.empGrossCost("fixedNet", "2026-07").gross - 9000) + (10314 - fixedGrossNet), 0.000001);
 
   c.renderPayTeamSummary();
   const out = el("payTeamSummary").innerHTML;
   assert.match(out, /ברוטו כל העובדים · משוער/);
   assert.match(out, new RegExp("₪" + Math.round(t.grossCost).toLocaleString("he-IL").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-  assert.match(out, /2 עובדים שמוגדרים נטו/);
+  assert.match(out, /עובד אחד שמוגדר ״נטו זה נטו״ נספר בנטו בלבד/);
+  assert.match(out, /אצל עובד אחד עם נטו חודשי קבוע/);
   assert.match(out, /נותר לשלם לצוות/);
   assert.doesNotMatch(out, /לא ניתן היה לאמוד/);
 });
@@ -168,10 +170,16 @@ test("employer cost adds the employer's national insurance, pension, severance a
   close(none.total, 10000 + 521.9773, 0.0001);
 });
 
-test("employer national insurance ignores the employee's exemption, uses youth rates under 18 and stops at the ceiling", () => {
+test("only what is defined for the employee counts: exemption removes employer NI, youth rates under 18, ceiling, net-is-net", () => {
   const { context: c } = harness();
   const asOf = new Date(2026, 6, 15);
-  close(c.estimateEmployerCost(10000, { niExempt: true }, asOf).ni, 521.9773, 0.0001);
+  const exempt = c.estimateEmployerCost(10000, { niExempt: true, pensionOn: true, pensionBase: "gross" }, asOf);
+  assert.equal(exempt.ni, 0);
+  close(exempt.total, 10000 + 650 + 600, 0.0001);
+  const netOnly = c.estimateEmployerCost(4000, { netIsNet: true, pensionOn: true, pensionBase: "gross" }, asOf);
+  assert.equal(netOnly.netOnly, true);
+  assert.equal(netOnly.contributions, 0);
+  assert.equal(netOnly.total, 4000);
   const minor = c.estimateEmployerCost(10000, { birthDate: "2010-01-01" }, asOf);
   assert.equal(minor.isMinor, true);
   close(minor.ni, REDUCED * 0.0061 + (10000 - REDUCED) * 0.0212, 0.0001);
@@ -210,9 +218,11 @@ test("per-employee employer cost builds on the exact or grossed-up gross of each
   close(fixedNet.total, grossUp.gross + adultNi(grossUp.gross) + grossUp.gross * 0.125, 0.0001);
 
   const netHourly = c.empEmployerCost("netHourly", "2026-07");
-  assert.equal(netHourly.estimated, true);
-  assert.ok(netHourly.gross > 4000);
-  close(netHourly.total, netHourly.gross + adultNi(netHourly.gross), 0.0001);
+  assert.equal(netHourly.estimated, false);
+  assert.equal(netHourly.netOnly, true);
+  assert.equal(netHourly.gross, 4000);
+  assert.equal(netHourly.ni, 0);
+  assert.equal(netHourly.total, 4000);
   assert.equal(c.empEmployerCost("fixedGross", "2026-07").regularGross, 10314);
   assert.equal(c.estimateEmployerCost(0, c.payrollEmployee("grossHourly", "2026-07"), asOf).total, 0);
 });
@@ -277,7 +287,26 @@ test("the employee detail page folds in the same employer cost estimate", () => 
   assert.match(fixed, /תגמולי מעסיק \(6.5%\)/);
   assert.match(fixed, /פיצויים \(6%\)/);
 
-  c.shifts = {}; c.paySubEmpId = "grossHourly";
+  // Net is net: the fold shows the net itself as the cost, with no employer additions.
+  addShifts(c, "netHourly");
+  c.paySubEmpId = "netHourly";
+  c.renderPayDetail();
+  const netOnly = el("payBody").innerHTML;
+  assert.match(netOnly, /עלות מעביד · ₪4,000/);
+  assert.match(netOnly, /נטו זה נטו/);
+  assert.match(netOnly, /אין — לא הוגדרו הפרשות/);
+  assert.doesNotMatch(netOnly, /משוערת|ביטוח לאומי · חלק המעסיק/);
+
+  // An employee marked exempt from national insurance has no employer share either.
+  c.employees.grossHourly.niExempt = true;
+  c.paySubEmpId = "grossHourly";
+  c.renderPayDetail();
+  const exempt = el("payBody").innerHTML;
+  assert.match(exempt, /עלות מעביד משוערת · ₪4,000/);
+  assert.match(exempt, /לא מחושב — מסומן פטור/);
+  delete c.employees.grossHourly.niExempt;
+
+  c.shifts = {};
   c.renderPayDetail();
   assert.doesNotMatch(el("payBody").innerHTML, /עלות מעביד משוערת/);
 });
