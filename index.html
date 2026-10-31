@@ -720,8 +720,13 @@
   .team-sum .ts-gross-tile{background:rgba(255,255,255,.92);color:var(--primary-d)}
   .team-sum .ts-gross-tile span{opacity:.78;font-weight:800}
   .team-sum .ts-gross-tile strong{direction:ltr;unicode-bidi:isolate;white-space:nowrap}
-  .team-sum .ts-gross-note{margin:-4px 2px 14px;font-size:12.5px;font-weight:700;line-height:1.5;opacity:.92}
-  .team-sum .ts-gross-note strong{font-weight:800;opacity:1}
+  .team-sum .ts-cost{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.26);border-radius:16px;padding:14px;margin-bottom:14px}
+  .team-sum .ts-cost-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px}
+  .team-sum .ts-cost-label{font-size:15px;font-weight:800}
+  .team-sum .ts-cost-sub{font-size:12px;font-weight:700;opacity:.84;margin-top:2px}
+  .team-sum .ts-cost-amount{font-size:30px;font-weight:800;line-height:1.05;letter-spacing:-.02em;font-variant-numeric:tabular-nums;white-space:nowrap;direction:ltr;unicode-bidi:isolate}
+  .team-sum .ts-cost-grid .ts-calc-item{background:rgba(255,255,255,.12)}
+  .team-sum .ts-cost-note{margin-top:10px;font-size:12px;font-weight:700;line-height:1.5;opacity:.9}
   .team-sum .ts-result{background:#fff;color:var(--ink);border-radius:16px;padding:16px 18px;margin-bottom:14px}
   .team-sum .ts-result-label{font-size:15px;font-weight:800;color:var(--ink-soft)}
   .team-sum .ts-amount{font-size:46px;font-weight:800;line-height:1.05;letter-spacing:-.03em;margin:5px 0 4px;color:var(--primary-d);font-variant-numeric:tabular-nums}
@@ -857,7 +862,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v88</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v89</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -882,7 +887,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v88</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v89</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -1846,6 +1851,15 @@
             <label class="fld" for="netPensionRate">כמה אחוזים יורדים מהעובד?</label>
             <input type="number" id="netPensionRate" inputmode="decimal" step="0.1" min="0" max="25" value="6">
           </div>
+          <div class="net-field">
+            <label class="fld" for="netEmployerPensionRate">חלק המעסיק לתגמולים (%)</label>
+            <input type="number" id="netEmployerPensionRate" inputmode="decimal" step="0.01" min="0" max="25" value="6.5">
+          </div>
+          <div class="net-field">
+            <label class="fld" for="netSeveranceRate">פיצויים (%)</label>
+            <input type="number" id="netSeveranceRate" inputmode="decimal" step="0.01" min="0" max="25" value="6">
+            <p class="net-contribution-help">חלק המעסיק לא יורד מהשכר ומשמש רק לחישוב עלות המעביד. לפי צו ההרחבה: 6.5% תגמולים ו-6% פיצויים; לפיצויים מלאים לפי סעיף 14 מזינים 8.33%.</p>
+          </div>
           <div class="net-field" id="netPensionVariableBaseWrap">
             <label class="fld" for="netPensionBase">מאיזה שכר מחשבים?</label>
             <select id="netPensionBase" onchange="netSyncContributionHelp()">
@@ -1879,6 +1893,11 @@
             <label class="fld" for="netStudyFundRate">כמה אחוזים יורדים מהעובד?</label>
             <input type="number" id="netStudyFundRate" inputmode="decimal" step="0.1" min="0" max="25" value="2.5">
           </div>
+          <div class="net-field">
+            <label class="fld" for="netEmployerStudyFundRate">חלק המעסיק (%)</label>
+            <input type="number" id="netEmployerStudyFundRate" inputmode="decimal" step="0.01" min="0" max="25" value="7.5">
+            <p class="net-contribution-help">לא יורד מהשכר; משמש רק לחישוב עלות המעביד. מקובל 7.5%.</p>
+          </div>
           <div class="net-field" id="netStudyFundVariableBaseWrap">
             <label class="fld" for="netStudyFundBase">מאיזה שכר מחשבים?</label>
             <select id="netStudyFundBase" onchange="netSyncContributionHelp()">
@@ -1903,7 +1922,7 @@
         </div>
       </div>
       <div class="net-basis-warning hidden" id="netContributionOtNote">כדי להפריד בין שכר רגיל לשעות נוספות, יש להפעיל למעלה את ״חישוב שעות נוספות״. כרגע כל השעות מחושבות כרגילות.</div>
-      <p class="net-contribution-help" style="margin:0 0 14px">הגדירו לפי תנאי ההעסקה של העובד. כאן מזינים רק את חלק העובד, שנוכה מהברוטו בחישוב הנטו.</p>
+      <p class="net-contribution-help" style="margin:0 0 14px">הגדירו לפי תנאי ההעסקה של העובד. חלק העובד יורד מהברוטו בחישוב הנטו; חלק המעסיק מתווסף לברוטו בחישוב עלות המעביד.</p>
       <div class="net-toggle-row">
         <span class="lbl">פטור מביטוח לאומי <span style="font-weight:500;color:var(--muted);font-size:12px">(18–21 לפני צבא / חייל)</span></span>
         <label class="switch"><input type="checkbox" id="netNiExempt"><span class="sl"></span></label>
@@ -2088,7 +2107,7 @@ function payrollRecord(empId){
 }
 function payrollSettings(emp){
   const result={};
-  for(const key of ['netIsNet','birthDate','creditPoints','pensionOn','pensionRate','pensionBase','pensionBaseAmount','studyFundOn','studyFundRate','studyFundBase','studyFundBaseAmount','niExempt','overtimeEnabled']){
+  for(const key of ['netIsNet','birthDate','creditPoints','pensionOn','pensionRate','pensionBase','pensionBaseAmount','employerPensionRate','severanceRate','studyFundOn','studyFundRate','studyFundBase','studyFundBaseAmount','employerStudyFundRate','niExempt','overtimeEnabled']){
     if(emp[key]!=null) result[key]=emp[key];
     else if(key==='birthDate') result[key]='';
   }
@@ -2153,17 +2172,26 @@ function fixedNetEquivalent(cp, emp, monthKey){
 // כמה עלה העובד למעסיק בברוטו החודש, לפני תשלומים והקפות.
 // ברוטו קבוע ושכר ברוטו לפי שעות הם סכומים מדויקים; נטו קבוע ונטו לפי שעות מגולמים לברוטו משוער.
 // cp: תוצאת computeEmpPay (אופציונלי, כדי לא לחשב פעמיים).
+// regularGross: החלק מהברוטו שנחשב שכר רגיל (בלי שעות נוספות) — לבסיסי ההפרשות של חלק המעסיק.
 function empGrossCost(empId, monthKey, cp){
   cp=cp||computeEmpPay(empId, monthKey);
   const e=payrollEmployee(empId, monthKey);
-  if(cp.fixedGross) return {gross:cp.monthlyGross, estimated:false, unknown:false};
-  if(!cp.fixedNet && !e.netIsNet) return {gross:cp.totalPay, estimated:false, unknown:false};
-  if(!(cp.totalPay>0)) return {gross:0, estimated:false, unknown:false};
+  if(cp.fixedGross) return {gross:cp.monthlyGross, regularGross:cp.monthlyGross, estimated:false, unknown:false};
+  if(!cp.fixedNet && !e.netIsNet) return {gross:cp.totalPay, regularGross:Math.min(cp.totalPay,(cp.regH||0)*(cp.rate||0)), estimated:false, unknown:false};
+  if(!(cp.totalPay>0)) return {gross:0, regularGross:0, estimated:false, unknown:false};
   const weighted=(cp.regH||0)+(cp.ot125H||0)*1.25+(cp.ot150H||0)*1.5;
   const share=weighted>0?(cp.regH||0)/weighted:1;
   const result=grossUpFromNet(cp.totalPay,{...e,netIsNet:false},monthRefDate(monthKey),share);
-  if(!result) return {gross:cp.totalPay, estimated:true, unknown:true};
-  return {gross:result.gross, estimated:true, unknown:false};
+  if(!result) return {gross:cp.totalPay, regularGross:cp.totalPay*share, estimated:true, unknown:true};
+  return {gross:result.gross, regularGross:result.regularGross, estimated:true, unknown:false};
+}
+// עלות מעביד משוערת לעובד לחודש: הברוטו (מדויק או מגולם) ועליו חלק המעסיק בביטוח לאומי ובהפרשות.
+function empEmployerCost(empId, monthKey, cp){
+  cp=cp||computeEmpPay(empId, monthKey);
+  const e=payrollEmployee(empId, monthKey);
+  const g=empGrossCost(empId, monthKey, cp);
+  const cost=estimateEmployerCost(g.gross, e, monthRefDate(monthKey), g.regularGross);
+  return {...cost, estimated:g.estimated, unknown:g.unknown};
 }
 function fixedNetSummaryHtml(cp, emp, monthKey){
   if(!cp.fixedNet) return '';
@@ -2767,6 +2795,14 @@ function renderTaxSettings(){
       <div class="net-field"><label class="fld">מס בריאות — מדרגה מלאה (%)</label><input type="number" id="txHealthFull" inputmode="decimal" step="0.01" min="0" max="100" value="${pct(T.healthFull)}"></div>
     </div>
     <div class="card">
+      <h2>אחוזי ביטוח לאומי (חלק המעסיק)</h2>
+      <p class="sub">משמש לחישוב עלות המעביד בלבד. עובד שטרם מלאו לו 18: המעסיק משלם שיעור מופחת ואין ניכוי מהעובד.</p>
+      <div class="net-field"><label class="fld">מעסיק — מדרגה מופחתת (%)</label><input type="number" id="txNiEmployerRed" inputmode="decimal" step="0.01" min="0" max="100" value="${pct(T.niEmployerRed)}"></div>
+      <div class="net-field"><label class="fld">מעסיק — מדרגה מלאה (%)</label><input type="number" id="txNiEmployerFull" inputmode="decimal" step="0.01" min="0" max="100" value="${pct(T.niEmployerFull)}"></div>
+      <div class="net-field"><label class="fld">מעסיק לעובד מתחת ל-18 — מדרגה מופחתת (%)</label><input type="number" id="txNiMinorRed" inputmode="decimal" step="0.01" min="0" max="100" value="${pct(T.niMinorRed)}"></div>
+      <div class="net-field"><label class="fld">מעסיק לעובד מתחת ל-18 — מדרגה מלאה (%)</label><input type="number" id="txNiMinorFull" inputmode="decimal" step="0.01" min="0" max="100" value="${pct(T.niMinorFull)}"></div>
+    </div>
+    <div class="card">
       <h2>מדרגות מס הכנסה</h2>
       <p class="sub">לכל מדרגה: עד איזה סכום חודשי היא חלה, ואיזה אחוז מס. המדרגה האחרונה חלה על כל מה שמעבר.</p>
       ${bracketsRows}
@@ -2789,7 +2825,11 @@ function saveTaxSettings(){
   const niEmpFull  = toNum(val("txNiEmpFull"));
   const healthRed  = toNum(val("txHealthRed"));
   const healthFull = toNum(val("txHealthFull"));
-  const pctFields = {niEmpRed, niEmpFull, healthRed, healthFull};
+  const niEmployerRed  = toNum(val("txNiEmployerRed"));
+  const niEmployerFull = toNum(val("txNiEmployerFull"));
+  const niMinorRed     = toNum(val("txNiMinorRed"));
+  const niMinorFull    = toNum(val("txNiMinorFull"));
+  const pctFields = {niEmpRed, niEmpFull, healthRed, healthFull, niEmployerRed, niEmployerFull, niMinorRed, niMinorFull};
   const moneyFields = {creditPointValue, niReducedCeil, niMaxCeil};
   for(const k in moneyFields){ if(moneyFields[k]==null || moneyFields[k]<0){ toast("יש למלא את כל הסכומים במספרים תקינים"); return; } }
   for(const k in pctFields){ if(pctFields[k]==null || pctFields[k]<0 || pctFields[k]>100){ toast("אחוז לא תקין (חייב להיות בין 0 ל-100)"); return; } }
@@ -2813,6 +2853,8 @@ function saveTaxSettings(){
     creditPointValue, niReducedCeil, niMaxCeil,
     niEmpRed: niEmpRed/100, niEmpFull: niEmpFull/100,
     healthRed: healthRed/100, healthFull: healthFull/100,
+    niEmployerRed: niEmployerRed/100, niEmployerFull: niEmployerFull/100,
+    niMinorRed: niMinorRed/100, niMinorFull: niMinorFull/100,
     brackets, updatedAt: Date.now()
   };
   uiConfirm("לשמור את הגדרות המס? מעכשיו החישוב באפליקציה ישתמש בערכים האלה במקום ברירת המחדל.", {okText:"שמור", title:"שמירת הגדרות מס"}).then(ok=>{
@@ -4672,6 +4714,11 @@ const NI_MAX_CEIL = 51910;                 // תקרת הכנסה לדמי בי�
 // חלק העובד (כולל תיקון 252):
 const NI_EMP_RED = 0.0104, NI_EMP_FULL = 0.07;     // ביטוח לאומי
 const HEALTH_RED = 0.0323, HEALTH_FULL = 0.0517;   // מס בריאות
+// חלק המעסיק בביטוח לאומי (לעלות מעביד): עובד מגיל 18, ועובד שטרם מלאו לו 18 (המעסיק בלבד, ללא בריאות)
+const NI_EMPLOYER_RED = 0.0451, NI_EMPLOYER_FULL = 0.076;
+const NI_MINOR_RED = 0.0061, NI_MINOR_FULL = 0.0212;
+// ברירות מחדל לחלק המעסיק בהפרשות (אחוז מבסיס ההפרשה): תגמולים, פיצויים, קרן השתלמות
+const EMPLOYER_PENSION_RATE = 6.5, SEVERANCE_RATE = 6, EMPLOYER_STUDY_FUND_RATE = 7.5;
 // מדרגות מס הכנסה חודשיות (יגיעה אישית) — לאחר ריווח 2026
 const TAX_BRACKETS = [
   {upTo:7010,     rate:0.10},
@@ -4710,6 +4757,10 @@ function txParams(){
     niEmpFull:        numOr(c.niEmpFull,        NI_EMP_FULL),
     healthRed:        numOr(c.healthRed,        HEALTH_RED),
     healthFull:       numOr(c.healthFull,       HEALTH_FULL),
+    niEmployerRed:    numOr(c.niEmployerRed,    NI_EMPLOYER_RED),
+    niEmployerFull:   numOr(c.niEmployerFull,   NI_EMPLOYER_FULL),
+    niMinorRed:       numOr(c.niMinorRed,       NI_MINOR_RED),
+    niMinorFull:      numOr(c.niMinorFull,      NI_MINOR_FULL),
     brackets
   };
 }
@@ -4745,6 +4796,19 @@ function contributionRate(emp, kind){
   const rate=value==null?fallback:Number(value);
   return Number.isFinite(rate) && rate>=0 && rate<=25 ? rate : fallback;
 }
+// בסיס ההפרשה בפועל לחודש לפי הבחירה (שכר רגיל / כל הברוטו / סכום מהתלוש), ולעולם לא יותר מהברוטו.
+function contributionBaseAmount(emp, kind, gross, regularGross){
+  const basis=contributionBasis(emp,kind);
+  if(basis==='amount') return Math.min(gross,Math.max(0,Number(emp[kind+'BaseAmount'])||0));
+  return basis==='regular'?regularGross:gross;
+}
+// חלק המעסיק בהפרשות (אחוז מבסיס ההפרשה). kind: 'employerPension' | 'severance' | 'employerStudyFund'
+function employerRate(emp, kind){
+  const fallback=kind==='employerPension'?EMPLOYER_PENSION_RATE:kind==='severance'?SEVERANCE_RATE:EMPLOYER_STUDY_FUND_RATE;
+  const value=emp && emp[kind+'Rate'];
+  const rate=value==null?fallback:Number(value);
+  return Number.isFinite(rate) && rate>=0 && rate<=25 ? rate : fallback;
+}
 function contributionBasisLabel(basis){
   return basis==='amount'?'בסיס חודשי מהתלוש':basis==='regular'?'שכר רגיל בלבד':'כל הברוטו';
 }
@@ -4766,11 +4830,8 @@ function estimateNet(gross, emp, asOf, regularGross){
   const age=ageAtDate(emp.birthDate, asOf);
   const isMinor = (age!=null && age<18);
   let incomeTax=0, ni=0, health=0, pension=0, studyFund=0;
-  const baseFor=kind=>contributionBasis(emp,kind)==='amount'
-    ? Math.min(gross,Math.max(0,Number(emp[kind+'BaseAmount'])||0))
-    : contributionBasis(emp,kind)==='regular'?regularGross:gross;
-  const pensionBaseAmount=baseFor('pension');
-  const studyFundBaseAmount=baseFor('studyFund');
+  const pensionBaseAmount=contributionBaseAmount(emp,'pension',gross,regularGross);
+  const studyFundBaseAmount=contributionBaseAmount(emp,'studyFund',gross,regularGross);
   if(!isMinor){
     const T = txParams();
     const points = (emp.creditPoints!=null ? Number(emp.creditPoints) : 2.25);
@@ -4787,6 +4848,27 @@ function estimateNet(gross, emp, asOf, regularGross){
   if(emp.studyFundOn) studyFund=studyFundBaseAmount*contributionRate(emp,'studyFund')/100;
   const deductions = incomeTax+ni+health+pension+studyFund;
   return {gross, regularGross, age, isMinor, incomeTax, ni, health, niHealth:ni+health, pension, studyFund, pensionBaseAmount, studyFundBaseAmount, deductions, net:Math.max(0,gross-deductions)};
+}
+// עלות מעביד משוערת לחודש: ברוטו + ביטוח לאומי (חלק המעסיק) + תגמולים ופיצויים + קרן השתלמות (חלק המעסיק).
+// gross: ברוטו חודשי; regularGross: החלק שנחשב שכר רגיל לבסיסי ההפרשה. הפטור של העובד מביטוח לאומי
+// אינו משנה את חלק המעסיק; לעובד שטרם מלאו לו 18 המעסיק משלם שיעור מופחת. הערכה בלבד — התלוש והדיווח קובעים.
+function estimateEmployerCost(gross, emp, asOf, regularGross){
+  emp=emp||{}; asOf=asOf||new Date(); gross=Math.max(0, Number(gross)||0);
+  regularGross=regularGross==null?gross:Math.min(gross,Math.max(0,Number(regularGross)||0));
+  const T=txParams();
+  const age=ageAtDate(emp.birthDate, asOf);
+  const isMinor=(age!=null && age<18);
+  const capped=Math.min(gross, T.niMaxCeil);
+  const red=Math.min(capped, T.niReducedCeil);
+  const full=Math.max(0, capped-T.niReducedCeil);
+  const ni=isMinor ? red*T.niMinorRed + full*T.niMinorFull : red*T.niEmployerRed + full*T.niEmployerFull;
+  const pensionBase=emp.pensionOn?contributionBaseAmount(emp,'pension',gross,regularGross):0;
+  const studyFundBase=emp.studyFundOn?contributionBaseAmount(emp,'studyFund',gross,regularGross):0;
+  const pension=pensionBase*employerRate(emp,'employerPension')/100;
+  const severance=pensionBase*employerRate(emp,'severance')/100;
+  const studyFund=studyFundBase*employerRate(emp,'employerStudyFund')/100;
+  const contributions=ni+pension+severance+studyFund;
+  return {gross, regularGross, isMinor, ni, pension, severance, studyFund, pensionBase, studyFundBase, contributions, total:gross+contributions};
 }
 // תאריך ייחוס לגיל לפי מפתח חודש "YYYY-MM" (אמצע החודש)
 function monthRefDate(monthKey){
@@ -4859,11 +4941,14 @@ function loadNetMonth(){
   $("netPoints").value = (e.creditPoints!=null ? e.creditPoints : 2.25);
   $("netPension").checked = e.pensionOn===true;
   $("netPensionRate").value = contributionRate(e,'pension');
+  $("netEmployerPensionRate").value = employerRate(e,'employerPension');
+  $("netSeveranceRate").value = employerRate(e,'severance');
   $("netPensionBase").value = contributionBasis(e,'pension');
   $("netPensionFixedBase").value = contributionBasis(e,'pension')==='gross'?'gross':'amount';
   $("netPensionBaseAmount").value = e.pensionBaseAmount??'';
   $("netStudyFund").checked = e.studyFundOn===true;
   $("netStudyFundRate").value = contributionRate(e,'studyFund');
+  $("netEmployerStudyFundRate").value = employerRate(e,'employerStudyFund');
   $("netStudyFundBase").value = contributionBasis(e,'studyFund');
   $("netStudyFundFixedBase").value = contributionBasis(e,'studyFund')==='gross'?'gross':'amount';
   $("netStudyFundBaseAmount").value = e.studyFundBaseAmount??'';
@@ -4949,10 +5034,13 @@ function saveNetSettings(){
   let points=parseFloat($("netPoints").value);
   const pensionOn=$("netPension").checked;
   let rate=parseFloat($("netPensionRate").value);
+  let employerPensionRate=parseFloat($("netEmployerPensionRate").value);
+  let severanceRate=parseFloat($("netSeveranceRate").value);
   const pensionBase=$(mode==='fixedGross'?'netPensionFixedBase':'netPensionBase').value;
   const pensionBaseAmount=Number($("netPensionBaseAmount").value);
   const studyFundOn=$("netStudyFund").checked;
   let studyFundRate=parseFloat($("netStudyFundRate").value);
+  let employerStudyFundRate=parseFloat($("netEmployerStudyFundRate").value);
   const studyFundBase=$(mode==='fixedGross'?'netStudyFundFixedBase':'netStudyFundBase').value;
   const studyFundBaseAmount=Number($("netStudyFundBaseAmount").value);
   const niExempt=$("netNiExempt").checked;
@@ -4962,6 +5050,9 @@ function saveNetSettings(){
     if(!Number.isFinite(points) || points<0){ toast("מספר נקודות זיכוי לא תקין"); return; }
     if(pensionOn && (!Number.isFinite(rate)||rate<0||rate>25)){ toast("אחוז פנסיה לא תקין (0–25)"); return; }
     if(studyFundOn && (!Number.isFinite(studyFundRate)||studyFundRate<0||studyFundRate>25)){ toast("אחוז קרן השתלמות לא תקין (0–25)"); return; }
+    if(pensionOn && (!Number.isFinite(employerPensionRate)||employerPensionRate<0||employerPensionRate>25)){ toast("אחוז תגמולי המעסיק לא תקין (0–25)"); return; }
+    if(pensionOn && (!Number.isFinite(severanceRate)||severanceRate<0||severanceRate>25)){ toast("אחוז הפיצויים לא תקין (0–25)"); return; }
+    if(studyFundOn && (!Number.isFinite(employerStudyFundRate)||employerStudyFundRate<0||employerStudyFundRate>25)){ toast("אחוז קרן ההשתלמות של המעסיק לא תקין (0–25)"); return; }
     const allowedBases=mode==='fixedGross'?['amount','gross']:['regular','gross','amount'];
     if((pensionOn && !allowedBases.includes(pensionBase)) ||
        (studyFundOn && !allowedBases.includes(studyFundBase))){ toast("יש לבחור מאיזה שכר מחשבים את ההפרשה"); return; }
@@ -4981,12 +5072,17 @@ function saveNetSettings(){
   if(isNaN(points)) points=2.25;
   if(!Number.isFinite(rate) || rate<0 || rate>25) rate=6;
   if(!Number.isFinite(studyFundRate) || studyFundRate<0 || studyFundRate>25) studyFundRate=2.5;
+  if(!Number.isFinite(employerPensionRate) || employerPensionRate<0 || employerPensionRate>25) employerPensionRate=EMPLOYER_PENSION_RATE;
+  if(!Number.isFinite(severanceRate) || severanceRate<0 || severanceRate>25) severanceRate=SEVERANCE_RATE;
+  if(!Number.isFinite(employerStudyFundRate) || employerStudyFundRate<0 || employerStudyFundRate>25) employerStudyFundRate=EMPLOYER_STUDY_FUND_RATE;
   const fields={
     netIsNet:netIsNet, birthDate:birth, creditPoints:points,
     pensionOn:pensionOn, pensionRate:rate, pensionBase:pensionBase,
     pensionBaseAmount:pensionBase==='amount' && Number.isFinite(pensionBaseAmount)?pensionBaseAmount:0,
+    employerPensionRate:employerPensionRate, severanceRate:severanceRate,
     studyFundOn:studyFundOn, studyFundRate:studyFundRate, studyFundBase:studyFundBase,
     studyFundBaseAmount:studyFundBase==='amount' && Number.isFinite(studyFundBaseAmount)?studyFundBaseAmount:0,
+    employerStudyFundRate:employerStudyFundRate,
     niExempt:niExempt, overtimeEnabled:overtime, unpaidBreak:unpaidBreak
   };
   // Use a transaction so simultaneous edits cannot erase another month's history.
@@ -5224,6 +5320,7 @@ function payEmployeeSummaryHtml(e, monthKey, openFn){
 function teamMonthTotals(monthKey){
   let hours=0, gross=0, paid=0, takings=0, due=0, overpaid=0, hakafaOverCount=0, count=0;
   let grossCost=0, grossEstimatedCount=0, grossUnknownCount=0;
+  const employerCost={gross:0, ni:0, pension:0, severance:0, studyFund:0, contributions:0, total:0};
   Object.keys(employees).forEach(id=>{
     const e=employees[id]; if(!e || e.active===false) return;
     count++;
@@ -5232,15 +5329,16 @@ function teamMonthTotals(monthKey){
     const empTakings=takingsSumFor(id, monthKey);
     const empBalance=cp.totalPay-empPaid-empTakings;
     hours+=cp.totalH; gross+=cp.totalPay; paid+=empPaid; takings+=empTakings;
-    const cost=empGrossCost(id, monthKey, cp);
+    const cost=empEmployerCost(id, monthKey, cp);
     grossCost+=cost.gross;
+    Object.keys(employerCost).forEach(k=>{ employerCost[k]+=cost[k]; });
     if(cost.estimated) grossEstimatedCount++;
     if(cost.unknown) grossUnknownCount++;
     if(cp.totalPay>0 && empTakings>cp.totalPay*0.25) hakafaOverCount++;
     if(empBalance>=0) due+=empBalance;
     else overpaid+=Math.abs(empBalance);
   });
-  return {hours, gross, paid, takings, due, overpaid, hakafaOverCount, remaining:gross-paid, count, grossCost, grossEstimatedCount, grossUnknownCount};
+  return {hours, gross, paid, takings, due, overpaid, hakafaOverCount, remaining:gross-paid, count, grossCost, grossEstimatedCount, grossUnknownCount, employerCost};
 }
 // סך ההקפות של כל הצוות (עובדים פעילים) לחודש מסוים
 function teamTakingsSum(monthKey){
@@ -5266,8 +5364,9 @@ function renderPayTeamSummary(){
   const teamBasis="אצל עובדים שמוגדרים ברוטו, היתרה היא לפני ניכויי חובה.";
   const teamResultNote=p.note+(hasActivity?" "+teamBasis:"");
   const grossEstimated=t.grossEstimatedCount>0;
-  const grossNote=!hasActivity ? "עוד לא נצבר שכר החודש."
-    : "סך השכר ברוטו של כל העובדים הפעילים החודש, לפני תשלומים, הקפות וניכויים."
+  const ec=t.employerCost;
+  const costNote=!hasActivity ? "עוד לא נצבר שכר החודש."
+    : "הברוטו של כל העובדים הפעילים, ועליו חלק המעסיק בביטוח לאומי, בפנסיה ובפיצויים ובקרן השתלמות לפי ההגדרות של כל עובד. הערכה לפני תשלומים והקפות; הסכום הסופי נקבע בתלושים ובדיווח לביטוח לאומי."
       +(grossEstimated?` אצל ${t.grossEstimatedCount===1?'עובד אחד שמוגדר':t.grossEstimatedCount+' עובדים שמוגדרים'} נטו, הברוטו נאמד מהנטו לפי הגדרות המס וההפרשות ועשוי להיות שונה מהתלוש.`:'')
       +(t.grossUnknownCount>0?` אצל ${t.grossUnknownCount===1?'עובד אחד':t.grossUnknownCount+' עובדים'} לא ניתן היה לאמוד ברוטו, ונספר הנטו בלבד.`:'');
   el.innerHTML=`<div class="team-sum ${p.cls}">
@@ -5283,7 +5382,19 @@ function renderPayTeamSummary(){
       <div class="ts-amount">₪${fmtPayMoney(p.amount)}</div>
       <div class="ts-result-note">${teamResultNote}</div>
     </div>
-    <div class="ts-gross-note"><strong>ברוטו כל העובדים ₪${fmtPayMoney(t.grossCost)}</strong> · ${grossNote}</div>
+    <div class="ts-cost">
+      <div class="ts-cost-head">
+        <div><div class="ts-cost-label">עלות מעביד${grossEstimated?' · משוער':''}</div><div class="ts-cost-sub">כמה המעביד מוציא על משכורות החודש</div></div>
+        <div class="ts-cost-amount">₪${fmtPayMoney(ec.total)}</div>
+      </div>
+      <div class="ts-calc-grid ts-cost-grid">
+        <div class="ts-calc-item"><span class="k">ברוטו כל העובדים</span><span class="v">₪${fmtPayMoney(ec.gross)}</span></div>
+        <div class="ts-calc-item plus"><span class="k">ביטוח לאומי · חלק המעסיק</span><span class="v">₪${fmtPayMoney(ec.ni)}</span></div>
+        <div class="ts-calc-item plus"><span class="k">פנסיה ופיצויים · חלק המעסיק</span><span class="v">₪${fmtPayMoney(ec.pension+ec.severance)}</span></div>
+        ${ec.studyFund>0.005?`<div class="ts-calc-item plus"><span class="k">קרן השתלמות · חלק המעסיק</span><span class="v">₪${fmtPayMoney(ec.studyFund)}</span></div>`:''}
+      </div>
+      <div class="ts-cost-note">${costNote}</div>
+    </div>
     <div class="ts-calc-title">כך חושבה היתרה לתשלום</div>
     <div class="ts-calc-grid">
       <div class="ts-calc-item"><span class="k">שכר לפי המסלול של כל עובד</span><span class="v">₪${fmtPayMoney(t.gross)}</span></div>
@@ -5389,6 +5500,22 @@ function renderPayDetail(){
     ? (cp.fixedMonthly?' החודש עדיין פתוח. ממוצע הברוטו לשעה יוצג לאחר סיומו.':" החודש עדיין פתוח והסכומים יתעדכנו עם המשמרות הבאות.")
     : "";
   const balanceDetail=balanceView.note+(hasActivity?" "+balanceBasis:"")+currentMonthNote;
+  const ecost=empEmployerCost(paySubEmpId, paySelMonthKey, cp);
+  const employerFold=hasActivity && ecost.gross>0 ? `<details class="pay-extra-fold">
+      <summary><span>עלות מעביד משוערת · ₪${fmtPayMoney(ecost.total)}</span><span class="pay-extra-chevron">⌄</span></summary>
+      <div class="pay-extra-body">
+        <div class="pay-extra-lead">כמה העובד עולה למעסיק החודש: הברוטו${ecost.estimated?' המשוער':''} ועליו חלק המעסיק. הערכה לפי ההגדרות שנשמרו לעובד, לפני תשלומים והקפות; התלוש והדיווח לביטוח לאומי קובעים.</div>
+        <div class="net-box">
+          <div class="nb-row"><span>ברוטו${ecost.estimated?' משוער':''}</span><span>₪${fmtPayMoney(ecost.gross)}</span></div>
+          <div class="nb-row"><span>ביטוח לאומי · חלק המעסיק${ecost.isMinor?' (מתחת לגיל 18)':''}</span><span>₪${fmtPayMoney(ecost.ni)}</span></div>
+          ${e.pensionOn?`<div class="nb-row"><span>תגמולי מעסיק (${employerRate(e,'employerPension')}%)</span><span>₪${fmtPayMoney(ecost.pension)}</span></div>
+          <div class="nb-row"><span>פיצויים (${employerRate(e,'severance')}%)</span><span>₪${fmtPayMoney(ecost.severance)}</span></div>`
+          :`<div class="nb-row"><span>פנסיה ופיצויים</span><span>לא הוגדרה פנסיה לעובד</span></div>`}
+          ${e.studyFundOn?`<div class="nb-row"><span>קרן השתלמות · חלק המעסיק (${employerRate(e,'employerStudyFund')}%)</span><span>₪${fmtPayMoney(ecost.studyFund)}</span></div>`:''}
+          <div class="nb-net"><span>עלות מעביד משוערת</span><span class="v">₪${fmtPayMoney(ecost.total)}</span></div>
+        </div>
+      </div>
+    </details>` : '';
   const paymentsRows = payList.length ? payList.map(p=>`<div class="hk-row">
     <div class="hk-main"><div class="hk-name">₪${fmtPayMoney(Number(p.amount)||0)}${p.note?` · ${esc(p.note)}`:''}</div><div class="hk-date">${fmtDate(p.createdAt)}</div></div>
     <div class="hk-acts"><button class="btn line sm" onclick="delPayment('${paySubEmpId}','${p.id}')">🗑️</button></div>
@@ -5442,6 +5569,8 @@ function renderPayDetail(){
         ${netSummaryHtml(totalPay, e, monthRefDate(paySelMonthKey), cp.regH*cp.rate)}
       </div>
     </details>`}
+
+    ${employerFold}
 
     ${list.length||cp.fixedMonthly?`<div class="pay-export">
       <div class="pay-section-head" style="margin:0 0 10px">דוחות וייצוא לרואה החשבון</div>

@@ -64,7 +64,7 @@ test("gross cost is exact for gross-based salaries and grossed up for net-based 
   const { context: c } = harness();
   addShifts(c, "grossHourly"); addShifts(c, "netHourly");
   const grossHourly = c.empGrossCost("grossHourly", "2026-07");
-  sameCost(grossHourly, { gross: 4000, estimated: false, unknown: false });
+  sameCost(grossHourly, { gross: 4000, regularGross: 4000, estimated: false, unknown: false });
 
   const netHourly = c.empGrossCost("netHourly", "2026-07");
   assert.equal(netHourly.estimated, true);
@@ -74,7 +74,7 @@ test("gross cost is exact for gross-based salaries and grossed up for net-based 
   close(c.estimateNet(netHourly.gross, emp, new Date(2026, 6, 15)).net, 4000, 0.001);
 
   const fixedGross = c.empGrossCost("fixedGross", "2026-07");
-  sameCost(fixedGross, { gross: 10314, estimated: false, unknown: false });
+  sameCost(fixedGross, { gross: 10314, regularGross: 10314, estimated: false, unknown: false });
   const fixedGrossNet = c.computeEmpPay("fixedGross", "2026-07").totalPay;
   assert.ok(fixedGrossNet < 10314 && fixedGrossNet > 9000, "fixed gross pays an estimated net below the entered gross");
 
@@ -87,8 +87,8 @@ test("gross cost is exact for gross-based salaries and grossed up for net-based 
 
 test("an empty month costs nothing and the gross-up helper agrees with the per-hour equivalent", () => {
   const { context: c } = harness();
-  sameCost(c.empGrossCost("netHourly", "2026-07"), { gross: 0, estimated: false, unknown: false });
-  sameCost(c.empGrossCost("grossHourly", "2026-07"), { gross: 0, estimated: false, unknown: false });
+  sameCost(c.empGrossCost("netHourly", "2026-07"), { gross: 0, regularGross: 0, estimated: false, unknown: false });
+  sameCost(c.empGrossCost("grossHourly", "2026-07"), { gross: 0, regularGross: 0, estimated: false, unknown: false });
   const emp = c.payrollEmployee("fixedNet", "2026-07");
   const cp = { fixedNet: true, totalPay: 9000, totalH: 180, regH: 160, ot125H: 15, ot150H: 5 };
   const equivalent = c.fixedNetEquivalent(cp, emp, "2026-07");
@@ -134,5 +134,150 @@ test("a team with only gross-based salaries shows the gross cost without an esti
   const out = el("payTeamSummary").innerHTML;
   assert.match(out, /ברוטו כל העובדים<\/span>/);
   assert.doesNotMatch(out, /משוער/);
-  assert.match(out, /לפני תשלומים, הקפות וניכויים/);
+  assert.match(out, /עלות מעביד<\/div>/);
+});
+
+const REDUCED = 7703, MAX = 51910;
+const adultNi = gross => Math.min(gross, REDUCED) * 0.0451 + Math.max(0, Math.min(gross, MAX) - REDUCED) * 0.076;
+
+test("employer cost adds the employer's national insurance, pension, severance and study fund on top of gross", () => {
+  const { context: c } = harness();
+  const emp = { pensionOn: true, pensionBase: "gross", studyFundOn: true, studyFundBase: "regular" };
+  const cost = c.estimateEmployerCost(10000, emp, new Date(2026, 6, 15), 8000);
+  close(cost.ni, 521.9773, 0.0001);
+  close(cost.pension, 650, 0.0001);
+  close(cost.severance, 600, 0.0001);
+  close(cost.studyFund, 600, 0.0001);
+  close(cost.contributions, 521.9773 + 650 + 600 + 600, 0.0001);
+  close(cost.total, 10000 + cost.contributions, 0.0001);
+  assert.equal(cost.isMinor, false);
+
+  // Saved employer rates replace the statutory defaults; the basis follows the employee's share.
+  const custom = c.estimateEmployerCost(10000, { ...emp, employerPensionRate: 7, severanceRate: 8.33, employerStudyFundRate: 5 }, new Date(2026, 6, 15), 8000);
+  close(custom.pension, 700, 0.0001);
+  close(custom.severance, 833, 0.0001);
+  close(custom.studyFund, 400, 0.0001);
+
+  // A payslip basis is capped at the month's gross, and disabled funds cost nothing.
+  const capped = c.estimateEmployerCost(5000, { pensionOn: true, pensionBase: "amount", pensionBaseAmount: 7280 }, new Date(2026, 6, 15));
+  close(capped.pension, 325, 0.0001);
+  close(capped.severance, 300, 0.0001);
+  assert.equal(capped.studyFund, 0);
+  const none = c.estimateEmployerCost(10000, {}, new Date(2026, 6, 15));
+  assert.equal(none.pension + none.severance + none.studyFund, 0);
+  close(none.total, 10000 + 521.9773, 0.0001);
+});
+
+test("employer national insurance ignores the employee's exemption, uses youth rates under 18 and stops at the ceiling", () => {
+  const { context: c } = harness();
+  const asOf = new Date(2026, 6, 15);
+  close(c.estimateEmployerCost(10000, { niExempt: true }, asOf).ni, 521.9773, 0.0001);
+  const minor = c.estimateEmployerCost(10000, { birthDate: "2010-01-01" }, asOf);
+  assert.equal(minor.isMinor, true);
+  close(minor.ni, REDUCED * 0.0061 + (10000 - REDUCED) * 0.0212, 0.0001);
+  close(c.estimateEmployerCost(60000, {}, asOf).ni, adultNi(60000), 0.0001);
+  close(c.estimateEmployerCost(60000, {}, asOf).ni, 3707.1373, 0.0001);
+  assert.equal(c.estimateEmployerCost(0, {}, asOf).total, 0);
+  // Saved tax settings override the built-in employer rates.
+  vm.runInContext("taxCfg={niEmployerRed:0.05,niEmployerFull:0.08,niMinorRed:0.01,niMinorFull:0.02}", c);
+  close(c.estimateEmployerCost(10000, {}, asOf).ni, REDUCED * 0.05 + (10000 - REDUCED) * 0.08, 0.0001);
+  close(c.estimateEmployerCost(10000, { birthDate: "2010-01-01" }, asOf).ni, REDUCED * 0.01 + (10000 - REDUCED) * 0.02, 0.0001);
+  vm.runInContext("taxCfg=null", c);
+  const T = c.txParams();
+  assert.equal(T.niEmployerRed, 0.0451); assert.equal(T.niEmployerFull, 0.076);
+  assert.equal(T.niMinorRed, 0.0061); assert.equal(T.niMinorFull, 0.0212);
+});
+
+test("per-employee employer cost builds on the exact or grossed-up gross of each salary mode", () => {
+  const { context: c } = harness();
+  addShifts(c, "grossHourly"); addShifts(c, "netHourly");
+  const asOf = new Date(2026, 6, 15);
+  const grossHourly = c.empEmployerCost("grossHourly", "2026-07");
+  close(grossHourly.gross, 4000); close(grossHourly.ni, adultNi(4000), 0.0001);
+  assert.equal(grossHourly.pension, 0); assert.equal(grossHourly.estimated, false);
+  close(grossHourly.total, 4000 + adultNi(4000), 0.0001);
+
+  const fixedGross = c.empEmployerCost("fixedGross", "2026-07");
+  close(fixedGross.gross, 10314); close(fixedGross.ni, adultNi(10314), 0.0001);
+  assert.equal(fixedGross.estimated, false);
+
+  const fixedNet = c.empEmployerCost("fixedNet", "2026-07");
+  const grossUp = c.empGrossCost("fixedNet", "2026-07");
+  assert.equal(fixedNet.estimated, true);
+  close(fixedNet.gross, grossUp.gross, 0.000001);
+  close(fixedNet.pension, grossUp.gross * 0.065, 0.0001);
+  close(fixedNet.severance, grossUp.gross * 0.06, 0.0001);
+  close(fixedNet.total, grossUp.gross + adultNi(grossUp.gross) + grossUp.gross * 0.125, 0.0001);
+
+  const netHourly = c.empEmployerCost("netHourly", "2026-07");
+  assert.equal(netHourly.estimated, true);
+  assert.ok(netHourly.gross > 4000);
+  close(netHourly.total, netHourly.gross + adultNi(netHourly.gross), 0.0001);
+  assert.equal(c.empEmployerCost("fixedGross", "2026-07").regularGross, 10314);
+  assert.equal(c.estimateEmployerCost(0, c.payrollEmployee("grossHourly", "2026-07"), asOf).total, 0);
+});
+
+test("team totals and the summary card show the employer cost with its breakdown", () => {
+  const { context: c, element: el } = harness();
+  addShifts(c, "grossHourly"); addShifts(c, "netHourly"); addShifts(c, "gone");
+  const t = c.teamMonthTotals("2026-07");
+  const ids = ["grossHourly", "netHourly", "fixedNet", "fixedGross"];
+  const parts = ids.map(id => c.empEmployerCost(id, "2026-07"));
+  for (const k of ["gross", "ni", "pension", "severance", "studyFund", "contributions", "total"]) {
+    close(t.employerCost[k], parts.reduce((s, p) => s + p[k], 0), 0.000001);
+  }
+  close(t.employerCost.gross, t.grossCost, 0.000001);
+  assert.ok(t.employerCost.total > t.grossCost, "employer cost exceeds gross");
+  assert.equal(t.employerCost.studyFund, 0);
+
+  c.renderPayTeamSummary();
+  let out = el("payTeamSummary").innerHTML;
+  assert.match(out, /עלות מעביד · משוער/);
+  assert.match(out, /כמה המעביד מוציא על משכורות החודש/);
+  assert.match(out, /ביטוח לאומי · חלק המעסיק/);
+  assert.match(out, /פנסיה ופיצויים · חלק המעסיק/);
+  assert.doesNotMatch(out, /קרן השתלמות · חלק המעסיק/);
+  const money = n => "₪" + Math.round(n).toLocaleString("he-IL").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  assert.match(out, new RegExp(money(t.employerCost.total)));
+  assert.match(out, new RegExp(money(t.employerCost.ni)));
+  assert.match(out, new RegExp(money(t.employerCost.pension + t.employerCost.severance)));
+  assert.match(out, /הסכום הסופי נקבע בתלושים/);
+
+  c.secureRates.fixedNet.baseline.studyFundOn = true;
+  c.secureRates.fixedNet.baseline.studyFundBase = "gross";
+  const withFund = c.teamMonthTotals("2026-07");
+  close(withFund.employerCost.studyFund, c.empGrossCost("fixedNet", "2026-07").gross * 0.075, 0.0001);
+  c.renderPayTeamSummary();
+  out = el("payTeamSummary").innerHTML;
+  assert.match(out, /קרן השתלמות · חלק המעסיק/);
+});
+
+test("the employee detail page folds in the same employer cost estimate", () => {
+  const { context: c, element: el } = harness();
+  addShifts(c, "grossHourly");
+  Object.assign(c, {
+    paySubEmpId: "grossHourly", paySelMonthKey: "2026-07", currentMonthKey: () => "2026-08",
+    takingsListFor: () => [], paymentsListFor: () => [],
+    fmtDate: () => "05/07/2026", fmtTime: () => "08:00", hakafaDataReady: () => true,
+    giftMoney: n => (n / 100).toFixed(2), StoreGifts: { cents: n => n * 100 },
+  });
+  vm.runInContext(section("function renderPayDetail(){", "let payFullMonthBusy="), c);
+  c.renderPayDetail();
+  const cost = c.empEmployerCost("grossHourly", "2026-07");
+  const out = el("payBody").innerHTML;
+  assert.match(out, /עלות מעביד משוערת · ₪4,1\d\d/);
+  assert.match(out, new RegExp("₪" + Math.round(cost.ni)));
+  assert.match(out, /לא הוגדרה פנסיה לעובד/);
+  assert.doesNotMatch(out, /ברוטו משוער/);
+
+  c.paySubEmpId = "fixedNet";
+  c.renderPayDetail();
+  const fixed = el("payBody").innerHTML;
+  assert.match(fixed, /ברוטו משוער/);
+  assert.match(fixed, /תגמולי מעסיק \(6.5%\)/);
+  assert.match(fixed, /פיצויים \(6%\)/);
+
+  c.shifts = {}; c.paySubEmpId = "grossHourly";
+  c.renderPayDetail();
+  assert.doesNotMatch(el("payBody").innerHTML, /עלות מעביד משוערת/);
 });

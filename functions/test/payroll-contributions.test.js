@@ -603,6 +603,34 @@ test('changing an hourly monthly contribution base preserves earlier months and 
   assert.equal(c.payrollProfile('sample','2026-06').studyFundBase,'regular');
 });
 
+test('employer shares default to the extension order, save with the private profile and drive the employer cost',async()=>{
+  const {context:c,element:el,writes}=await fixedHarness();
+  c.openNetModal('sample');
+  assert.equal(el('netEmployerPensionRate').value,6.5);
+  assert.equal(el('netSeveranceRate').value,6);
+  assert.equal(el('netEmployerStudyFundRate').value,7.5);
+  const before=c.estimateEmployerCost(10000,c.payrollEmployee('sample'),new Date(2026,6,15),8000);
+  close(before.pension,520); close(before.severance,480); close(before.studyFund,600);
+  el('netEmployerPensionRate').value='7'; el('netSeveranceRate').value='8.33'; el('netEmployerStudyFundRate').value='5';
+  await c.saveNetSettings();
+  const saved=c.payrollEmployee('sample');
+  assert.equal(saved.employerPensionRate,7); assert.equal(saved.severanceRate,8.33); assert.equal(saved.employerStudyFundRate,5);
+  assert.equal(c.employees.sample.severanceRate,undefined);
+  assert.ok(writes.filter(w=>w.key.startsWith('employees/')).every(w=>Object.keys(w.value).join()==='unpaidBreak'));
+  const after=c.estimateEmployerCost(10000,saved,new Date(2026,6,15),8000);
+  close(after.pension,560); close(after.severance,666.4); close(after.studyFund,400);
+  c.openNetModal('sample');
+  assert.equal(el('netSeveranceRate').value,8.33);
+  const count=writes.length;
+  for(const [id,value] of [['netSeveranceRate',''],['netSeveranceRate','26'],['netEmployerPensionRate','-1'],['netEmployerStudyFundRate','abc']]){
+    const keep=el(id).value; el(id).value=value; await c.saveNetSettings(); assert.equal(writes.length,count); el(id).value=keep;
+  }
+  // Employer shares are ignored while the fund itself is off.
+  el('netPension').checked=false; el('netSeveranceRate').value='';
+  await c.saveNetSettings(); assert.equal(writes.length,count+2);
+  assert.equal(c.estimateEmployerCost(10000,c.payrollEmployee('sample'),new Date(2026,6,15)).severance,0);
+});
+
 test('an entered contribution base stays usable when switching from hourly to fixed net',async()=>{
   const {context:c,element:el}=await hourlyPayslipHarness();
   c.currentMonthKey=()=> '2026-08'; c.openNetModal('sample');
