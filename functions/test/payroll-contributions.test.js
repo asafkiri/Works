@@ -64,10 +64,15 @@ test("the supplied 50-hour week produces 42 regular, 5 at 125%, 3 at 150%, and t
   assert.equal(pay.regH, 42);
   assert.equal(pay.ot125H, 5);
   assert.equal(pay.ot150H, 3);
-  close(pay.totalPay, 2690.25);
+  close(pay.grossPay, 2690.25);
+  // An hourly gross employee's pay for the balance is the estimated net of that gross.
+  assert.equal(pay.netEstimated, true);
+  close(pay.totalPay, Math.round(c.estimateNet(2690.25, profile, new Date(2026,6,15), 2142).net * 100) / 100);
+  assert.ok(pay.totalPay < pay.grossPay);
   const month = c.monthTotals("sample", 51);
   close(month.regularPay, 2142);
-  const net = c.estimateNet(pay.totalPay * 52 / 12, profile, new Date(2026,9,4), month.regularPay * 52 / 12);
+  close(month.gross, 2690.25);
+  const net = c.estimateNet(pay.grossPay * 52 / 12, profile, new Date(2026,9,4), month.regularPay * 52 / 12);
   close(net.pension, 556.92);
   close(net.studyFund, 232.05);
   close(net.net, 10058.568825);
@@ -553,7 +558,9 @@ test('hourly employee can save the payslip study-fund base independently of regu
   assert.equal(el('netStudyFundBaseAmount').value,7280);
   assert.equal(el('netStudyFundBaseAmountWrap').classList.contains('hidden'),false);
   addRoutine(c);
-  assert.equal(c.computeEmpPay('sample','2026-07').totalPay,2637.5);
+  const hourly=c.computeEmpPay('sample','2026-07');
+  assert.equal(hourly.grossPay,2637.5);
+  assert.ok(hourly.totalPay<2637.5 && hourly.totalPay>2000);
   assert.equal(c.employees.sample.studyFundBaseAmount,undefined);
   assert.ok(writes.filter(w=>w.key.startsWith('employees/')).every(w=>Object.keys(w.value).join()==='unpaidBreak'));
   c.currentRole='employee'; c.currentEmpId='sample'; c.myRate=c.secureRates.sample; c.secureRates={};

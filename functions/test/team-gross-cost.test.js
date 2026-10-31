@@ -107,12 +107,13 @@ test("team totals report the gross cost separately from the balance due and skip
   assert.equal(t.grossUnknownCount, 0);
   assert.equal(t.netOnlyCount, 1);
   assert.equal(t.count, 4);
-  close(t.gross, 4000 + 4000 + 9000 + c.computeEmpPay("fixedGross", "2026-07").totalPay);
+  const payOf = id => c.computeEmpPay(id, "2026-07").totalPay;
+  close(t.gross, payOf("grossHourly") + 4000 + 9000 + payOf("fixedGross"));
   close(t.due, t.gross - 1300);
-  assert.ok(t.grossCost > t.gross, "gross cost includes the grossed-up fixed net salary");
-  // Only the fixed-net gross-up and the fixed-gross employee's entered gross lift the gross above the pay totals.
-  const fixedGrossNet = c.computeEmpPay("fixedGross", "2026-07").totalPay;
-  close(t.grossCost - t.gross, (c.empGrossCost("fixedNet", "2026-07").gross - 9000) + (10314 - fixedGrossNet), 0.000001);
+  assert.ok(t.grossCost > t.gross, "gross cost sits above the net-based pay totals");
+  // The gap is exactly each employee's gross minus the pay used for the balance (estimated net for gross-based salaries).
+  const expectedGap = ["grossHourly", "netHourly", "fixedNet", "fixedGross"].reduce((s, id) => s + c.empGrossCost(id, "2026-07").gross - payOf(id), 0);
+  close(t.grossCost - t.gross, expectedGap, 0.000001);
 
   c.renderPayTeamSummary();
   const out = el("payTeamSummary").innerHTML;
@@ -135,7 +136,7 @@ test("a team with only gross-based salaries shows the gross cost without an esti
   c.renderPayTeamSummary();
   const out = el("payTeamSummary").innerHTML;
   assert.match(out, /ברוטו כל העובדים<\/span>/);
-  assert.doesNotMatch(out, /משוער/);
+  assert.doesNotMatch(out, /ברוטו כל העובדים · משוער|עלות מעביד · משוער/);
   assert.match(out, /עלות מעביד<\/div>/);
 });
 
@@ -269,6 +270,59 @@ test("team totals and the summary card show the employer cost with its breakdown
   c.renderPayTeamSummary();
   out = el("payTeamSummary").innerHTML;
   assert.match(out, /קרן השתלמות · חלק המעסיק/);
+});
+
+test("hourly gross employees owe the estimated net, while the 25% hakafa limit stays on the gross", () => {
+  const { context: c, element: el } = harness();
+  addShifts(c, "grossHourly"); addShifts(c, "netHourly");
+  const asOf = new Date(2026, 6, 15);
+  const grossHourly = c.computeEmpPay("grossHourly", "2026-07");
+  const expectedNet = Math.round(c.estimateNet(4000, c.payrollEmployee("grossHourly", "2026-07"), asOf, 4000).net * 100) / 100;
+  assert.equal(grossHourly.grossPay, 4000);
+  assert.equal(grossHourly.netEstimated, true);
+  close(grossHourly.totalPay, expectedNet, 0.000001);
+  assert.ok(grossHourly.totalPay < 4000 && grossHourly.totalPay > 3500);
+  const netHourly = c.computeEmpPay("netHourly", "2026-07");
+  assert.equal(netHourly.totalPay, 4000); assert.equal(netHourly.grossPay, 4000); assert.equal(netHourly.netEstimated, false);
+  // The weighted-hours pass used by fixed salaries is never net-estimated.
+  assert.equal(c.computeEmpPay("grossHourly", "2026-07", true).netEstimated, false);
+
+  c.paymentsSumFor = id => id === "grossHourly" ? 500 : 0;
+  c.takingsSumFor = id => id === "grossHourly" ? 990 : 0;
+  const snap = c.payBalanceSnapshot("grossHourly", "2026-07");
+  close(snap.wage, expectedNet, 0.000001);
+  close(snap.balance, expectedNet - 1490, 0.000001);
+  assert.equal(snap.hakafaLimit, 1000);
+  assert.equal(snap.hakafaOver, false, "990 is under 25% of the 4000 gross even though it exceeds 25% of the net");
+  assert.equal(c.teamMonthTotals("2026-07").hakafaOverCount, 0);
+  c.takingsSumFor = id => id === "grossHourly" ? 1010 : 0;
+  assert.equal(c.payBalanceSnapshot("grossHourly", "2026-07").hakafaOver, true);
+  assert.equal(c.teamMonthTotals("2026-07").hakafaOverCount, 1);
+
+  const card = c.payEmployeeSummaryHtml({ id: "grossHourly", ...c.employees.grossHourly }, "2026-07", "openPayEmp");
+  assert.match(card, /נטו משוער לפי שעות/);
+  assert.match(card, /לפי נטו משוער/);
+  assert.match(card, new RegExp("₪" + Math.round(expectedNet).toLocaleString("he-IL")));
+  const netCard = c.payEmployeeSummaryHtml({ id: "netHourly", ...c.employees.netHourly }, "2026-07", "openPayEmp");
+  assert.match(netCard, /שכר נטו לפי שעות/);
+  assert.doesNotMatch(netCard, /לפי נטו משוער/);
+
+  Object.assign(c, {
+    paySubEmpId: "grossHourly", paySelMonthKey: "2026-07", currentMonthKey: () => "2026-08",
+    takingsListFor: () => [], paymentsListFor: () => [],
+    fmtDate: () => "05/07/2026", fmtTime: () => "08:00", hakafaDataReady: () => true,
+    giftMoney: n => (n / 100).toFixed(2), StoreGifts: { cents: n => n * 100 },
+  });
+  vm.runInContext(section("function renderPayDetail(){", "let payFullMonthBusy="), c);
+  c.renderPayDetail();
+  const out = el("payBody").innerHTML;
+  assert.match(out, /ברוטו לפי שעות<\/span><span>₪4,000/);
+  assert.match(out, /ניכויי חובה משוערים<\/span><span>−₪/);
+  assert.match(out, /נטו משוער לפי שעות/);
+  assert.match(out, /היתרה מבוססת על נטו משוער/);
+  assert.match(out, /<div class="nb-row"><span>ברוטו<\/span><span>₪4000<\/span>/);
+  c.renderPayTeamSummary();
+  assert.match(el("payTeamSummary").innerHTML, /היתרה מבוססת על נטו משוער אחרי ניכויי חובה/);
 });
 
 test("the employee detail page folds in the same employer cost estimate", () => {
