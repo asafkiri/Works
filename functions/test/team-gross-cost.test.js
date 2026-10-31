@@ -244,6 +244,15 @@ test("team totals and the summary card show the employer cost with its breakdown
   let out = el("payTeamSummary").innerHTML;
   assert.match(out, /עלות מעביד · משוער/);
   assert.match(out, /כמה המעביד מוציא על משכורות החודש/);
+  // The block is a fold, closed by default, and stays open across a re-render once the manager opened it.
+  assert.match(out, /<details class="ts-cost">\s*<summary class="ts-cost-head">/);
+  el("payTeamSummary").querySelector = sel => sel === "details.ts-cost[open]" ? {} : null;
+  c.renderPayTeamSummary();
+  assert.match(el("payTeamSummary").innerHTML, /<details class="ts-cost" open>/);
+  delete el("payTeamSummary").querySelector;
+  c.renderPayTeamSummary();
+  out = el("payTeamSummary").innerHTML;
+  assert.doesNotMatch(out, /<details class="ts-cost" open>/);
   assert.match(out, /ביטוח לאומי · חלק המעסיק/);
   assert.match(out, /פנסיה ופיצויים · חלק המעסיק/);
   assert.doesNotMatch(out, /קרן השתלמות · חלק המעסיק/);

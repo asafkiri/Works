@@ -720,11 +720,17 @@
   .team-sum .ts-gross-tile{background:rgba(255,255,255,.92);color:var(--primary-d)}
   .team-sum .ts-gross-tile span{opacity:.78;font-weight:800}
   .team-sum .ts-gross-tile strong{direction:ltr;unicode-bidi:isolate;white-space:nowrap}
-  .team-sum .ts-cost{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.26);border-radius:16px;padding:14px;margin-bottom:14px}
-  .team-sum .ts-cost-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px}
+  .team-sum .ts-cost{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.26);border-radius:16px;padding:0;margin-bottom:14px;overflow:hidden}
+  .team-sum .ts-cost-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:14px;cursor:pointer;list-style:none;-webkit-tap-highlight-color:transparent}
+  .team-sum .ts-cost-head::-webkit-details-marker{display:none}
+  .team-sum .ts-cost-head::marker{content:""}
   .team-sum .ts-cost-label{font-size:15px;font-weight:800}
   .team-sum .ts-cost-sub{font-size:12px;font-weight:700;opacity:.84;margin-top:2px}
+  .team-sum .ts-cost-side{display:flex;align-items:center;gap:8px;flex:0 0 auto}
   .team-sum .ts-cost-amount{font-size:30px;font-weight:800;line-height:1.05;letter-spacing:-.02em;font-variant-numeric:tabular-nums;white-space:nowrap;direction:ltr;unicode-bidi:isolate}
+  .team-sum .ts-cost-chevron{font-size:20px;line-height:1;opacity:.85;transition:transform .18s}
+  .team-sum .ts-cost[open] .ts-cost-chevron{transform:rotate(180deg)}
+  .team-sum .ts-cost-body{padding:0 14px 14px}
   .team-sum .ts-cost-grid .ts-calc-item{background:rgba(255,255,255,.12)}
   .team-sum .ts-cost-note{margin-top:10px;font-size:12px;font-weight:700;line-height:1.5;opacity:.9}
   .team-sum .ts-result{background:#fff;color:var(--ink);border-radius:16px;padding:16px 18px;margin-bottom:14px}
@@ -862,7 +868,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v90</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v91</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -887,7 +893,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v90</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v91</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -5376,6 +5382,8 @@ function renderPayTeamSummary(){
   const teamResultNote=p.note+(hasActivity?" "+teamBasis:"");
   const grossEstimated=t.grossEstimatedCount>0;
   const ec=t.employerCost;
+  // הקיפול של עלות המעביד סגור כברירת מחדל; אם המנהל פתח אותו, הוא נשאר פתוח גם כשהכרטיס מתרענן.
+  const costOpen=typeof el.querySelector==='function' && !!el.querySelector('details.ts-cost[open]');
   const costNote=!hasActivity ? "עוד לא נצבר שכר החודש."
     : "הברוטו של כל העובדים הפעילים, ועליו רק מה שמוגדר אצל כל עובד: חלק המעסיק בביטוח לאומי, בפנסיה ובפיצויים ובקרן השתלמות. הערכה לפני תשלומים והקפות; הסכום הסופי נקבע בתלושים ובדיווח לביטוח לאומי."
       +(t.netOnlyCount>0?` ${t.netOnlyCount===1?'עובד אחד שמוגדר':t.netOnlyCount+' עובדים שמוגדרים'} ״נטו זה נטו״ ${t.netOnlyCount===1?'נספר':'נספרים'} בנטו בלבד, בלי גילום ובלי תוספות.`:'')
@@ -5394,19 +5402,21 @@ function renderPayTeamSummary(){
       <div class="ts-amount">₪${fmtPayMoney(p.amount)}</div>
       <div class="ts-result-note">${teamResultNote}</div>
     </div>
-    <div class="ts-cost">
-      <div class="ts-cost-head">
-        <div><div class="ts-cost-label">עלות מעביד${grossEstimated?' · משוער':''}</div><div class="ts-cost-sub">כמה המעביד מוציא על משכורות החודש</div></div>
-        <div class="ts-cost-amount">₪${fmtPayMoney(ec.total)}</div>
+    <details class="ts-cost"${costOpen?' open':''}>
+      <summary class="ts-cost-head">
+        <div><div class="ts-cost-label">עלות מעביד${grossEstimated?' · משוער':''}</div><div class="ts-cost-sub">כמה המעביד מוציא על משכורות החודש · לחץ לפירוט</div></div>
+        <div class="ts-cost-side"><div class="ts-cost-amount">₪${fmtPayMoney(ec.total)}</div><span class="ts-cost-chevron" aria-hidden="true">⌄</span></div>
+      </summary>
+      <div class="ts-cost-body">
+        <div class="ts-calc-grid ts-cost-grid">
+          <div class="ts-calc-item"><span class="k">ברוטו כל העובדים</span><span class="v">₪${fmtPayMoney(ec.gross)}</span></div>
+          <div class="ts-calc-item plus"><span class="k">ביטוח לאומי · חלק המעסיק</span><span class="v">₪${fmtPayMoney(ec.ni)}</span></div>
+          <div class="ts-calc-item plus"><span class="k">פנסיה ופיצויים · חלק המעסיק</span><span class="v">₪${fmtPayMoney(ec.pension+ec.severance)}</span></div>
+          ${ec.studyFund>0.005?`<div class="ts-calc-item plus"><span class="k">קרן השתלמות · חלק המעסיק</span><span class="v">₪${fmtPayMoney(ec.studyFund)}</span></div>`:''}
+        </div>
+        <div class="ts-cost-note">${costNote}</div>
       </div>
-      <div class="ts-calc-grid ts-cost-grid">
-        <div class="ts-calc-item"><span class="k">ברוטו כל העובדים</span><span class="v">₪${fmtPayMoney(ec.gross)}</span></div>
-        <div class="ts-calc-item plus"><span class="k">ביטוח לאומי · חלק המעסיק</span><span class="v">₪${fmtPayMoney(ec.ni)}</span></div>
-        <div class="ts-calc-item plus"><span class="k">פנסיה ופיצויים · חלק המעסיק</span><span class="v">₪${fmtPayMoney(ec.pension+ec.severance)}</span></div>
-        ${ec.studyFund>0.005?`<div class="ts-calc-item plus"><span class="k">קרן השתלמות · חלק המעסיק</span><span class="v">₪${fmtPayMoney(ec.studyFund)}</span></div>`:''}
-      </div>
-      <div class="ts-cost-note">${costNote}</div>
-    </div>
+    </details>
     <div class="ts-calc-title">כך חושבה היתרה לתשלום</div>
     <div class="ts-calc-grid">
       <div class="ts-calc-item"><span class="k">שכר לפי המסלול של כל עובד</span><span class="v">₪${fmtPayMoney(t.gross)}</span></div>
