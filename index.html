@@ -868,7 +868,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v92</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v93</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -893,7 +893,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v92</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v93</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -1930,9 +1930,10 @@
       <div class="net-basis-warning hidden" id="netContributionOtNote">כדי להפריד בין שכר רגיל לשעות נוספות, יש להפעיל למעלה את ״חישוב שעות נוספות״. כרגע כל השעות מחושבות כרגילות.</div>
       <p class="net-contribution-help" style="margin:0 0 14px">הגדירו לפי תנאי ההעסקה של העובד. חלק העובד יורד מהברוטו בחישוב הנטו; חלק המעסיק מתווסף לברוטו בחישוב עלות המעביד.</p>
       <div class="net-toggle-row">
-        <span class="lbl">פטור מביטוח לאומי <span style="font-weight:500;color:var(--muted);font-size:12px">(18–21 לפני צבא / חייל · גם חלק המעסיק לא ייספר בעלות)</span></span>
+        <span class="lbl">פטור מביטוח לאומי <span style="font-weight:500;color:var(--muted);font-size:12px">(רק לפי אישור רואה החשבון)</span></span>
         <label class="switch"><input type="checkbox" id="netNiExempt"><span class="sl"></span></label>
       </div>
+      <p class="net-contribution-help" style="margin:-6px 0 14px">מבטל את ניכוי הביטוח הלאומי והבריאות לעובד וגם את חלק המעסיק בעלות המעביד. לא מיועד לנוער: עובד מתחת לגיל 18 מזוהה לבד מתאריך הלידה. עובד שכיר מגיל 18, גם לפני הצבא, חייב בביטוח לאומי כרגיל.</p>
     </div>
     </div>
     <div class="modal-actions">
