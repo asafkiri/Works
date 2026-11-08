@@ -356,8 +356,9 @@ test('manager view, balances and accountant report use the fixed net without pha
   assert.match(el('payBody').innerHTML,/נטו חודשי קבוע/);
   assert.doesNotMatch(el('payBody').innerHTML,/class="pl-amt"|שכר ברוטו לפי שעות/);
   const report=c.accountantReportHtml(c.payReportData());
-  assert.match(report,/נטו חודשי קבוע: ₪10000/);
-  assert.doesNotMatch(report,/תעריף לשעה/);
+  // The accountant receives only the credit points of a fixed salary — never the amount or the funds.
+  assert.match(report,/נקודות זיכוי: 11.75/);
+  assert.doesNotMatch(report,/נטו חודשי קבוע|10000|תעריף לשעה|פנסיה|קרן השתלמות|נטו מוסכם|ניכויי חובה/);
   c.shifts={};
   assert.equal(c.payReportData().totalPay,10000);
 });
@@ -483,7 +484,7 @@ test('missing, negative, non-finite and oversized contribution bases cannot be s
   assert.equal(c.payrollEmployee('sample').pensionBase,'gross');
 });
 
-test('fixed-gross balances and manager report use estimated net once and retain the entered gross',async()=>{
+test('fixed-gross balances use estimated net once and the accountant report sends only the credit points',async()=>{
   const {context:c,element:el}=await grossHarness(); addRoutine(c);
   Object.assign(c,{
     paySubEmpId:'sample',paySelMonthKey:'2026-07',
@@ -504,9 +505,37 @@ test('fixed-gross balances and manager report use estimated net once and retain 
   assert.match(el('payBody').innerHTML,/נטו משוער מברוטו קבוע/);
   assert.doesNotMatch(el('payBody').innerHTML,/class="pl-amt"|שכר ברוטו לפי שעות/);
   const report=c.accountantReportHtml(c.payReportData());
-  assert.match(report,/ברוטו חודשי קבוע: ₪10314/); assert.match(report,/נטו משוער: ₪9019.22/);
-  assert.match(report,/בסיס חודשי מהתלוש · ₪7280/); assert.doesNotMatch(report,/נטו מוסכם|תעריף לשעה/);
+  assert.match(report,/נקודות זיכוי: 4.75/);
+  assert.doesNotMatch(report,/ברוטו חודשי קבוע|10314|נטו משוער|9019|7280|פנסיה|קרן השתלמות|נטו מוסכם|תעריף לשעה/);
   c.shifts={}; assert.equal(c.payReportData().ot.monthlyGross,10314);
+});
+
+// Build the accountant report for the sample employee with the real report code.
+function accountantReport(c){
+  Object.assign(c,{
+    paySubEmpId:'sample',paySelMonthKey:'2026-07',
+    takingsListFor:()=>[],paymentsListFor:()=>[],takingsSumFor:()=>0,paymentsSumFor:()=>0,
+    fmtTime:()=> '08:00',monthLabel:k=>k,esc:s=>s,hakafaDataReady:()=>true,
+    giftMoney:n=>(n/100).toFixed(2),StoreGifts:{cents:n=>n*100},
+  });
+  vm.runInContext(section('function payReportData(){','// ---------- PDF (הדפסה)'),c);
+  return c.accountantReportHtml(c.payReportData());
+}
+
+test('the accountant report for an hourly employee sends only the rate and the defined credit points',()=>{
+  const gross=harness(profile); addRoutine(gross.context);
+  const report=accountantReport(gross.context);
+  assert.match(report,/תעריף לשעה: ₪51/); assert.match(report,/נקודות זיכוי: 11.75/);
+  assert.match(report,/סך שעות החודש:<\/b> 50.00/);
+  assert.doesNotMatch(report,/פנסיה|קרן השתלמות|נטו משוער|ברוטו|נטו מוסכם|2690/);
+  // Credit points that were never defined are not invented for the accountant.
+  const undefinedPoints=harness({hourlyRate:51}); addRoutine(undefinedPoints.context);
+  const bare=accountantReport(undefinedPoints.context);
+  assert.match(bare,/תעריף לשעה: ₪51/); assert.doesNotMatch(bare,/נקודות זיכוי/);
+  // A net hourly rate has no credit points in the app, so none are sent either.
+  const net=harness({hourlyRate:51,netIsNet:true,creditPoints:2.25}); addRoutine(net.context);
+  const netReport=accountantReport(net.context);
+  assert.match(netReport,/תעריף לשעה: ₪51/); assert.doesNotMatch(netReport,/נקודות זיכוי/);
 });
 
 test('creating a monthly gross employee uses the nested option and writes the gross only to the private node',async()=>{
