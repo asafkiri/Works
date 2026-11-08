@@ -868,7 +868,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v93</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v94</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -893,7 +893,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v93</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v94</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -5627,7 +5627,7 @@ function renderPayDetail(){
         <button class="btn" style="flex:1" onclick="imagePayrollAccountant()">📷 דוח לרו"ח (תמונה)</button>
         <button class="btn line" onclick="exportPayrollAccountant()">PDF</button>
       </div>
-      <div class="pay-export-note">תמונה לשליחה בוואטסאפ; קובץ PDF לשמירה, שיתוף והדפסה.</div>
+      <div class="pay-export-note">תמונה לשליחה בוואטסאפ; קובץ PDF לשמירה, שיתוף והדפסה.<br>הדוח לרו״ח כולל רק שעות, הקפות ומקדמות לניכוי, ומנתוני השכר — נקודות זיכוי, ותעריף לשעה אצל עובד שעתי. בלי סכומי שכר, הפרשות או נטו משוער.</div>
     </div>`:''}`;
 }
 
@@ -5683,9 +5683,18 @@ function payReportData(){
   return { e, rate, rows, totalH, totalPay, paidPay, genDate, tkList, tkSum, payList, ot:cp };
 }
 
-// דוח לרואה החשבון — נקי: שעות וברוטו בלבד, בלי סטטוס תשלום
+// דוח לרואה החשבון — נקי: שעות, הקפות ומקדמות לניכוי, ומנתוני השכר רק המינימום לתלוש.
+// משכורת קבועה (גלובלי): נקודות זיכוי בלבד. שעתי: התעריף לשעה, ונקודות זיכוי אם הוגדרו.
+// בלי סכומי שכר, הפרשות, נטו משוער או סטטוס תשלום — את אלה המנהל רואה רק במערכת.
 // ---------- בניית ה-HTML של הדוחות (משותף ל-PDF ולתמונה) ----------
 function accountantReportHtml(D){
+  const payslip=[];
+  if(!D.ot.fixedMonthly) payslip.push('תעריף לשעה: ₪'+D.rate);
+  // נקודות זיכוי נשלחות רק כשהן חלק מהגדרות השכר של העובד (משכורת קבועה או תעריף ברוטו).
+  // אצל "נטו זה נטו" השדה אינו מוצג במערכת, ולכן גם אינו נשלח.
+  const points=Number(D.e.creditPoints);
+  if((D.ot.fixedMonthly || !D.e.netIsNet) && D.e.creditPoints!=null && Number.isFinite(points)) payslip.push('נקודות זיכוי: '+points);
+  const payslipBox=payslip.length?`<div style="margin:0 0 16px;padding:11px 16px;border:2px solid #000;border-radius:8px;display:inline-block;font-weight:800;font-size:17px;line-height:1.5">${payslip.join('<br>')}</div>`:'';
   const rows=D.rows.map(r=>`<tr>
     <td>${pad(r.d.getDate())}/${pad(r.d.getMonth()+1)}/${r.d.getFullYear()}</td>
     <td>יום ${r.day}</td>
@@ -5704,8 +5713,7 @@ function accountantReportHtml(D){
   return `<div class="pr-wrap">
     <div class="pr-h1">דוח לרואה החשבון — ${esc(D.e.name)}</div>
     <div class="pr-meta">חודש: ${monthLabel(paySelMonthKey)}<br>הופק בתאריך: ${D.genDate}</div>
-    <div style="margin:0 0 16px;padding:11px 16px;border:2px solid #000;border-radius:8px;display:inline-block;font-weight:800;font-size:17px">${D.ot.fixedGross?'ברוטו חודשי קבוע: ₪'+D.ot.monthlyGross:D.ot.fixedNet?'נטו חודשי קבוע: ₪'+D.totalPay:'תעריף לשעה: ₪'+D.rate}</div>
-    ${D.ot.fixedMonthly?`<div class="pr-meta">נקודות זיכוי: ${D.e.creditPoints==null?2.25:D.e.creditPoints}<br>${contributionSettingsText(D.e,'pension')}<br>${contributionSettingsText(D.e,'studyFund')}<br>${D.ot.fixedGross?'נטו משוער: ₪'+D.totalPay.toFixed(2)+' — הנטו הסופי נקבע בתלוש.':'הסכום הוא נטו מוסכם. אין להפחית ממנו שוב ניכויי חובה.'}</div>`:''}
+    ${payslipBox}
     <table class="pr-table">
       <thead><tr><th>תאריך</th><th>יום</th><th>כניסה</th><th>יציאה</th><th>שעות</th></tr></thead>
       <tbody>${rows}</tbody>
