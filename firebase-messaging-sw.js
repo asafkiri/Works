@@ -1,5 +1,5 @@
 /* ============================================================
-   firebase-messaging-sw.js — v81
+   firebase-messaging-sw.js — v95
    Service Worker לקבלת התראות פוש כשהאפליקציה סגורה/ברקע.
    יושב באותה תיקייה של index.html בריפו (חובה — לא בתת-תיקייה).
    ============================================================ */
@@ -143,8 +143,8 @@ function queueShop(work){
   shopQueue=next.catch(()=>{});
   return next;
 }
-async function closeShopNotices(match){
-  (await self.registration.getNotifications()).forEach(n => { if(n.data && n.data.worksShopReminder && match(n.data)) n.close(); });
+async function closeShopNotices(match, keepTag){
+  (await self.registration.getNotifications()).forEach(n => { if(n.tag !== keepTag && n.data && n.data.worksShopReminder && match(n.data)) n.close(); });
 }
 // Returns what happened to the reminder; recorded in the receipt log.
 async function showShopReminder(data){
@@ -159,12 +159,21 @@ async function showShopReminder(data){
   if(Number(muted[data.snoozeKey]) > clocks.latest) return "snoozed";
   // The terminal just recorded this punch; a copy still in transit is obsolete.
   if(Number(muted["resolved:"+data.employeeId+":"+data.kind]) > clocks.latest) return "resolved";
+  const employeeId = data.employeeId || "", kind = data.kind || "";
+  // Every repeat is a new notification with its own tag, never an update of the
+  // one already on screen: on some phones (MIUI) an update in place plays no
+  // sound even with renotify, while a new notification alerts like the first.
+  // The same push delivered twice (push and page) keeps one tag.
+  const tag = (data.tag || "works-shop-reminder") + "-" + (data.sentAt || Date.now());
   await self.registration.showNotification(data.title || "תזכורת החתמה", {
     body:data.body || "", icon:new URL("icon-192.png", self.registration.scope).href,
-    dir:"rtl", lang:"he", tag:data.tag || "works-shop-reminder", renotify:true,
+    dir:"rtl", lang:"he", tag, renotify:true,
     silent:false, vibrate:[250,100,250], requireInteraction:true,
-    data:{worksShopReminder:true,employeeId:data.employeeId || "",kind:data.kind || "",snoozeKey:data.snoozeKey || "",planKey:data.planKey || ""}
+    data:{worksShopReminder:true,employeeId,kind,snoozeKey:data.snoozeKey || "",planKey:data.planKey || ""}
   });
+  // Only now remove the earlier notice of this employee and kind, so a display
+  // that fails never leaves the terminal without the reminder on screen.
+  await closeShopNotices(d => d.employeeId === employeeId && d.kind === kind, tag).catch(() => {});
   // An opt-out may have run while a slow display timed out of the queue.
   const after = await shopPolicy();
   if(shopOptedOut || after.enabled !== true || after.deviceId !== data.deviceId){ await closeShopNotices(() => true); return "opted-out"; }

@@ -253,5 +253,11 @@
   // a token that died or a worker policy that was lost is repaired within minutes.
   setInterval(()=>{if(shopNotificationsEnabled())refreshWhenReady(false);},15*60000);
   if(navigator.serviceWorker && navigator.serviceWorker.addEventListener)
-    navigator.serviceWorker.addEventListener("message",event=>{if(event.data?.type==="SHOP_REMINDER_SHOWN")window.ShopSnooze?.refresh(true);});
+    navigator.serviceWorker.addEventListener("message",event=>{
+      if(event.data?.type!=="SHOP_REMINDER_SHOWN")return;
+      window.ShopSnooze?.refresh(true);
+      // The terminal chimes by itself while on screen (see index.html); the
+      // phone's own notification sound is not reliable on every phone.
+      if(typeof window.playShopReminderChime==="function")window.playShopReminderChime();
+    });
 })();

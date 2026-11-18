@@ -31,10 +31,10 @@ function fakeIndexedDB(){
   }};
 }
 function worker(){
-  const listeners={},notices=[],stored=new Map(),timers=[],windows=[],firebaseSaw=[];let background,delay=null;
+  const listeners={},notices=[],stored=new Map(),timers=[],windows=[],firebaseSaw=[];let background,delay=null,failShow=false;
   const scope="https://asafkiri.github.io/Works/";
   const self={registration:{scope,
-    async showNotification(title,options){if(delay)await delay;notices.push({title,...options,closed:false,close(){this.closed=true;}});},
+    async showNotification(title,options){if(delay)await delay;if(failShow)throw Error("display failed");notices.push({title,...options,closed:false,close(){this.closed=true;}});},
     async getNotifications(){return notices;}
   },clients:{matchAll:async()=>windows},addEventListener:(name,fn)=>{(listeners[name]||=[]).push(fn);}};
   const indexedDB=fakeIndexedDB();
@@ -51,7 +51,7 @@ function worker(){
     await event.waited;return event;
   }
   const payload={audience:"shop",deviceId:"this-device",expiresAt:String(Date.now()+60000),title:"דני — יציאה",tag:"same-employee",kind:"out"};
-  return {notices,payload,message,push,listeners,stored,indexedDB,timers,windows,firebaseSaw,background:data=>background({data}),delay:p=>{delay=p;}};
+  return {notices,payload,message,push,listeners,stored,indexedDB,timers,windows,firebaseSaw,background:data=>background({data}),delay:p=>{delay=p;},failShow:v=>{failShow=v;}};
 }
 test("background push is silent until this device opts in and rejects another or expired device payload",async()=>{
   const w=worker();await w.background(w.payload);assert.equal(w.notices.length,0);
@@ -77,22 +77,24 @@ test("opting out closes an in-flight reminder and prevents late queued backgroun
 });
 test("snooze closes only this shift's notice and suppresses late delivery for it",async()=>{
   const w=worker();await w.message({type:"SHOP_NOTIFICATION_POLICY",enabled:true,deviceId:"this-device"});
-  await w.background({...w.payload,snoozeKey:"first"});await w.background({...w.payload,snoozeKey:"other"});
+  await w.background({...w.payload,employeeId:"a",snoozeKey:"first"});await w.background({...w.payload,employeeId:"b",snoozeKey:"other"});
+  assert.equal(w.notices[0].closed,false,"another employee's reminder does not replace this one");
   await w.message({type:"SHOP_REMINDER_SNOOZED",snoozeKey:"first",until:Date.now()+600000});
   assert.equal(w.notices[0].closed,true);assert.equal(w.notices[1].closed,false);
-  await w.background({...w.payload,snoozeKey:"first"});assert.equal(w.notices.length,2);
-  await w.background({...w.payload,snoozeKey:"next-shift"});assert.equal(w.notices.length,3);
+  await w.background({...w.payload,employeeId:"a",snoozeKey:"first"});assert.equal(w.notices.length,2);
+  await w.background({...w.payload,employeeId:"a",snoozeKey:"next-shift"});assert.equal(w.notices.length,3);
 });
 test("plan cancellation closes both kinds and blocks late entry/exit notices while other plans still display",async()=>{
   const w=worker();await w.message({type:"SHOP_NOTIFICATION_POLICY",enabled:true,deviceId:"this-device"});
-  await w.background({...w.payload,planKey:"first",kind:"in",snoozeKey:"entry-first"});
-  await w.background({...w.payload,planKey:"first",kind:"out",snoozeKey:"exit-first"});
-  await w.background({...w.payload,planKey:"other",snoozeKey:"exit-other"});
+  await w.background({...w.payload,employeeId:"a",planKey:"first",kind:"in",snoozeKey:"entry-first"});
+  await w.background({...w.payload,employeeId:"a",planKey:"first",kind:"out",snoozeKey:"exit-first"});
+  await w.background({...w.payload,employeeId:"b",planKey:"other",snoozeKey:"exit-other"});
+  assert.ok(w.notices.every(n=>!n.closed),"three different reminders stay on screen");
   await w.message({type:"SHOP_REMINDER_CANCELLED",planKey:"first",until:Date.now()+48*3600000});
   assert.equal(w.notices[0].closed,true);assert.equal(w.notices[1].closed,true);assert.equal(w.notices[2].closed,false);
-  for(const kind of ["in","out"])await w.background({...w.payload,planKey:"first",kind,snoozeKey:"new-key"});
+  for(const kind of ["in","out"])await w.background({...w.payload,employeeId:"a",planKey:"first",kind,snoozeKey:"new-key"});
   assert.equal(w.notices.length,3);
-  await w.background({...w.payload,planKey:"next",kind:"in",snoozeKey:"entry-next"});assert.equal(w.notices.length,4);
+  await w.background({...w.payload,employeeId:"a",planKey:"next",kind:"in",snoozeKey:"entry-next"});assert.equal(w.notices.length,4);
 });
 test("another app on the origin deleting every cache no longer mutes reminders or undoes a snooze",async()=>{
   const w=worker();await w.message({type:"SHOP_NOTIFICATION_POLICY",enabled:true,deviceId:"this-device"});
@@ -212,4 +214,26 @@ test("a punch recorded on the terminal closes that employee's reminder and ignor
   await w.push({data:{...w.payload,employeeId:"a",kind:"in"}});assert.equal(w.notices.length,2,"late copy is not shown");
   await w.push({data:{...w.payload,employeeId:"a",kind:"out"}});assert.equal(w.notices.length,3,"the other kind still shows");
   await w.message({type:"SHOP_REMINDER_RESOLVED",employeeId:"a",kind:"bogus"});assert.equal(w.notices[2].closed,false);
+});
+test("a repeated reminder is a new notification: the previous notice of that employee and kind is closed, not updated in place",async()=>{
+  const w=worker();await w.message({type:"SHOP_NOTIFICATION_POLICY",enabled:true,deviceId:"this-device"});
+  const base={...w.payload,employeeId:"a",kind:"in",tag:"works-shop-a-in"};
+  await w.push({data:{...base,sentAt:"1000"}});await w.push({data:{...base,sentAt:"301000"}});
+  assert.equal(w.notices.length,2);assert.equal(w.notices[0].closed,true);assert.equal(w.notices[1].closed,false);
+  assert.notEqual(w.notices[0].tag,w.notices[1].tag);assert.ok(w.notices.every(n=>n.tag.startsWith("works-shop-a-in-")));
+  assert.equal(w.notices[1].renotify,true);assert.equal(w.notices[1].silent,false);
+  // The same push shown twice (push and page) keeps one tag, so Android keeps one copy.
+  await w.message({type:"SHOW_SHOP_REMINDER",data:{...base,sentAt:"301000"}});assert.equal(w.notices[2].tag,w.notices[1].tag);
+  // Another employee's reminder leaves this one on screen.
+  await w.push({data:{...base,employeeId:"b",tag:"works-shop-b-in",sentAt:"301000"}});assert.equal(w.notices[2].closed,false);
+  await w.push({data:{...base,kind:"out",tag:"works-shop-a-out",sentAt:"301000"}});assert.equal(w.notices[2].closed,false,"the other kind is a separate reminder");
+});
+test("a repeat that fails to display leaves the previous reminder on screen",async()=>{
+  const w=worker();await w.message({type:"SHOP_NOTIFICATION_POLICY",enabled:true,deviceId:"this-device"});
+  const base={...w.payload,employeeId:"a",kind:"in",tag:"works-shop-a-in",ref:"r"};
+  await w.push({data:{...base,sentAt:"1000"}});
+  w.failShow(true);await w.push({data:{...base,sentAt:"301000"}});
+  assert.equal(w.notices.length,1);assert.equal(w.notices[0].closed,false);
+  const [reply]=await w.message({type:"SHOP_RECEIPTS_TAKE"});
+  assert.deepEqual(JSON.parse(JSON.stringify(reply.entries)).map(e=>e.outcome),["shown","error"]);
 });

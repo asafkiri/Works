@@ -868,7 +868,7 @@
 <!-- ============================ מסך התחברות ============================ -->
 <div id="authScreen" class="auth-screen">
   <div class="auth-box">
-    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v94</span></div>
+    <div class="logo"><span class="dot"></span> שעון נוכחות <span style="font-size:11px;color:var(--muted);font-weight:700">v95</span></div>
     <p class="lead" id="authLead">התחברות לחשבון המנהל</p>
     <div id="authErr" class="err"></div>
 
@@ -893,7 +893,7 @@
 <!-- ============================ אפליקציה ============================ -->
 <div id="app" class="hidden">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v94</span></div>
+    <div class="brand"><span class="dot"></span> שעון נוכחות <span style="font-size:10px;color:var(--muted);font-weight:700">v95</span></div>
     <div class="topbar-actions">
       <div class="seg" id="viewTabs">
         <button id="tabConsole" class="on" onclick="showView('console')">קונסולת מנהל</button>
@@ -2026,7 +2026,7 @@
 <script src="report-pdf.js?v=87"></script>
 <script src="store-gifts.js?v=73"></script>
 <script src="luach.js?v=73"></script>
-<script src="shop-notifications-client.js?v=81"></script>
+<script src="shop-notifications-client.js?v=95"></script>
 <script src="shop-snooze-ui.js?v=81"></script>
 <script>
 /* ============================================================
@@ -7499,6 +7499,88 @@ function shopNotificationsEnabled(){
   const key = shopNotificationPreferenceKey();
   try{ return !!key && localStorage.getItem(key) === "on"; }catch(e){ return false; }
 }
+
+/* ---------- צליל תזכורת מתוך הטרמינל (v95) ---------- */
+// Android decides whether the phone's own notification sound plays, and some
+// phones (MIUI) stay silent when a reminder repeats. While the terminal is on
+// screen, the page itself chimes for every reminder the worker displays.
+let shopChimeContext = null, shopChimeUnlocked = false, shopChimeIdleTimer = null;
+function shopChimeKey(){
+  const uid = auth && auth.currentUser && auth.currentUser.uid;
+  return uid ? "worksShopChime:" + uid : null;
+}
+// On by default once this phone opted in to shop notifications; per device and account.
+function shopChimeEnabled(){
+  if(!shopNotificationsEnabled()) return false;
+  const key = shopChimeKey();
+  try{ return !!key && localStorage.getItem(key) !== "off"; }catch(e){ return false; }
+}
+function chooseShopChime(enabled){
+  const key = shopChimeKey();
+  if(!key) return;
+  try{ localStorage.setItem(key, enabled ? "on" : "off"); }catch(e){}
+  if(enabled) playShopReminderChime(true);
+  renderShopNotificationTest();
+}
+function shopAudioContext(){
+  if(shopChimeContext) return shopChimeContext;
+  const Context = window.AudioContext || window.webkitAudioContext;
+  if(!Context) return null;
+  try{ shopChimeContext = new Context(); }catch(e){ return null; }
+  return shopChimeContext;
+}
+// Idle between reminders: no audio stream stays open on the terminal all day.
+function shopChimeSleepSoon(){
+  clearTimeout(shopChimeIdleTimer);
+  shopChimeIdleTimer = setTimeout(() => {
+    if(shopChimeContext && shopChimeContext.state === "running") shopChimeContext.suspend().catch(()=>{});
+  }, 4000);
+}
+// Browsers let audio start only after a user gesture. The first tap on the shop
+// terminal (it is touched all day) unlocks it; later reminders need no gesture.
+// Other phones (employees, the manager) never create audio here.
+function unlockShopChime(){
+  try{ if(shopChimeUnlocked || !shopChimeEnabled()) return; }catch(e){ return; }
+  const context = shopAudioContext();
+  if(!context) return;
+  context.resume().then(() => { shopChimeUnlocked = true; shopChimeSleepSoon(); }).catch(()=>{});
+}
+// pointerup, not pointerdown: on a touch screen the gesture counts on release.
+if(typeof document !== "undefined") document.addEventListener("pointerup", unlockShopChime, {passive:true});
+// Returns whether a chime was requested. force: a preview from the settings row.
+function playShopReminderChime(force){
+  if(!force){
+    if(!shopChimeEnabled()) return false;
+    if(typeof document !== "undefined" && document.visibilityState !== "visible") return false;
+  }
+  const context = shopAudioContext();
+  if(!context) return false;
+  const play = () => {
+    const start = context.currentTime + 0.05;
+    // Three rising notes, twice: clearly different from the phone's own sound.
+    [[0, 880], [0.18, 1108.73], [0.36, 1318.51], [0.9, 880], [1.08, 1108.73], [1.26, 1318.51]].forEach(([at, frequency]) => {
+      const oscillator = context.createOscillator(), gain = context.createGain();
+      oscillator.type = "sine"; oscillator.frequency.value = frequency;
+      gain.gain.setValueAtTime(0.0001, start + at);
+      gain.gain.exponentialRampToValueAtTime(0.6, start + at + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + at + 0.3);
+      oscillator.connect(gain).connect(context.destination);
+      oscillator.start(start + at); oscillator.stop(start + at + 0.32);
+    });
+    shopChimeSleepSoon();
+  };
+  try{
+    if(context.state === "running") play();
+    else{
+      // A resume the browser holds back until the next tap must not chime late.
+      const requestedAt = Date.now();
+      context.resume().then(() => { shopChimeUnlocked = true; if(Date.now() - requestedAt < 3000) play(); }).catch(()=>{});
+    }
+    try{ if(navigator.vibrate) navigator.vibrate([200, 100, 200]); }catch(e){}
+    return true;
+  }catch(e){ return false; }
+}
+
 async function closeShopTestNotifications(){
   if(!("serviceWorker" in navigator)) return;
   const reg = await navigator.serviceWorker.getRegistration("firebase-messaging-sw.js");
@@ -7578,6 +7660,9 @@ function renderShopNotificationTest(){
     <div class="rem-sub" style="margin-top:10px">${help}</div>
     ${enabled && supported && !blocked ? `<button class="btn line" style="width:100%;margin-top:12px" onclick="testShopNotification()" ${shopNotificationTestBusy || shopNotificationPreferenceBusy?'disabled':''}>${shopNotificationTestBusy?'מכין התראת בדיקה…':'בדיקת התראה וצליל'}</button>` : ''}
     <div class="rem-sub" style="margin-top:10px">תזכורת לכניסה וליציאה לפי הסידור, כל 5 דקות כל עוד ההחתמה חסרה. התזכורת נעצרת כשההחתמה נרשמת; סגירת ההתראה לא עוצרת אותה.</div>
+    ${enabled && supported && !blocked ? `<label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:14px;line-height:1.5;cursor:pointer"><input type="checkbox" onchange="chooseShopChime(this.checked)"${shopChimeEnabled()?' checked':''}> צליל גם מתוך האפליקציה בכל תזכורת, כשהטרמינל על המסך</label>
+    <div class="rem-sub" style="margin-top:6px">לא תלוי בהגדרות ההתראות של הטלפון. מתנגן בעוצמת המדיה, אז כדאי לוודא שהיא לא על אפס.</div>
+    <button class="btn line sm" style="width:100%;margin-top:8px" onclick="playShopReminderChime(true)">נסה את הצליל</button>` : ''}
     ${enabled && serverState !== 'active' ? `<button class="btn line sm" style="width:100%;margin-top:10px" onclick="ShopNotifications.sync(true)">חבר תזכורות מהשרת</button><div class="rem-sub" style="margin-top:8px">${esc(window.ShopNotifications ? ShopNotifications.getError() : 'יש לרענן את האפליקציה.')}</div>` : ''}
     ${enabled && serverState === 'active' ? `<button class="btn line sm" style="width:100%;margin-top:10px" onclick="testShopServerNotification()">בדיקת הודעה מהשרת</button>` : ''}
     <div role="status" aria-live="polite" style="margin-top:10px;font-size:14px;line-height:1.6">${esc(shopNotificationTestMessage)}</div>
