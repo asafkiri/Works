@@ -94,6 +94,24 @@ test("a late permission grant after account change cannot opt in either account"
   p.resolve("granted");await pending;assert.equal(d.storage.size,0);
 });
 
+test("the terminal chime is on by default once this phone opted in, is saved per device and account, and never throws without audio", async () => {
+  const d = device();
+  assert.equal(d.context.shopChimeEnabled(), false, "no chime while shop notifications are off");
+  await d.context.chooseShopNotifications(true);
+  assert.equal(d.context.shopChimeEnabled(), true);
+  assert.match(d.nodes.shopNotificationTestCard.innerHTML, /chooseShopChime\(this\.checked\)" checked/);
+  assert.equal(d.context.playShopReminderChime(), false, "no audio in this environment, no exception");
+  assert.equal(d.context.playShopReminderChime(true), false);
+  d.context.chooseShopChime(false);
+  assert.equal(d.context.shopChimeEnabled(), false);
+  assert.doesNotMatch(d.nodes.shopNotificationTestCard.innerHTML, /chooseShopChime\(this\.checked\)" checked/);
+  assert.equal(device({storage:d.storage}).context.shopChimeEnabled(), false, "the choice survives reload on this device");
+  d.context.chooseShopChime(true);
+  assert.equal(device({storage:d.storage}).context.shopChimeEnabled(), true);
+  d.context.auth.currentUser.uid = "another-manager";
+  assert.equal(d.context.shopChimeEnabled(), false, "another account on this phone has not opted in");
+});
+
 test("an existing manager registration is refreshed without new-device enrollment", () => {
   const d=device({storage:new Map([["fcmSavedMgr","existing-token"]])});
   d.context.mode="manager";d.context.initPushForManager();assert.equal(d.calls.manager,1);

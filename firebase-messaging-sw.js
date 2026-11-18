@@ -1,5 +1,5 @@
 /* ============================================================
-   firebase-messaging-sw.js — v81
+   firebase-messaging-sw.js — v95
    Service Worker לקבלת התראות פוש כשהאפליקציה סגורה/ברקע.
    יושב באותה תיקייה של index.html בריפו (חובה — לא בתת-תיקייה).
    ============================================================ */
@@ -159,11 +159,17 @@ async function showShopReminder(data){
   if(Number(muted[data.snoozeKey]) > clocks.latest) return "snoozed";
   // The terminal just recorded this punch; a copy still in transit is obsolete.
   if(Number(muted["resolved:"+data.employeeId+":"+data.kind]) > clocks.latest) return "resolved";
+  const employeeId = data.employeeId || "", kind = data.kind || "";
+  // Every repeat is a new notification, never an update of the one already on
+  // screen. Replacing a notification in place (same tag, renotify) replays no
+  // sound on some phones (MIUI); a fresh one alerts the way the first did.
+  // The same push arriving twice (push and page) still shares one tag.
+  await closeShopNotices(d => d.employeeId === employeeId && d.kind === kind).catch(() => {});
   await self.registration.showNotification(data.title || "תזכורת החתמה", {
     body:data.body || "", icon:new URL("icon-192.png", self.registration.scope).href,
-    dir:"rtl", lang:"he", tag:data.tag || "works-shop-reminder", renotify:true,
+    dir:"rtl", lang:"he", tag:(data.tag || "works-shop-reminder") + "-" + (data.sentAt || Date.now()), renotify:true,
     silent:false, vibrate:[250,100,250], requireInteraction:true,
-    data:{worksShopReminder:true,employeeId:data.employeeId || "",kind:data.kind || "",snoozeKey:data.snoozeKey || "",planKey:data.planKey || ""}
+    data:{worksShopReminder:true,employeeId,kind,snoozeKey:data.snoozeKey || "",planKey:data.planKey || ""}
   });
   // An opt-out may have run while a slow display timed out of the queue.
   const after = await shopPolicy();

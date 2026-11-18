@@ -192,6 +192,13 @@ test("a reminder shown by the worker refreshes the terminal's snooze controls",a
   d.swListeners.forEach(fn=>fn({data:{type:"SHOP_REMINDER_SHOWN"}}));d.swListeners.forEach(fn=>fn({data:{type:"OTHER"}}));
   assert.equal(refreshed,1);
 });
+test("a reminder shown by the worker also chimes from the terminal when the page offers a chime",async()=>{
+  const d=device();let chimed=0;d.ctx.ShopSnooze={refresh(){},clear(){}};d.ctx.playShopReminderChime=()=>{chimed++;};
+  d.swListeners.forEach(fn=>fn({data:{type:"SHOP_REMINDER_SHOWN"}}));d.swListeners.forEach(fn=>fn({data:{type:"OTHER"}}));
+  assert.equal(chimed,1);
+  const silent=device();silent.ctx.ShopSnooze={refresh(){},clear(){}};
+  silent.swListeners.forEach(fn=>fn({data:{type:"SHOP_REMINDER_SHOWN"}}),"a page without a chime still refreshes without throwing");
+});
 test("a renewal of a working registration keeps it usable while in flight and after a transient failure",{timeout:10000},async()=>{
   const d=device();await d.api.sync(true);let release;d.delay(new Promise(r=>{release=r;}));
   const renewal=d.api.sync(true);await settle();assert.equal(d.api.getState(),"active","snooze/cancel stay available during renewal");

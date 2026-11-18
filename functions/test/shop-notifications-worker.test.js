@@ -213,3 +213,16 @@ test("a punch recorded on the terminal closes that employee's reminder and ignor
   await w.push({data:{...w.payload,employeeId:"a",kind:"out"}});assert.equal(w.notices.length,3,"the other kind still shows");
   await w.message({type:"SHOP_REMINDER_RESOLVED",employeeId:"a",kind:"bogus"});assert.equal(w.notices[2].closed,false);
 });
+test("a repeated reminder is a new notification: the previous notice of that employee and kind is closed, not updated in place",async()=>{
+  const w=worker();await w.message({type:"SHOP_NOTIFICATION_POLICY",enabled:true,deviceId:"this-device"});
+  const base={...w.payload,employeeId:"a",kind:"in",tag:"works-shop-a-in"};
+  await w.push({data:{...base,sentAt:"1000"}});await w.push({data:{...base,sentAt:"301000"}});
+  assert.equal(w.notices.length,2);assert.equal(w.notices[0].closed,true);assert.equal(w.notices[1].closed,false);
+  assert.notEqual(w.notices[0].tag,w.notices[1].tag);assert.ok(w.notices.every(n=>n.tag.startsWith("works-shop-a-in-")));
+  assert.equal(w.notices[1].renotify,true);assert.equal(w.notices[1].silent,false);
+  // The same push shown twice (push and page) keeps one tag, so Android keeps one copy.
+  await w.message({type:"SHOW_SHOP_REMINDER",data:{...base,sentAt:"301000"}});assert.equal(w.notices[2].tag,w.notices[1].tag);
+  // Another employee's reminder leaves this one on screen.
+  await w.push({data:{...base,employeeId:"b",tag:"works-shop-b-in",sentAt:"301000"}});assert.equal(w.notices[2].closed,false);
+  await w.push({data:{...base,kind:"out",tag:"works-shop-a-out",sentAt:"301000"}});assert.equal(w.notices[2].closed,false,"the other kind is a separate reminder");
+});
