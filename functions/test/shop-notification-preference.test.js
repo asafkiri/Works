@@ -112,6 +112,46 @@ test("the terminal chime is on by default once this phone opted in, is saved per
   assert.equal(d.context.shopChimeEnabled(), false, "another account on this phone has not opted in");
 });
 
+function fakeAudio(d, {state = "suspended", resume} = {}) {
+  const audio = {created:0, oscillators:0, last:null, timers:[]};
+  d.context.window.AudioContext = class {
+    constructor(){ audio.created++; audio.last = this; this.state = state; this.currentTime = 0; this.destination = {}; }
+    resume(){ return resume ? resume(this) : (this.state = "running", Promise.resolve()); }
+    suspend(){ this.state = "suspended"; return Promise.resolve(); }
+    createOscillator(){ audio.oscillators++; return {frequency:{}, connect:g => g, start(){}, stop(){}}; }
+    createGain(){ return {gain:{setValueAtTime(){}, exponentialRampToValueAtTime(){}}, connect:n => n}; }
+  };
+  d.context.setTimeout = (fn, ms) => { audio.timers.push({fn, ms}); return audio.timers.length; };
+  d.context.clearTimeout = () => {};
+  return audio;
+}
+const ticks = async () => { for(let i = 0; i < 10; i++) await new Promise(r => setImmediate(r)); };
+
+test("only an opted-in shop terminal prepares the chime audio, and it idles between reminders", async () => {
+  const d = device(), audio = fakeAudio(d);
+  d.context.unlockShopChime(); await ticks();
+  assert.equal(audio.created, 0, "a phone without shop notifications never creates audio");
+  await d.context.chooseShopNotifications(true);
+  d.context.unlockShopChime(); await ticks();
+  assert.equal(audio.created, 1); assert.equal(audio.last.state, "running");
+  audio.timers.find(t => t.ms === 4000).fn(); assert.equal(audio.last.state, "suspended", "idle audio is suspended");
+  assert.equal(d.context.playShopReminderChime(), true); await ticks();
+  assert.equal(audio.oscillators, 6); assert.equal(audio.created, 1, "one audio context for the page");
+  d.context.chooseShopChime(false); audio.oscillators = 0;
+  assert.equal(d.context.playShopReminderChime(), false); assert.equal(audio.oscillators, 0);
+});
+
+test("a chime whose audio unlock is held back until a later tap never plays late", async () => {
+  const d = device(); await d.context.chooseShopNotifications(true);
+  let release; const audio = fakeAudio(d, {resume: ctx => new Promise(r => { release = () => { ctx.state = "running"; r(); }; })});
+  let now = 1_000_000; d.context.Date = {now: () => now};
+  assert.equal(d.context.playShopReminderChime(), true);
+  now += 60_000; release(); await ticks();
+  assert.equal(audio.oscillators, 0, "a reminder from a minute ago must not chime now");
+  assert.equal(d.context.playShopReminderChime(), true); await ticks();
+  assert.equal(audio.oscillators, 6, "once unlocked, the next reminder chimes at once");
+});
+
 test("an existing manager registration is refreshed without new-device enrollment", () => {
   const d=device({storage:new Map([["fcmSavedMgr","existing-token"]])});
   d.context.mode="manager";d.context.initPushForManager();assert.equal(d.calls.manager,1);

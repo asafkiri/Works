@@ -7504,7 +7504,7 @@ function shopNotificationsEnabled(){
 // Android decides whether the phone's own notification sound plays, and some
 // phones (MIUI) stay silent when a reminder repeats. While the terminal is on
 // screen, the page itself chimes for every reminder the worker displays.
-let shopChimeContext = null;
+let shopChimeContext = null, shopChimeUnlocked = false, shopChimeIdleTimer = null;
 function shopChimeKey(){
   const uid = auth && auth.currentUser && auth.currentUser.uid;
   return uid ? "worksShopChime:" + uid : null;
@@ -7529,13 +7529,25 @@ function shopAudioContext(){
   try{ shopChimeContext = new Context(); }catch(e){ return null; }
   return shopChimeContext;
 }
-// Browsers start audio only after a user gesture; the terminal is touched all day.
-function unlockShopChime(){
-  const context = shopAudioContext();
-  if(context && context.state === "suspended") context.resume().catch(()=>{});
+// Idle between reminders: no audio stream stays open on the terminal all day.
+function shopChimeSleepSoon(){
+  clearTimeout(shopChimeIdleTimer);
+  shopChimeIdleTimer = setTimeout(() => {
+    if(shopChimeContext && shopChimeContext.state === "running") shopChimeContext.suspend().catch(()=>{});
+  }, 4000);
 }
-if(typeof document !== "undefined") document.addEventListener("pointerdown", unlockShopChime, {passive:true});
-// Returns whether a chime was started. force: a preview from the settings row.
+// Browsers let audio start only after a user gesture. The first tap on the shop
+// terminal (it is touched all day) unlocks it; later reminders need no gesture.
+// Other phones (employees, the manager) never create audio here.
+function unlockShopChime(){
+  try{ if(shopChimeUnlocked || !shopChimeEnabled()) return; }catch(e){ return; }
+  const context = shopAudioContext();
+  if(!context) return;
+  context.resume().then(() => { shopChimeUnlocked = true; shopChimeSleepSoon(); }).catch(()=>{});
+}
+// pointerup, not pointerdown: on a touch screen the gesture counts on release.
+if(typeof document !== "undefined") document.addEventListener("pointerup", unlockShopChime, {passive:true});
+// Returns whether a chime was requested. force: a preview from the settings row.
 function playShopReminderChime(force){
   if(!force){
     if(!shopChimeEnabled()) return false;
@@ -7543,8 +7555,7 @@ function playShopReminderChime(force){
   }
   const context = shopAudioContext();
   if(!context) return false;
-  try{
-    if(context.state === "suspended") context.resume().catch(()=>{});
+  const play = () => {
     const start = context.currentTime + 0.05;
     // Three rising notes, twice: clearly different from the phone's own sound.
     [[0, 880], [0.18, 1108.73], [0.36, 1318.51], [0.9, 880], [1.08, 1108.73], [1.26, 1318.51]].forEach(([at, frequency]) => {
@@ -7556,6 +7567,15 @@ function playShopReminderChime(force){
       oscillator.connect(gain).connect(context.destination);
       oscillator.start(start + at); oscillator.stop(start + at + 0.32);
     });
+    shopChimeSleepSoon();
+  };
+  try{
+    if(context.state === "running") play();
+    else{
+      // A resume the browser holds back until the next tap must not chime late.
+      const requestedAt = Date.now();
+      context.resume().then(() => { shopChimeUnlocked = true; if(Date.now() - requestedAt < 3000) play(); }).catch(()=>{});
+    }
     try{ if(navigator.vibrate) navigator.vibrate([200, 100, 200]); }catch(e){}
     return true;
   }catch(e){ return false; }
